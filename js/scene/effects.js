@@ -56,6 +56,23 @@ export class Effects {
     this.coarse.renderOrder = 22;
     scene.add(this.coarse);
     this.pc = [];
+    // fine sparks for close-up moments (the cup)
+    this.fine = new THREE.Points(geo.clone(), new THREE.PointsMaterial({
+      size: 0.016, map: dotTexture(), vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: true,
+    }));
+    this.fine.frustumCulled = false;
+    this.fine.renderOrder = 22;
+    scene.add(this.fine);
+    this.pf = [];
+  }
+
+  /** Ball in the hole: golden sparks lift out of the cup, a ring runs across the green. */
+  holeOut(x, y, z, level = 0.5) {
+    this.burst(x, y, z, { n: Math.round(40 + level * 80), color: 0xffd36a, speed: 0.55, up: 2.6 + level * 1.6, gravity: 3.2, life: 1.6, fine: true });
+    this.burst(x, y, z, { n: Math.round(20 + level * 40), color: 0xfff4dc, speed: 0.3, up: 3.2 + level * 1.4, gravity: 2.6, life: 1.9, fine: true });
+    this.ring(x, y - 0.045, z, 0xffd36a, 0.55, 0.7);
+    setTimeout(() => this.ring(x, y - 0.045, z, 0xffe7b0, 3 + level * 6, 1.6), 220);
+    if (level >= 0.6) setTimeout(() => this.celebrate(x, y, z), 900);
   }
 
   ring(x, y, z, color = 0xffd9a0, size = 6, life = 1.1) {
@@ -66,9 +83,9 @@ export class Effects {
     this.items.push({ m, t: 0, life });
   }
 
-  burst(x, y, z, { n = 30, color = 0x9bd27a, speed = 3, up = 2.5, gravity = 9.8, life = 1.2, spread = 1, coarse = false } = {}) {
+  burst(x, y, z, { n = 30, color = 0x9bd27a, speed = 3, up = 2.5, gravity = 9.8, life = 1.2, spread = 1, coarse = false, fine = false } = {}) {
     const c = new THREE.Color(color);
-    const pool = coarse ? this.pc : this.p;
+    const pool = fine ? this.pf : coarse ? this.pc : this.p;
     for (let i = 0; i < n; i++) {
       if (pool.length >= this.MAXP) pool.shift();
       const a = Math.random() * Math.PI * 2;
@@ -142,5 +159,6 @@ export class Effects {
     }
     this._step(this.p, this.points, dt);
     this._step(this.pc, this.coarse, dt);
+    this._step(this.pf, this.fine, dt);
   }
 }

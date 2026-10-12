@@ -47,6 +47,8 @@ class BaseMode {
     const w = this.game.world.env;
     return { kind: 'wind', mph: w.weather.windMph, fromDeg: w.windFromDeg };
   }
+  /** The hole a shot can drop into (null when the mode has none). */
+  cup() { return null; }
   /** Team rows from per-player values (sum or best). */
   teamRows(valueOf, { combine = 'sum', higherBetter = true, fmt = (v) => String(v) } = {}) {
     return this.roster.teams().map((t) => {
@@ -189,6 +191,8 @@ export class ClosestToPinMode extends BaseMode {
 
   suggestedClub() { return clubForYards(this.playsYards); }
 
+  cup() { return this.pin && !this.roundOver ? { x: this.pin.x, z: this.pin.z, flagstick: true } : null; }
+
   total(pid) { return (this.scores.get(pid) || []).reduce((a, s) => a + s.points, 0); }
 
   status() {
@@ -207,20 +211,8 @@ export class ClosestToPinMode extends BaseMode {
   evaluate(result, launch, club, player) {
     const pin = this.pin;
     let prox = Infinity;
-    let holed = false;
-    if (!result.lost) {
-      prox = Math.hypot(result.rest.x - pin.x, result.rest.z - pin.z);
-      const s = result.samples;
-      for (let i = 1; i < s.length; i++) {
-        if (s[i].phase !== 'roll' && s[i].phase !== 'impact') continue;
-        const d = Math.hypot(s[i].x - pin.x, s[i].z - pin.z);
-        if (d < 0.075) {
-          const v = Math.hypot(s[i].x - s[i - 1].x, s[i].z - s[i - 1].z) / Math.max(1e-3, s[i].t - s[i - 1].t);
-          if (v < 1.7) { holed = true; result.holedAt = { t: s[i].t, x: pin.x, z: pin.z }; break; }
-        }
-      }
-      if (holed) prox = 0;
-    }
+    const holed = !!result.holed; // the physics drops the ball in the cup
+    if (!result.lost) prox = holed ? 0 : Math.hypot(result.rest.x - pin.x, result.rest.z - pin.z);
     const onGreen = !result.lost && terrain(result.rest.x, result.rest.z).surface === 'green';
     const points = holed ? 250 : Number.isFinite(prox) ? Math.round(100 * Math.exp(-prox / 6)) : 0;
     this.scores.get(player.id)?.push({ hole: this.hole, yards: this.yards, prox, points, holed });

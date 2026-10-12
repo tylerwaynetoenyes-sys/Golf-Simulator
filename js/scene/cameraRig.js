@@ -106,9 +106,12 @@ export class CameraRig {
   }
 
   /** Begin following a precomputed shot. */
-  startShot(result) {
+  startShot(result, { cupCam = true } = {}) {
     this.mode = 'shot';
     this.result = result;
+    this.cupShot = null;
+    this.holeRest = null;
+    if (result.holedAt && cupCam) this._planCupCam(result);
     this.shake = result.putt ? 0 : 0.06 + Math.min(0.08, result.carry / 3000);
     this.cut = false;
     this.landCam = null;
@@ -155,6 +158,27 @@ export class CameraRig {
     }
   }
 
+  /**
+   * The payoff: a few frames before the ball reaches the hole, cut to a camera
+   * at cup level on the far side, looking back down the line, and push in as
+   * it drops.
+   */
+  _planCupCam(r) {
+    const h = r.holedAt;
+    const cy = this.ground(h.x, h.z);
+    // incoming direction from the path just before the drop
+    let px = r.origin?.x ?? 0, pz = r.origin?.z ?? 0;
+    for (const sm of r.samples) { if (sm.t > h.t - 0.12) break; px = sm.x; pz = sm.z; }
+    let dx = h.x - px, dz = h.z - pz;
+    const len = Math.hypot(dx, dz);
+    if (len < 1e-3) { const a = (this.heading * Math.PI) / 180; dx = Math.sin(a); dz = -Math.cos(a); } else { dx /= len; dz /= len; }
+    const lead = r.putt ? Math.min(1.25, Math.max(0.35, h.t * 0.55)) : h.dunk ? 0.7 : 1.0;
+    const side = Math.random() < 0.5 ? -1 : 1;
+    const ang = side * 0.55; // ~32° off the line
+    const ox = dx * Math.cos(ang) - dz * Math.sin(ang), oz = dx * Math.sin(ang) + dz * Math.cos(ang);
+    this.cupShot = { cup: new THREE.Vector3(h.x, cy, h.z), dx, dz, ox, oz, at: h.t, lead, cut: false };
+  }
+
   ballAtRest(pos) {
     this.mode = 'rest';
     this.restPos = pos.clone();
@@ -193,6 +217,27 @@ export class CameraRig {
         this.toAddress();
         done?.();
       }
+    } else if (this.mode === 'shot' && this.result && this.cupShot && playT >= this.cupShot.at - this.cupShot.lead) {
+      const c = this.cupShot;
+      const u = THREE.MathUtils.clamp((playT - (c.at - c.lead)) / (c.lead + 0.55), 0, 1);
+      const e = u * u * (3 - 2 * u);
+      // low and level as the ball rolls up, then rise to look down into the cup as it drops
+      const dist = THREE.MathUtils.lerp(0.95, 0.36, e);
+      const hgt = THREE.MathUtils.lerp(0.16, 0.36, e * e);
+      const x = c.cup.x + c.ox * dist, z = c.cup.z + c.oz * dist;
+      this.desiredPos.set(x, Math.max(c.cup.y + hgt, g(x, z) + 0.06), z);
+      const back = THREE.MathUtils.lerp(0.32, 0.02, e);
+      this.desiredLook.set(c.cup.x - c.dx * back, c.cup.y + THREE.MathUtils.lerp(0.015, -0.07, e), c.cup.z - c.dz * back);
+      if (!c.cut) {
+        c.cut = true;
+        this.pos.copy(this.desiredPos);
+        this.look.copy(this.desiredLook);
+        this.fov = 40;
+        this.shake = 0;
+      }
+      this.baseFov = THREE.MathUtils.lerp(40, 27, e);
+      this.rate = 10;
+      this.lookRate = 14;
     } else if (this.mode === 'shot' && this.result) {
       const r = this.result;
       if (r.putt) {
@@ -255,7 +300,25 @@ export class CameraRig {
       }
     } else if (this.mode === 'rest') {
       const p = this.restPos;
-      if (this.overlook) {
+      if (this.result?.holed && this.cupShot) {
+        // holed: rise slowly away from the cup, keeping it in frame
+        const c = this.cupShot;
+        const k = Math.min(1, this.t / 2.6);
+        const e = k * k * (3 - 2 * k);
+        // swing up over the cup so the ball is visible sitting on the bottom
+        // (a 4-inch-deep hole needs a steep angle to see into), then rise
+        // The ball usually finishes against the wall nearest this camera, so
+        // arc up over the top of the hole to the side it came in from.
+        const ix = -c.dx * Math.cos(0.4) + c.dz * Math.sin(0.4), iz = -c.dz * Math.cos(0.4) - c.dx * Math.sin(0.4);
+        const hx = c.ox * 0.36 * (1 - e) + ix * 1.05 * e, hz = c.oz * 0.36 * (1 - e) + iz * 1.05 * e;
+        const x = c.cup.x + hx, z = c.cup.z + hz;
+        this.desiredPos.set(x, Math.max(c.cup.y + 0.4 + Math.sin(e * Math.PI * 0.5) * 1.3, g(x, z) + 0.06), z);
+        this.baseFov = THREE.MathUtils.lerp(30, 42, e);
+        this.rate = 3.2;
+        this.lookRate = 5;
+        this.desiredLook.set(c.cup.x, c.cup.y - 0.06 * (1 - e), c.cup.z);
+        p.copy(c.cup);
+      } else if (this.overlook) {
         this.desiredPos.copy(this.overlook);
       } else if (this.result?.putt) {
         // hold

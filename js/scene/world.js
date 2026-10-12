@@ -131,7 +131,7 @@ export class World {
     this.tracer.update(dt);
     this.effects.update(dt);
     this.characters.update(dt);
-    if (this.sceneMode === 'course') this.course.update(t);
+    if (this.sceneMode === 'course') this.course.update(t, dt, this.camera);
     this.markers.update(t);
     if (render) this.r.render();
   }

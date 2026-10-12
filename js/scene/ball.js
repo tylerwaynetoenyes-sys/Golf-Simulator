@@ -1,6 +1,9 @@
-// Golf ball: real-size mesh with a dimpled normal map, a screen-space glow so
-// it stays readable 250 m out at night, and a soft contact shadow.
+// Golf ball: real-size, with ~330 actual dimples in the geometry (close-ups on
+// the green and in the cup), a clear-coat finish for crisp highlights, a
+// screen-space glow so it stays readable 250 m out at night, and a soft
+// contact shadow. A plain sphere stands in once it's more than a few metres away.
 import * as THREE from 'three';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BALL } from '../core/physics.js';
 import { groundHeight } from './layout.js';
 
@@ -42,16 +45,64 @@ function radialTexture(inner, outer) {
   return new THREE.CanvasTexture(c);
 }
 
+/**
+ * Dimpled ball geometry: a finely tessellated icosphere with spherical-cap
+ * dimples pressed in at ~330 points spread by a Fibonacci lattice (the usual
+ * 300–400 count; about 4 mm across and 0.25 mm deep at this scale).
+ */
+function dimpledGeometry(radius, detail = 44, count = 332) {
+  const centres = [];
+  const ga = Math.PI * (3 - Math.sqrt(5));
+  for (let i = 0; i < count; i++) {
+    const y = 1 - ((i + 0.5) / count) * 2;
+    const r = Math.sqrt(1 - y * y);
+    centres.push([Math.cos(ga * i) * r, y, Math.sin(ga * i) * r]);
+  }
+  const capAngle = 0.092; // radians (~3.9 mm dimple)
+  const cosCap = Math.cos(capAngle);
+  const depth = 0.012; // fraction of radius (~0.26 mm)
+  let geo = new THREE.IcosahedronGeometry(1, detail);
+  geo.deleteAttribute('normal');
+  geo.deleteAttribute('uv');
+  geo = mergeVertices(geo, 1e-5);
+  const p = geo.attributes.position;
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i).normalize();
+    let best = -1;
+    for (let k = 0; k < count; k++) {
+      const c = centres[k];
+      const d = v.x * c[0] + v.y * c[1] + v.z * c[2];
+      if (d > best) best = d;
+    }
+    let s = 1;
+    if (best > cosCap) {
+      const a = Math.acos(Math.min(1, best)) / capAngle; // 0 at the centre, 1 at the edge
+      s = 1 - depth * (1 - a * a);
+    }
+    v.multiplyScalar(radius * s);
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
 export class Ball {
   constructor(scene) {
-    this.mesh = new THREE.Mesh(
-      new THREE.SphereGeometry(BALL.radius, 32, 24),
-      new THREE.MeshStandardMaterial({
-        color: 0xffffff, roughness: 0.32, metalness: 0, normalMap: dimpleNormalMap(),
-        normalScale: new THREE.Vector2(0.6, 0.6), emissive: 0x332a20, emissiveIntensity: 0.6,
-      }),
-    );
-    this.mesh.castShadow = true;
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: 0xfdfcf8, roughness: 0.42, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.08,
+      emissive: 0x2a241c, emissiveIntensity: 0.55,
+    });
+    const far = new THREE.MeshStandardMaterial({
+      color: 0xffffff, roughness: 0.32, metalness: 0, normalMap: dimpleNormalMap(),
+      normalScale: new THREE.Vector2(0.6, 0.6), emissive: 0x332a20, emissiveIntensity: 0.6,
+    });
+    const hi = new THREE.Mesh(dimpledGeometry(BALL.radius), mat);
+    const lo = new THREE.Mesh(new THREE.SphereGeometry(BALL.radius, 24, 16), far);
+    hi.castShadow = lo.castShadow = true;
+    this.mesh = new THREE.LOD();
+    this.mesh.addLevel(hi, 0);
+    this.mesh.addLevel(lo, 5);
     scene.add(this.mesh);
 
     this.glow = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -105,7 +156,8 @@ export class Ball {
     this.shadow.position.set(x, gh + 0.015, z);
     const sz = 0.09 + hgt * 0.02;
     this.shadow.scale.set(sz, 1, sz);
-    this.shadow.material.opacity = Math.max(0, 0.75 - hgt * 0.025);
+    // tight and dark when the ball sits on the turf, soft and faint in the air
+    this.shadow.material.opacity = Math.max(0, 0.82 - hgt * 0.03) * (y < gh - 0.005 ? 0 : 1);
   }
 
   /** Bigger on-screen glow for TV / projector viewing. */

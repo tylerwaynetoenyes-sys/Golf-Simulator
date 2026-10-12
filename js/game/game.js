@@ -2,7 +2,7 @@
 // shots, plays them back, scores them through the active mode, keeps turn
 // order for 1–6 players, and drives HUD, camera, audio and commentary.
 import * as THREE from 'three';
-import { simulateShot, samplePath, MPH, YD } from '../core/physics.js';
+import { simulateShot, simulatePutt, puttSpeedFor, samplePath, MPH, YD, BALL } from '../core/physics.js';
 import { bus } from '../core/events.js';
 import { units } from '../core/units.js';
 import * as U from '../core/units.js';
@@ -184,6 +184,8 @@ export class Game {
     w.rig.toAddress(immediate);
     this.aimLine.position.set(s.origin.x, w.ball.mesh.position.y - 0.02, s.origin.z);
     this.aimLine.visible = !s.putting;
+    if (m.course) w.course.setPutting(!!s.putting);
+    this._buildPuttLine();
     w.markers.set(m.markers());
     const sug = m.suggestedClub?.();
     if (sug) this.selectClub(sug, true); else this._updateHelper();
@@ -251,7 +253,8 @@ export class Game {
         this.helper = { power: null, yards: want };
       }
     } else if (s.putting) {
-      this.helper = { power: 0.8, putt: true };
+      const pw = this.mode.puttPower ? this.mode.puttPower(this.player, this.aimDeg) : 0.8;
+      this.helper = { power: Math.min(1.1, pw), putt: true };
     }
     this.hud.setMeterTarget(this.helper?.power ?? null);
     this.updatePrompt();
@@ -263,8 +266,13 @@ export class Game {
     if (s.putting && this.mode.course) {
       const read = this.mode.puttRead(this.player);
       const brk = Math.abs(read.breakInches) < 2 ? 'straight' : `breaks ${Math.round(Math.abs(read.breakInches))} in ${read.breakInches > 0 ? 'right' : 'left'}`;
-      const slope = Math.abs(read.uphill) < 0.08 ? '' : read.uphill > 0 ? ' · uphill' : ' · downhill';
-      this.hud.setPrompt(`<b>${U.proximity(read.distance)}</b> · ${brk}${slope} · ${key('Enter')} auto putt · hold ${key('Space')} to putt yourself · ${key('← →')} aim`, this.r10);
+      // plays-like length from the pace the slope actually needs
+      const pw = this.helper?.putt ? this.helper.power : 0.8;
+      const plays = read.distance * (pw / 0.8);
+      const ft = (m) => m / 0.3048;
+      const playsTxt = Math.abs(ft(plays) - ft(read.distance)) >= 1.5 ? ` · plays <b>${U.proximity(plays)}</b>` : '';
+      const slope = Math.abs(read.uphill) < 0.03 ? '' : read.uphill > 0 ? ' uphill' : ' downhill';
+      this.hud.setPrompt(`<b>${U.proximity(read.distance)}</b>${slope} · ${brk}${playsTxt} · ${key('Enter')} auto putt · hold ${key('Space')} to putt · ${key('← →')} aim`, this.r10);
       this.hud.setPuttMode(true);
       return;
     }
@@ -387,7 +395,7 @@ export class Game {
     }
     const lie = this.mode.adjustLaunch ? this.mode.adjustLaunch(launch, s) : launch;
     const result = simulateShot(lie, {
-      terrain: this.world.terrainFn, wind: this.mode.wind(), origin: s.origin, heading: s.heading,
+      terrain: this.world.terrainFn, wind: this.mode.wind(), origin: s.origin, heading: s.heading, cup: this.mode.cup?.(s) || null,
     });
     this._play(result, lie, source);
   }
@@ -420,6 +428,9 @@ export class Game {
     this.shot = { launch, result, outcome, source, club, player, t: 0, ev: 0, landed: false, holed: false, revealed: false };
     this.state = 'flight';
     this.aimLine.visible = false;
+    if (this.puttLine) this.puttLine.visible = false;
+    if (this.mode.course) this.world.course.setReadingAids(false);
+    this.hud.setPrompt('');
     const w = this.world;
     w.tracer.reset();
     w.tracer.setColor(this.mode.id === 'ctp' ? 0xffc04a : new THREE.Color(player.color).getHex());
@@ -487,7 +498,60 @@ export class Game {
     this.hud.setSkip(false);
     this._reveal();
     const o = s.outcome;
-    s.restTimer = o.summary ? 2.6 : o.holeComplete ? 2.4 : r.putt ? 1.6 : 3.2 + (this.hud.commentEl.classList.contains('show') ? 0.8 : 0);
+    s.restTimer = r.holed && !s.tapping ? 3.2 : o.summary ? 2.6 : o.holeComplete ? 2.2 : r.putt ? 1.5 : 3.2 + (this.hud.commentEl.classList.contains('show') ? 0.8 : 0);
+    if (o.gimme && !s.tapped) s.tapDelay = 0.75;
+  }
+
+  /** Conceded putt: knock it in so the ball still finishes in the cup. */
+  _tapIn(s) {
+    const m = this.mode;
+    if (!m.course || !m.T) return;
+    const T = m.T;
+    const b = s.result.rest;
+    const d = T.toPin(b.x, b.z);
+    const base = (Math.atan2(T.pin.x - b.x, -(T.pin.z - b.z)) * 180) / Math.PI;
+    let res = null;
+    for (const sf of [1.12, 1.2, 1.05, 1.3]) {
+      for (let k = 0; k <= 24 && !res; k++) {
+        const aim = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.6;
+        const r = simulatePutt({ x: b.x, y: b.y, z: b.z }, base + aim, puttSpeedFor(d) * sf + 0.15, T.terrain, T.pin);
+        if (r.holed) res = r;
+      }
+      if (res) break;
+    }
+    if (!res) { this.world.ball.setVisible(false); return; }
+    s.tapped = true;
+    s.tapping = true;
+    s.result = res;
+    s.t = 0;
+    s.ev = 0;
+    s.restRevealed = true;
+    this.state = 'flight';
+    audio.putt();
+    this.hud.comment(null);
+    this.world.rig.startShot(res, { cupCam: false });
+  }
+
+  /** Ball at the bottom of the cup: banner, sparks, gallery, Piasa. */
+  _holeOutMoment(s) {
+    const r = s.result;
+    const o = s.outcome || {};
+    const w = this.world;
+    const cy = w.groundFn(r.holedAt.x, r.holedAt.z);
+    const d = r.putt ? Math.hypot(r.holedAt.x - r.origin.x, r.holedAt.z - r.origin.z) : 0;
+    const cat = o.category;
+    const level = o.ace ? 1 : cat === 'eagle' ? 0.95 : cat === 'birdie' || cat === 'longPutt' ? 0.7 : !r.putt ? 0.85 : cat === 'par' ? 0.35 : 0.22;
+    w.effects.holeOut(r.holedAt.x, cy, r.holedAt.z, level);
+    audio.cheer(level);
+    if (level >= 0.85) setTimeout(() => audio.personalBest(), 350);
+    const big = level >= 0.6;
+    let title = o.headline || 'In the hole';
+    let kicker = !r.putt ? (r.holedAt.dunk ? 'Straight in' : 'Holed out') : d > 6 ? `From ${U.proximity(d)}` : 'In the hole';
+    if (o.ace) { title = 'Hole in one'; kicker = this.mode.course ? this.mode.hole.name : 'Closest to Pin'; }
+    title = title.replace(/ · gimme$/, '');
+    const sub = this.roster.multi || this.mode.course ? `${s.player.name}${o.sub ? ` · ${o.sub.replace(` · ${s.player.name}`, '')}` : ''}` : o.sub || '';
+    this.hud.holeOut({ kicker, title, sub, big });
+    this.piasa?.react(big ? 'big' : 'cheer');
   }
 
   _reveal() {
@@ -499,7 +563,7 @@ export class Game {
     else this.hud.showShot({ launch, result, club, source, outcome, player: this.roster.multi ? player : null });
     if (!result.putt) this.hud.addDot(result, player.color);
     this.refreshMode();
-    if (store.settings.commentary) {
+    if (store.settings.commentary && !(result.holed && !s.tapping)) {
       const c = commentFor({ result, launch, club, mode: this.mode.id, outcome, hole: this.mode.course ? this.mode.hole : null });
       if (c) this.hud.comment(c);
     }
@@ -590,11 +654,19 @@ export class Game {
     const s = this.shot;
     if (this.state === 'flight' && s) {
       const prevT = s.t;
-      s.t += dt;
       const r = s.result;
+      // slow motion through the drop (not for tap-ins)
+      let scale = 1;
+      if (r.holedAt && !s.tapping) {
+        const rel = s.t - r.holedAt.t;
+        if (rel > -0.42 && rel < 0.45) scale = 0.34;
+        else if (rel > -0.8 && rel <= -0.42) scale = 1 - 0.66 * ((rel + 0.8) / 0.38);
+      }
+      s.t += dt * scale;
+      this.timeScale = scale;
       const p = samplePath(r, s.t);
       this.ballPos.set(p.x, p.y, p.z);
-      w.ball.setPosition(p.x, p.y + (r.putt ? 0.021 : 0), p.z);
+      w.ball.setPosition(p.x, p.y + BALL.radius, p.z);
       if (!s.landed && !r.putt) w.tracer.push(p.x, p.y, p.z);
       const o = r.origin || { x: 0, z: 0 };
       while (s.ev < r.events.length && r.events[s.ev].t <= s.t) {
@@ -603,8 +675,9 @@ export class Game {
         if (e.type === 'land') {
           s.landed = true;
           if (e.surface !== 'water' && e.surface !== 'oob') {
-            w.effects.land(e);
-            audio.land(e.surface, e.speed, d);
+            const surf = e.surface === 'cup' ? 'green' : e.surface;
+            w.effects.land({ ...e, surface: surf });
+            audio.land(surf, e.speed, d);
           }
           w.ball.spinRate *= 0.3;
         } else if (e.type === 'edge') {
@@ -614,27 +687,33 @@ export class Game {
           if (e.speed > 6) w.effects.burst(e.x, e.y, e.z, { n: 8, color: e.surface === 'sand' ? 0xe8dcb8 : 0x6f8a3a, speed: 1, up: 1, life: 0.5 });
         } else if (e.type === 'lip') {
           audio.lip();
+          if (!s.tapping && e.speed > 0.6) s.lipped = true;
+        } else if (e.type === 'drop') {
+          audio.cupDrop(e.speed);
+          w.ball.spinRate = 0;
+        } else if (e.type === 'rattle') {
+          audio.cupRattle(e.speed, e.pole);
+        } else if (e.type === 'cupBottom') {
+          s.holed = true;
+          audio.cupBottom(e.speed);
+          if (!s.tapping) this._holeOutMoment(s);
+          else audio.cheer(0.12);
         } else if (e.type === 'splash') {
           if (e.surface === 'water') { w.effects.splash(e.x, e.y, e.z); audio.splash(Math.max(0.2, 1 - d / 600)); }
           w.ball.setVisible(false);
           s.t = Math.max(s.t, r.duration);
         }
       }
-      if (r.holedAt && !s.holed && s.t >= r.holedAt.t) {
-        s.holed = true;
-        w.ball.setVisible(false);
-        audio.cup();
-        if (!r.putt || s.outcome.category === 'longPutt' || (s.outcome.holed && s.player && this.mode.course && this.mode.ball?.get(s.player.id)?.strokes <= this.mode.hole.par - 1)) {
-          w.effects.celebrate(r.holedAt.x, w.ball.mesh.position.y, r.holedAt.z);
-        }
-        if (!r.putt) audio.personalBest();
-        s.t = r.duration;
-      }
       if (prevT < r.duration && s.t >= r.duration) this._onRest();
     } else if (this.state === 'rest' && s) {
       this.ballPos.copy(w.ball.mesh.position);
-      s.restTimer -= dt;
-      if (s.restTimer <= 0) this._afterShot();
+      if (s.tapDelay != null) {
+        s.tapDelay -= dt;
+        if (s.tapDelay <= 0) { s.tapDelay = null; this._tapIn(s); }
+      } else {
+        s.restTimer -= dt;
+        if (s.restTimer <= 0) this._afterShot();
+      }
     } else {
       this.ballPos.copy(w.ball.mesh.position);
     }
@@ -692,7 +771,7 @@ export class Game {
   _updateLabels() {
     const el = this._pinEl || (this._pinEl = document.getElementById('pinLabel'));
     const tp = this._targetPoint();
-    const show = tp && (this.state === 'ready') && !panelOpen();
+    const show = tp && (this.state === 'ready') && !panelOpen() && !this.setup.putting;
     let pt = null;
     if (show) pt = this._project(tp.x, this.world.groundFn(tp.x, tp.z) + 3.2, tp.z);
     if (!pt) { el.hidden = true; } else {
@@ -717,8 +796,43 @@ export class Game {
   }
 
   setAim(deg) {
-    this.aimDeg = Math.max(-25, Math.min(25, Math.round(deg * 2) / 2));
+    const q = this.setup.putting ? 4 : 2; // quarter-degree steps on the green
+    this.aimDeg = Math.max(-25, Math.min(25, Math.round(deg * q) / q));
     this.world.rig.setAim(this.aimDeg);
+    if (this.setup.putting && this.mode.course && this.state === 'ready') {
+      this._buildPuttLine();
+      clearTimeout(this._aimT);
+      this._aimT = setTimeout(() => this._updateHelper(), 60);
+    }
+  }
+
+  /** Dotted aim line along the green surface, just past the hole's distance. */
+  _buildPuttLine() {
+    const w = this.world;
+    if (!this.puttLine) {
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(48 * 3), 3));
+      this.puttLine = new THREE.Points(g, new THREE.PointsMaterial({ color: new THREE.Color(1.05, 0.98, 0.86), size: 0.026, transparent: true, opacity: 0.8, depthWrite: false }));
+      this.puttLine.frustumCulled = false;
+      this.puttLine.renderOrder = 7;
+      w.scene.add(this.puttLine);
+    }
+    const s = this.setup;
+    if (!s.putting || !this.mode.course) { this.puttLine.visible = false; return; }
+    const T = this.mode.T;
+    const o = s.origin;
+    const d = T.toPin(o.x, o.z) + 0.6;
+    const a = ((s.heading + this.aimDeg) * Math.PI) / 180;
+    const fx = Math.sin(a), fz = -Math.cos(a);
+    const pos = this.puttLine.geometry.attributes.position;
+    const n = pos.count;
+    for (let i = 0; i < n; i++) {
+      const u = 0.12 + (i / (n - 1)) * (d - 0.12);
+      const x = o.x + fx * u, z = o.z + fz * u;
+      pos.setXYZ(i, x, w.groundFn(x, z) + 0.012, z);
+    }
+    pos.needsUpdate = true;
+    this.puttLine.visible = true;
   }
 
   // ── keep the screen on while playing (iPad / laptop on a TV) ──
@@ -773,6 +887,14 @@ export class Game {
         case 'n': case 'N': this.setTimeOfDay(this.world.env.isDay ? 'night' : 'day'); break;
         case 'h': case 'H': case '?': openHelp(this, 'pairing'); break;
         case 'r': case 'R': if (this.state === 'ready') this.setAim(0); break;
+        case 'g': case 'G':
+          if (this.mode.course) {
+            const c = this.world.course;
+            c.showGrid = c.showGrid === false;
+            c.setPutting(!!this.setup.putting);
+            toast(c.showGrid === false ? 'Green slope grid off' : 'Green slope grid on', { kind: 'info', ms: 1400 });
+          }
+          break;
         default:
           if (/^[1-7]$/.test(e.key)) this.selectClub(CLUBS[Number(e.key) - 1].id);
       }

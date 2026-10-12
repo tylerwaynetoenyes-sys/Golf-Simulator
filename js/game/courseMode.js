@@ -145,6 +145,12 @@ export class CourseMode {
 
   wind() { return this.game.world.env.wind(0); }
 
+  /** The cup for the current shot: flagstick in from off the green, out for putts. */
+  cup(setup) {
+    const T = this.T;
+    return { x: T.pin.x, z: T.pin.z, flagstick: !(setup && setup.putting) };
+  }
+
   // ── shot outcome ──
 
   _land(T, x, z) { const s = T.terrain(x, z).surface; return s !== 'water' && s !== 'oob'; }
@@ -173,18 +179,6 @@ export class CourseMode {
     b.strokes += 1;
     let penalty = null;
     let holed = !!result.holed;
-
-    if (!holed && !result.lost && !result.putt) {
-      // rolled over the cup slowly enough to drop?
-      const s = result.samples;
-      for (let i = 1; i < s.length; i++) {
-        if (s[i].phase !== 'roll' && s[i].phase !== 'impact') continue;
-        if (Math.hypot(s[i].x - T.pin.x, s[i].z - T.pin.z) < 0.075) {
-          const v = Math.hypot(s[i].x - s[i - 1].x, s[i].z - s[i - 1].z) / Math.max(1e-3, s[i].t - s[i - 1].t);
-          if (v < 1.7) { holed = true; result.holedAt = { t: s[i].t, x: T.pin.x, z: T.pin.z }; break; }
-        }
-      }
-    }
 
     if (holed) {
       b.holed = true;
@@ -251,7 +245,7 @@ export class CourseMode {
       else if (result.putt) category = toPin < 0.6 ? null : 'lagMiss';
     }
 
-    const out = { headline, sub, category, bests: [], holed: b.holed, penalty, ace: b.holed && b.strokes === 1 };
+    const out = { headline, sub, category, bests: [], holed: b.holed, penalty, ace: b.holed && b.strokes === 1, gimme };
     if (b.holed && b.strokes === 1) out.bests.push({ label: 'Hole in one', value: this.hole.name });
 
     // hole finished for everyone?
@@ -328,6 +322,31 @@ export class CourseMode {
       if (!r.holed || tries === 13) return r;
     }
     return simulatePutt(o, base + 3, v0 * 0.85, T.terrain, T.pin);
+  }
+
+  /**
+   * Swing-meter power that rolls the ball to hole pace (≈ 1 ft past) along
+   * the current aim, slope included. The gold mark on the putting meter.
+   */
+  puttPower(player, aimDeg) {
+    const T = this.T;
+    const b = this.ball.get(player.id);
+    const d = T.toPin(b.x, b.z);
+    const base = (Math.atan2(T.pin.x - b.x, -(T.pin.z - b.z)) * 180) / Math.PI;
+    const a = ((base + aimDeg) * Math.PI) / 180;
+    const fx = Math.sin(a), fz = -Math.cos(a);
+    const want = d + 0.3;
+    const along = (p) => {
+      const speed = puttSpeedFor(Math.max(0.2, d * (p / 0.8)) + 0.15);
+      const r = simulatePutt({ x: b.x, y: b.y, z: b.z }, base + aimDeg, speed, T.terrain, null);
+      return (r.rest.x - b.x) * fx + (r.rest.z - b.z) * fz;
+    };
+    let lo = 0.03, hi = 1.6;
+    for (let i = 0; i < 13; i++) {
+      const mid = (lo + hi) / 2;
+      if (along(mid) < want) lo = mid; else hi = mid;
+    }
+    return (lo + hi) / 2;
   }
 
   /** Manual putt from the swing meter: 80% power = hole pace on a flat green. */

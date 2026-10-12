@@ -12,7 +12,8 @@ glowing tracer, a cinematic camera and the full set of numbers.
 |---|---|
 | ![Hole intro](docs/screenshots/10-course-intro.jpg) | ![Afternoon on the course](docs/screenshots/11-course-day.jpg) |
 | ![Landing camera](docs/screenshots/03-landing-cam.jpg) | ![Four players, two teams](docs/screenshots/12-multiplayer.jpg) |
-| ![Pairing](docs/screenshots/08-pair-connected.jpg) | ![R10 help](docs/screenshots/13-r10-help.jpg) |
+| ![Cup camera](docs/screenshots/15-cup-cam.jpg) | ![Holed out](docs/screenshots/14-holed-out.jpg) |
+| ![Reading the green](docs/screenshots/16-green-read.jpg) | ![R10 help](docs/screenshots/13-r10-help.jpg) |
 
 ## Quick start
 
@@ -125,6 +126,7 @@ bridge. Use it on your home Wi-Fi, not on a network you don't trust.
 | **C** | Camera: Cinematic → Follow → Tee |
 | **Tab** | Session stats and personal bests |
 | **H** or **?** | R10 help |
+| **G** | Green slope arrows on/off |
 | **Custom shot** | Type in launch numbers from any monitor |
 
 ### Games
@@ -152,6 +154,37 @@ bridge. Use it on your home Wi-Fi, not on a network you don't trust.
   on target 15, near miss 5.
 - **Longest Drive.** Balls into a 50-yard grid, best ball counts. The bluff
   edge sits at about 330 yards, so a big enough drive finds the Mississippi.
+
+### The hole
+
+The cup is a real hole: 4¼ in across and 4 in deep, cut through the turf with
+a white-topped liner you can see into. The ball physically rolls in. It drops
+when it stays over the hole long enough to fall one ball radius before
+reaching the far edge. That works out to about 1.6 m/s dead centre (the
+measured figure for real cups) and less off-centre. Anything firmer or wider
+catches the lip and spins out. Chips can roll in or dunk, and they rattle off
+the flagstick when it's in. Putts are struck with the flagstick out.
+
+When a ball is going in, the camera cuts to cup level on the far side of the
+hole, play drops into slow motion, and the camera pushes in as the ball tips
+over the edge. You hear the rattle off the liner and the hollow knock on the
+bottom. Then a banner (Birdie, Par, Hole in one…), gold sparks out of the cup
+and the gallery, scaled to how good it was. The camera then rises over the
+cup so you see the ball sitting in the bottom.
+
+Greens are built at high detail around the hole, with tilt plus swells and
+swales. Pins sit on calmer ground, and peak slopes are 3–4%. Mowing stripes
+and slope shading show the contours from the fairway. On the green:
+
+- Animated arrows flow downhill over the last ~15 ft to the cup, coloured
+  blue (gentle), gold (medium) or red (steep), and fade out toward the edge.
+  Press **G** to hide them.
+- A dotted aim line runs to the hole, and the read shows length, uphill or
+  downhill, break, and "plays like" distance.
+- The gold mark on the putting meter is the pace for this putt, slope included.
+- A gimme is tapped in for you, so every hole still finishes in the cup.
+
+The ball itself has ~330 modelled dimples and a clear-coat finish for close-ups.
 
 ### Players and teams
 

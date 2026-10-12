@@ -1,6 +1,8 @@
 // Bluff-top ground (range plateau + wooded surroundings), limestone bluff face,
 // and the low Missouri floodplain across the river.
 import * as THREE from 'three';
+import { CUP } from '../core/physics.js';
+import { cutHoles } from './cup.js';
 import { LAYOUT, groundHeight, GREENS, CTP_GREEN } from './layout.js';
 
 function hash2(x, z) {
@@ -153,6 +155,9 @@ export function createTerrain(scene) {
   geo.setIndex(idx);
   geo.computeVertexNormals();
   const groundMat = groundMaterial();
+  // real holes in the turf at every cup
+  const holes = cutHoles(groundMat, GREENS.length + 1, 'range');
+  GREENS.forEach((g, i) => holes[i].set(g.x, g.z, CUP.radius, 1));
   const ground = new THREE.Mesh(geo, groundMat);
   ground.receiveShadow = true;
   ground.name = 'ground';
@@ -196,6 +201,7 @@ export function createTerrain(scene) {
     setCtpGreen() {
       const sh = groundMat.userData.shader;
       if (sh) sh.uniforms.uCtp.value.set(CTP_GREEN.x, CTP_GREEN.z, CTP_GREEN.r, CTP_GREEN.active ? 1 : 0);
+      holes[GREENS.length].set(CTP_GREEN.x, CTP_GREEN.z, CUP.radius, CTP_GREEN.active ? 1 : 0);
     },
     rebuildHeights() {
       // CTP green placement flattens terrain; re-sample the range part.

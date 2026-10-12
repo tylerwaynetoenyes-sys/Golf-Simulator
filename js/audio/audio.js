@@ -206,6 +206,89 @@ class AudioEngine {
     }
   }
 
+  // ── The cup: rim tick, plastic rattle, hollow knock on the bottom ──
+
+  /** Ball tipping over the front edge. */
+  cupDrop(speed = 1) {
+    if (!this.ok) return;
+    const t = this.ctx.currentTime;
+    this._noise(t, 0.03, { type: 'highpass', freq: 3800, gain: 0.05 + Math.min(0.08, speed * 0.04) });
+  }
+
+  /** Ball clattering off the liner (or the flagstick). */
+  cupRattle(speed = 0.5, pole = false) {
+    if (!this.ok) return;
+    const t = this.ctx.currentTime;
+    const g = Math.min(0.5, 0.12 + speed * 0.22);
+    if (pole) {
+      this._tone(t, 2300, 0.18, { type: 'sine', gain: g * 0.35, freqEnd: 2250 });
+      this._tone(t, 3460, 0.12, { type: 'sine', gain: g * 0.2 });
+    }
+    this._tone(t, 1180 + Math.random() * 160, 0.05, { type: 'triangle', gain: g * 0.45, freqEnd: 900 });
+    this._noise(t, 0.045, { type: 'bandpass', freq: 2300, q: 5, gain: g * 0.9 });
+  }
+
+  /** The sound everyone waits for: a hollow knock, then the little settle. */
+  cupBottom(speed = 1) {
+    if (!this.ok) return;
+    const t = this.ctx.currentTime;
+    const g = Math.min(1, 0.55 + speed * 0.12);
+    this._tone(t, 560, 0.11, { type: 'triangle', gain: 0.42 * g, freqEnd: 420 });
+    this._tone(t, 150, 0.09, { type: 'sine', gain: 0.35 * g, freqEnd: 110 });
+    this._noise(t, 0.08, { type: 'bandpass', freq: 950, q: 3, gain: 0.5 * g });
+    const send = this._tone(t, 560, 0.2, { type: 'triangle', gain: 0.12 * g, out: this.verbSend || this.sfx });
+    void send;
+    // second, smaller bounce and the rattle as it settles
+    this._tone(t + 0.105, 600, 0.07, { type: 'triangle', gain: 0.16 * g, freqEnd: 470 });
+    this._noise(t + 0.105, 0.05, { type: 'bandpass', freq: 1100, q: 3, gain: 0.18 * g });
+    this._tone(t + 0.17, 640, 0.05, { type: 'triangle', gain: 0.06 * g });
+  }
+
+  /**
+   * Gallery reaction: a swell of voices plus scattered applause.
+   * level 0..1 (a polite par putt ~0.25, a birdie ~0.6, an ace 1).
+   */
+  cheer(level = 0.5) {
+    if (!this.ok) return;
+    const ctx = this.ctx;
+    const t = ctx.currentTime + 0.12;
+    const out = this.sfx;
+    // voices: two broad formant bands of noise with a slow swell
+    if (level > 0.35) {
+      for (const [f, q, w] of [[480, 0.9, 1], [1150, 1.4, 0.7], [2300, 2, 0.25]]) {
+        const src = ctx.createBufferSource();
+        src.buffer = this.noise; src.loop = true;
+        const bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = f; bp.Q.value = q;
+        const g = ctx.createGain();
+        const peak = 0.16 * level * w;
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(peak, t + 0.35);
+        g.gain.setTargetAtTime(peak * 0.6, t + 0.6, 0.5);
+        g.gain.setTargetAtTime(0.0001, t + 1.4 + level * 1.4, 0.6);
+        // a little wobble so it sounds like many people, not a fan
+        const lfo = ctx.createOscillator(); lfo.frequency.value = 5.3 + Math.random() * 2;
+        const lg = ctx.createGain(); lg.gain.value = peak * 0.25;
+        lfo.connect(lg).connect(g.gain);
+        src.connect(bp).connect(g).connect(out);
+        if (this.verbSend) g.connect(this.verbSend);
+        src.start(t, Math.random()); src.stop(t + 5);
+        lfo.start(t); lfo.stop(t + 5);
+      }
+    }
+    // applause: many short claps, denser at the start
+    const n = Math.round(14 + level * 90);
+    const span = 1.6 + level * 2.2;
+    for (let i = 0; i < n; i++) {
+      const u = Math.pow(Math.random(), 1.6);
+      const at = t + 0.05 + u * span;
+      const fade = 1 - u * 0.75;
+      this._noise(at, 0.035, {
+        type: 'bandpass', freq: 1300 + Math.random() * 1600, q: 1.2,
+        gain: (0.035 + Math.random() * 0.05) * (0.5 + level * 0.6) * fade, pan: Math.random() * 1.6 - 0.8,
+      });
+    }
+  }
+
   cup() {
     if (!this.ok) return;
     const t = this.ctx.currentTime;

@@ -55,6 +55,110 @@ const ROLL_SLOPE = (5 / 7) * 9.80665;
 /** Putting green pace: ~10.5 on the Stimpmeter (1.83 m/s release rolls ~3.2 m). */
 export const PUTT = { decel: 0.42, drag: 0.06, cupRadius: 0.054, capture: 1.35 };
 
+// ── The cup ──
+// Regulation hole: 4.25 in (108 mm) across, at least 4 in (102 mm) deep; a
+// flagstick is at most 1 in across. A rolling ball drops if it stays over the
+// hole long enough to fall one ball radius before reaching the far edge
+// (t = sqrt(2r/g) ≈ 66 ms). Dead centre that gives a capture speed of
+// ≈ 1.6 m/s, matching measured values (Holmes, 1991); off-centre the chord
+// is shorter, so the ball needs to be slower, and a fast or glancing ball
+// catches the far lip and spins out.
+export const CUP = { radius: 0.054, depth: 0.102, pole: 0.0125 };
+const FALL_T = Math.sqrt((2 * BALL.radius) / G);
+
+/**
+ * One rolling step near the cup. st = {over:false} persists between steps.
+ * Returns null, {holed:true}, or {lip:true, vx, vz} (new velocity).
+ */
+function cupStep(st, cup, px, pz, vx, vz) {
+  const R = CUP.radius;
+  const d = Math.hypot(px - cup.x, pz - cup.z);
+  if (st.over) {
+    if (d > R + 0.004) st.over = false;
+    return null;
+  }
+  if (d >= R) return null;
+  st.over = true;
+  const sp = Math.hypot(vx, vz);
+  if (sp < 1e-4) return { holed: true };
+  const ux = vx / sp, uz = vz / sp;
+  const rx = cup.x - px, rz = cup.z - pz;
+  const along = rx * ux + rz * uz;
+  const perpX = rx - along * ux, perpZ = rz - along * uz;
+  const b = Math.hypot(perpX, perpZ);
+  const chord = 2 * Math.sqrt(Math.max(0, R * R - b * b));
+  const vCap = chord / FALL_T;
+  if (sp < vCap) return { holed: true, offset: b / R, speed: sp };
+  // Lip out: the far rim grabs the ball, bleeds pace and spins it away from the centre.
+  const frac = Math.min(1, b / R);
+  const turn = 0.18 + frac * 0.5; // radians
+  const nx = b > 1e-6 ? -perpX / b : 0, nz = b > 1e-6 ? -perpZ / b : 0;
+  const ns = sp * (0.55 + 0.3 * frac);
+  const dx = ux * Math.cos(turn) + nx * Math.sin(turn), dz = uz * Math.cos(turn) + nz * Math.sin(turn);
+  const dl = Math.hypot(dx, dz) || 1;
+  return { lip: true, vx: (dx / dl) * ns, vz: (dz / dl) * ns, speed: sp };
+}
+
+/**
+ * Animate a ball dropping into the cup: it carries on over the hole, falls,
+ * rattles off the liner (and the flagstick, if it's in), hits the bottom and
+ * settles. Pushes 'cup' samples plus 'drop' / 'rattle' / 'cupBottom' events.
+ * Sample y is the ball's contact height (bottom of the ball), like rolling samples.
+ */
+function cupDrop({ cup, t0, px, pz, vx, vz, vy = 0, rimY, samples, events, flagstick = false }) {
+  const dt = 1 / 240;
+  const R = CUP.radius, r = BALL.radius;
+  let x = px - cup.x, z = pz - cup.z, yb = 0; // bottom of ball relative to the rim
+  let t = t0, k = 0, hitBottom = false;
+  const speed0 = Math.hypot(vx, vz, vy);
+  events.push({ type: 'drop', t, x: px, y: rimY, z: pz, speed: speed0 });
+  let lastRattle = -1;
+  for (let i = 0; i < 360; i++) {
+    vy -= G * dt;
+    x += vx * dt; z += vz * dt; yb += vy * dt;
+    t += dt;
+    // liner wall (once the ball is below the rim it's fully inside)
+    const wallR = yb > -r ? R : R - r;
+    const d = Math.hypot(x, z);
+    if (d > wallR) {
+      const nx = x / d, nz = z / d;
+      const vn = vx * nx + vz * nz;
+      if (vn > 0) {
+        vx -= (1 + 0.35) * vn * nx; vz -= (1 + 0.35) * vn * nz;
+        vx *= 0.8; vz *= 0.8;
+        if (vn > 0.25 && t - lastRattle > 0.05) { events.push({ type: 'rattle', t, x: cup.x + x, y: rimY + yb, z: cup.z + z, speed: vn }); lastRattle = t; }
+      }
+      x = nx * wallR; z = nz * wallR;
+    }
+    // flagstick
+    if (flagstick) {
+      const pr = CUP.pole + r;
+      const dp = Math.hypot(x, z);
+      if (dp < pr) {
+        const nx = dp > 1e-6 ? x / dp : 1, nz = dp > 1e-6 ? z / dp : 0;
+        const vn = vx * nx + vz * nz;
+        if (vn < 0) {
+          vx -= 1.4 * vn * nx; vz -= 1.4 * vn * nz;
+          if (-vn > 0.25 && t - lastRattle > 0.05) { events.push({ type: 'rattle', t, x: cup.x + x, y: rimY + yb, z: cup.z + z, speed: -vn, pole: true }); lastRattle = t; }
+        }
+        x = nx * pr; z = nz * pr;
+      }
+    }
+    // bottom
+    if (yb <= -CUP.depth) {
+      yb = -CUP.depth;
+      if (!hitBottom) { hitBottom = true; events.push({ type: 'cupBottom', t, x: cup.x + x, y: rimY + yb, z: cup.z + z, speed: -vy }); }
+      vy = -vy * 0.28;
+      if (Math.abs(vy) < 0.12) vy = 0;
+      vx *= 0.55; vz *= 0.55;
+    }
+    if (++k % 2 === 0) samples.push({ t, x: cup.x + x, y: rimY + yb, z: cup.z + z, phase: 'cup' });
+    if (hitBottom && vy === 0 && Math.hypot(vx, vz) < 0.02) break;
+  }
+  samples.push({ t, x: cup.x + x, y: rimY + yb, z: cup.z + z, phase: 'cup' });
+  return { t, x: cup.x + x, y: rimY + yb, z: cup.z + z };
+}
+
 function dragCoeff(speed, S) {
   const re = (speed * 2 * BALL.radius) / AERO.kinViscosity;
   // Dimpled balls lose their low-drag regime below Re ~ 6e4 (~21 m/s).
@@ -92,8 +196,12 @@ function slopeAt(terrain, x, z) {
  * @param {{x:number,z:number}} [opts.wind]  air velocity, m/s
  * @param {{x:number,y:number,z:number}} [opts.origin]  ball position (default tee at origin)
  * @param {number} [opts.heading]  target-line direction in degrees, 0 = down -Z, + = right
+ * @param {{x:number,z:number,flagstick?:boolean}} [opts.cup]  hole the ball can drop into
  */
 export function simulateShot(launch, opts = {}) {
+  const cup = opts.cup || null;
+  const cupSt = { over: false };
+  let holed = null;
   const terrain = opts.terrain || (() => ({ height: 0, surface: 'fairway' }));
   const wind = opts.wind || { x: 0, z: 0 };
   const dt = 1 / 240;
@@ -177,6 +285,20 @@ export function simulateShot(launch, opts = {}) {
         continue;
       }
       py = ground.height;
+      // straight in the hole on the fly (or first bounce)
+      if (cup && Math.hypot(px - cup.x, pz - cup.z) < CUP.radius - BALL.radius * 0.4) {
+        if (!carry) {
+          carry = { x: px, z: pz, t, descent: (Math.atan2(-vy, Math.hypot(vx, vz)) * 180) / Math.PI, speed: Math.hypot(vx, vy, vz) };
+          landing = { x: px, y: py, z: pz, t, surface: 'green' };
+          events.push({ type: 'land', t, x: px, y: py, z: pz, surface: 'cup', speed: Math.hypot(vx, vy, vz) });
+        }
+        // a dunk loses most of its pace on the liner / flagstick
+        const end = cupDrop({ cup, t0: t, px, pz, vx: vx * 0.25, vz: vz * 0.25, vy: vy * 0.3, rimY: py, samples, events, flagstick: !!cup.flagstick });
+        holed = { t, x: cup.x, z: cup.z, dunk: true };
+        t = end.t; px = end.x; py = end.y; pz = end.z;
+        phase = 'holed';
+        break;
+      }
       const speed = Math.hypot(vx, vy, vz);
       const hs = Math.hypot(vx, vz);
       const descent = (Math.atan2(-vy, hs) * 180) / Math.PI;
@@ -257,11 +379,27 @@ export function simulateShot(launch, opts = {}) {
       }
       py = nh;
       samples.push({ t, x: px, y: py, z: pz, phase: 'roll' });
+      if (cup) {
+        const c = cupStep(cupSt, cup, px, pz, vx, vz);
+        if (c?.holed) {
+          const end = cupDrop({ cup, t0: t, px, pz, vx, vz, rimY: terrain(cup.x, cup.z).height, samples, events, flagstick: !!cup.flagstick });
+          holed = { t, x: cup.x, z: cup.z };
+          t = end.t; px = end.x; py = end.y; pz = end.z;
+          phase = 'holed';
+          break;
+        }
+        if (c?.lip) {
+          if (c.speed > 0.4) events.push({ type: 'lip', t, x: px, y: py, z: pz, speed: c.speed });
+          vx = c.vx; vz = c.vz;
+        }
+      }
     }
   }
   if (phase !== 'gone') phase = 'rest';
 
-  return finishResult({ samples, events, t, apex, landing, carry, px, py, pz, o, hd, phase, lastSurface, terrain });
+  const res = finishResult({ samples, events, t, apex, landing, carry, px, py, pz, o, hd, phase, lastSurface, terrain });
+  if (holed) { res.holed = true; res.holedAt = holed; res.restSurface = 'cup'; }
+  return res;
 }
 
 function finishResult({ samples, events, t, apex, landing, carry, px, py, pz, o, hd, phase, lastSurface, terrain }) {
@@ -313,7 +451,8 @@ export function simulatePutt(origin, headingDeg, speed, terrain, cup) {
   const samples = [{ t: 0, x: px, y: py, z: pz, phase: 'roll' }];
   const events = [];
   const dt = 1 / 240;
-  let t = 0, holed = false, lipped = false, phase = 'roll', lastSurface = 'green';
+  const cupSt = { over: false };
+  let t = 0, holed = null, phase = 'roll', lastSurface = 'green';
   while (t < 30) {
     const g = terrain(px, pz);
     lastSurface = g.surface;
@@ -338,26 +477,30 @@ export function simulatePutt(origin, headingDeg, speed, terrain, cup) {
     }
     px += vx * dt; pz += vz * dt; t += dt;
     py = terrain(px, pz).height;
+    if (Math.round(t / dt) % 2 === 0) samples.push({ t, x: px, y: py, z: pz, phase: 'roll' });
     if (cup) {
-      const d = Math.hypot(px - cup.x, pz - cup.z);
-      if (d < PUTT.cupRadius) {
-        const v = Math.hypot(vx, vz);
-        if (v < PUTT.capture) { holed = true; px = cup.x; pz = cup.z; samples.push({ t, x: px, y: py - 0.05, z: pz, phase: 'roll' }); break; }
-        if (!lipped) { lipped = true; events.push({ type: 'lip', t, x: px, y: py, z: pz, speed: v }); }
-        // over the hole: lose some pace and get knocked off line a touch
-        vx *= 0.985; vz *= 0.985;
+      const c = cupStep(cupSt, cup, px, pz, vx, vz);
+      if (c?.holed) {
+        samples.push({ t, x: px, y: py, z: pz, phase: 'roll' });
+        const end = cupDrop({ cup, t0: t, px, pz, vx, vz, rimY: terrain(cup.x, cup.z).height, samples, events, flagstick: !!cup.flagstick });
+        holed = { t, x: cup.x, z: cup.z, offset: c.offset, speed: c.speed };
+        t = end.t; px = end.x; py = end.y; pz = end.z;
+        break;
+      }
+      if (c?.lip) {
+        events.push({ type: 'lip', t, x: px, y: py, z: pz, speed: c.speed });
+        vx = c.vx; vz = c.vz;
       }
     }
-    if (Math.round(t / dt) % 2 === 0) samples.push({ t, x: px, y: py, z: pz, phase: 'roll' });
   }
-  samples.push({ t, x: px, y: py, z: pz, phase: 'roll' });
+  if (!holed) samples.push({ t, x: px, y: py, z: pz, phase: 'roll' });
   const res = finishResult({
     samples, events, t, apex: { x: origin.x, y: py, z: origin.z, t: 0 }, landing: null, carry: null,
     px, py, pz, o: { x: origin.x, y: py, z: origin.z }, hd: h, phase, lastSurface, terrain,
   });
   res.putt = true;
-  res.holed = holed;
-  if (holed) res.holedAt = { t, x: cup.x, z: cup.z };
+  res.holed = !!holed;
+  if (holed) { res.holedAt = holed; res.restSurface = 'cup'; }
   return res;
 }
 

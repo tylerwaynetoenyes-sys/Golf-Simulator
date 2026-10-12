@@ -406,6 +406,23 @@ body.day #envButton .env-moon { display: none; }
 .hc-note { font-family: var(--serif); font-style: italic; color: var(--text-2); font-size: 15px; line-height: 1.45; margin: 12px 0 0; }
 .hc-skip { font-size: 11px; color: var(--text-3); margin-top: 12px; letter-spacing: 0.06em; }
 
+/* hole-out banner */
+.hole-out { position: absolute; left: 50%; top: 24%; transform: translate(-50%, 0); text-align: center; pointer-events: none !important; opacity: 0; }
+.hole-out.show { animation: hoIn 2.9s var(--ease) forwards; }
+.hole-out.big.show { animation-duration: 3.6s; }
+.ho-kicker { font-size: 13px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--amber-hi); text-shadow: 0 2px 16px rgba(0, 0, 0, 0.8); }
+.ho-title { font-size: clamp(54px, 8vw, 112px); font-weight: 760; letter-spacing: -0.03em; line-height: 1; margin: 6px 0 8px; background: linear-gradient(180deg, #fff9ec 10%, #ffd98f 55%, #e8a54c); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 6px 30px rgba(0, 0, 0, 0.55)) drop-shadow(0 0 34px rgba(255, 196, 110, 0.45)); white-space: nowrap; }
+.hole-out:not(.big) .ho-title { font-size: clamp(40px, 5.4vw, 72px); }
+.ho-sub { font-family: var(--serif); font-style: italic; font-size: clamp(17px, 1.8vw, 24px); color: #fff3e2; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.85); }
+@keyframes hoIn {
+  0% { opacity: 0; transform: translate(-50%, 18px) scale(0.86); letter-spacing: 0.1em; }
+  14% { opacity: 1; transform: translate(-50%, 0) scale(1.03); }
+  22% { transform: translate(-50%, 0) scale(1); }
+  78% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -12px) scale(0.98); }
+}
+body.tv .hole-out { zoom: 1.25; }
+
 /* ball name tags */
 .ball-tags { position: absolute; inset: 0; pointer-events: none !important; }
 .ball-tag { position: absolute; left: 0; top: 0; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 650; background: rgba(14, 18, 27, 0.78); border: 1px solid var(--pc); color: var(--text); white-space: nowrap; will-change: transform; }
@@ -419,6 +436,8 @@ body.day #envButton .env-moon { display: none; }
 /* putting */
 body.putting .club-rail { opacity: 0; pointer-events: none; }
 .club-rail { transition: opacity 0.3s, transform 0.3s var(--ease); }
+
+body.putting .bottom-center { width: min(820px, calc(100vw - 32px)); }
 
 /* the Piasa */
 .piasa-mascot { position: absolute; left: var(--gutter); bottom: var(--gutter); width: 112px; height: 86px; color: var(--amber-hi); cursor: pointer; filter: drop-shadow(0 0 10px rgba(255, 170, 90, 0.25)); opacity: 0.78; transition: opacity 0.3s; }

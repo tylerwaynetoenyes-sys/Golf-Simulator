@@ -43,6 +43,17 @@ export class HoleTerrain {
     this.fwHalf = hole.fw / 2;
     this.fwStart = (hole.fwStart || 0) * YD;
     this.greenBase = this.elevAt(1) + 0.4;
+    // Green contours: two soft swells/swales per green (deterministic per hole)
+    // on top of the overall tilt, flattened around the pin like a real hole
+    // location. Peak slopes stay around 2–3%.
+    {
+      const n = hole.n;
+      const R = this.greenR;
+      this.contours = [
+        { x: Math.cos(n * 1.7) * R * 0.5, z: Math.sin(n * 2.3) * R * 0.5, a: (n % 2 ? 1 : -1) * 0.16, s: R * 0.42 },
+        { x: Math.cos(n * 2.9 + 2) * R * 0.55, z: Math.sin(n * 1.3 + 1) * R * 0.55, a: (n % 3 ? -1 : 1) * 0.11, s: R * 0.32 },
+      ];
+    }
     this.pin = {
       x: this.green.x + this.finalRight.x * hole.pin[0] - this.finalDir.x * hole.pin[1],
       z: this.green.z + this.finalRight.z * hole.pin[0] - this.finalDir.z * hole.pin[1],
@@ -136,13 +147,27 @@ export class HoleTerrain {
     const gd = Math.hypot(gdx, gdz);
     const gw = smooth(this.greenR + 9, this.greenR, gd);
     if (gw > 0) {
-      const gh = this.greenBase + this.slope[0] * gdx + this.slope[1] * gdz;
+      let gh = this.greenBase + this.slope[0] * gdx + this.slope[1] * gdz;
+      if (this.contours && gd < this.greenR + 9) {
+        const cf = (dx, dz) => { let c = 0; for (const k of this.contours) c += k.a * Math.exp(-((dx - k.x) ** 2 + (dz - k.z) ** 2) / (2 * k.s * k.s)); return c; };
+        let c = cf(gdx, gdz);
+        if (this.pin) {
+          // ease the contour toward its value at the hole: the cup sits on a calmer spot
+          const pdx = this.pin.x - this.green.x, pdz = this.pin.z - this.green.z;
+          const c0 = this._cPin ?? (this._cPin = cf(pdx, pdz));
+          const pd = Math.hypot(gdx - pdx, gdz - pdz);
+          c = c0 + (c - c0) * (0.45 + 0.55 * smooth(0.5, 4, pd));
+        }
+        gh += c;
+      }
       h += (gh - h) * gw;
     }
     // bunkers: shallow bowls with a lip
+    // (greenside bunkers never deform the putting surface itself)
+    const keepGreen = smooth(this.greenR + 0.2, this.greenR + 2.2, gd);
     for (const b of this.bunkers) {
       const q = this._ellipse(b, x, z);
-      if (q < 1.6) h += -0.75 * smooth(1.15, 0, q) + 0.25 * smooth(1.6, 1.05, q) * smooth(0.9, 1.05, q);
+      if (q < 1.6) h += (-0.75 * smooth(1.15, 0, q) + 0.25 * smooth(1.6, 1.05, q) * smooth(0.9, 1.05, q)) * keepGreen;
     }
     return h;
   }

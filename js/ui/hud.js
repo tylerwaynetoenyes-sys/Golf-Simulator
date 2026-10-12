@@ -159,6 +159,19 @@ export class HUD {
     this.card.dataset.visible = 'true';
   }
 
+  /** Big centre-screen moment when the ball drops. */
+  holeOut({ kicker = '', title, sub = '', big = false }) {
+    const el = $('#holeOut');
+    if (!el) return;
+    $('#hoKicker').textContent = kicker;
+    $('#hoTitle').textContent = title;
+    $('#hoSub').textContent = sub;
+    el.classList.remove('show');
+    el.classList.toggle('big', big);
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+
   // ── multiplayer layer ──
 
   /** Whose turn it is. info = {name, color, team, detail} */

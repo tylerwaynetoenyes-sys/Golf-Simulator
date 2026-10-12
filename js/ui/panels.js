@@ -464,8 +464,19 @@ export function openHoleSummary(game, data, onNext) {
       </div>
       <p class="hint" style="margin-top:12px;color:var(--text-3);font-size:12px">Or just take your next swing: the R10 moves things along.</p>
     </div>`, { onClosed: () => next() });
-  el.querySelector('#hsNext').addEventListener('click', () => { audio.click(); next(); });
-  el.querySelector('#hsCard').addEventListener('click', () => { onClose = null; openScorecard(game, { onContinue: () => onNext?.() }); });
+  // keep a couch game moving: advance on its own after a few seconds
+  const btn = el.querySelector('#hsNext');
+  const label = btn.textContent;
+  let left = 8;
+  const timer = setInterval(() => {
+    left -= 1;
+    if (left <= 0) { clearInterval(timer); next(); return; }
+    if (left <= 5) btn.textContent = `${label} (${left})`;
+  }, 1000);
+  const done = next;
+  next = () => { clearInterval(timer); done(); };
+  btn.addEventListener('click', () => { audio.click(); next(); });
+  el.querySelector('#hsCard').addEventListener('click', () => { clearInterval(timer); onClose = null; openScorecard(game, { onContinue: () => onNext?.() }); });
   return () => { next = () => {}; };
 }
 

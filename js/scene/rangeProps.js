@@ -2,6 +2,8 @@
 // target greens with flags, yardage boards, tree lines, the faded Alton sign,
 // and the featured Closest-to-Pin green.
 import * as THREE from 'three';
+import { CUP } from '../core/physics.js';
+import { buildCup } from './cup.js';
 import { YD } from '../core/physics.js';
 import { LAYOUT, GREENS, CTP_GREEN, groundHeight } from './layout.js';
 import { surroundHeight } from './terrain.js';
@@ -255,15 +257,15 @@ export function createRange(scene, river, quality) {
   const greenObjs = new Map();
   for (const g of GREENS) {
     const y = groundHeight(g.x, g.z);
-    const flag = makeFlag(g.color, 2.4, 0.55);
-    flag.position.set(g.x, y, g.z);
+    const flag = makeFlag(g.color, 2.4 + CUP.depth, 0.55);
+    flag.position.set(g.x, y - CUP.depth, g.z);
     group.add(flag);
     flags.push(flag);
     const rim = greenRing(g.r, g.color, 0.38, 0.14);
     rim.position.set(g.x, y + 0.14, g.z);
     group.add(rim);
-    const cup = new THREE.Mesh(new THREE.CircleGeometry(0.054, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x050505 }));
-    cup.position.set(g.x, y + 0.012, g.z);
+    const cup = buildCup();
+    cup.position.set(g.x, y, g.z);
     group.add(cup);
     greenObjs.set(g.id, { rim, flag, baseOpacity: 0.38 });
   }
@@ -417,15 +419,11 @@ export function createRange(scene, river, quality) {
 
   // ── Closest-to-Pin green ──
   const ctp = new THREE.Group();
-  const ctpFlag = makeFlag(0xffd54a, 2.6, 0.9);
+  const ctpFlag = makeFlag(0xffd54a, 2.6 + CUP.depth, 0.9);
+  ctpFlag.position.y = -CUP.depth;
   ctp.add(ctpFlag);
   flags.push(ctpFlag);
-  const cup = new THREE.Mesh(new THREE.CircleGeometry(0.054, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x020202 }));
-  cup.position.y = 0.012;
-  ctp.add(cup);
-  const cupRim = greenRing(0.07, 0xffffff, 0.6, 0.016);
-  cupRim.position.y = 0.014;
-  ctp.add(cupRim);
+  ctp.add(buildCup());
   const proxRings = [3 * 0.3048, 10 * 0.3048, 20 * 0.3048].map((r, i) => {
     const ring = greenRing(r, 0xffe9a8, [0.5, 0.32, 0.2][i], 0.05);
     ring.position.y = 0.02;
