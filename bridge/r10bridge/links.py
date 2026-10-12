@@ -11,10 +11,11 @@ import asyncio
 import logging
 import random
 import sys
+import time
 from typing import Awaitable, Callable
 
 from . import protocol as P
-from .client import R10Session
+from .client import DeviceInfoReceived, R10Session
 from .mock import FakeR10, random_shot
 
 log = logging.getLogger("r10bridge.link")
@@ -59,12 +60,35 @@ class BaseLink:
         if self.session:
             self.session.send_shot_config(**kwargs)
 
+    async def wake(self) -> None:
+        """Re-arm the radar (WakeUpRequest). Safe to call any time after the handshake."""
+        if self.session:
+            self.session.send_wakeup()
+
+    async def restart_handshake(self) -> None:
+        """Resend MultiLink REGISTER if the device never answered the first one."""
+        if self.session:
+            self.session.start()
+
+    @property
+    def phase(self) -> str:
+        return self.session.phase if self.session else "none"
+
     async def _emit(self, events: list) -> None:
         for ev in events:
+            if isinstance(ev, DeviceInfoReceived):
+                i = ev.info
+                self.device.update({"firmware": f"{i.software_version / 100:.2f}", "unitId": i.unit_id,
+                                    "product": i.product_number})
             await _maybe(self.on_event(ev))
 
 
 # ── Real hardware ─────────────────────────────────────────────────────────
+
+
+def _looks_like_r10(name: str) -> bool:
+    n = (name or "").lower()
+    return "approach r10" in n or n.startswith("r10") or ("approach" in n and "r10" in n)
 
 
 def _is_r10(device, adv) -> bool:
@@ -89,6 +113,27 @@ class BleLink(BaseLink):
         self._writer_task: asyncio.Task | None = None
         self._rx_q: asyncio.Queue[bytes] = asyncio.Queue()
         self._rx_task: asyncio.Task | None = None
+        self.last_rx = 0.0
+        self.seen: list[str] = []
+
+    async def _fallback_scan(self, BleakScanner, seconds: float = 5.0):
+        """Second pass: full discovery, matching looser names, remembering what we saw."""
+        try:
+            found = await BleakScanner.discover(timeout=seconds, return_adv=True)
+        except Exception as e:  # adapter trouble surfaces in the first pass
+            log.debug("fallback scan failed: %s", e)
+            return None
+        best = None
+        seen = []
+        for _addr, (dev, adv) in found.items():
+            name = adv.local_name or dev.name or ""
+            seen.append((adv.rssi if adv.rssi is not None else -999, name or dev.address))
+            if _is_r10(dev, adv) or _looks_like_r10(name):
+                if best is None or (adv.rssi or -999) > (best[1].rssi or -999):
+                    best = (dev, adv)
+        seen.sort(reverse=True)
+        self.seen = [f"{n} ({r} dBm)" for r, n in seen[:8]]
+        return best[0] if best else None
 
     async def connect(self, scan_timeout: float = 20.0, address: str | None = None) -> None:
         try:
@@ -115,11 +160,15 @@ class BleLink(BaseLink):
         except OSError as e:
             raise LinkError("bluetooth_off", f"Bluetooth is unavailable: {e}") from e
 
+        if device is None and not address:
+            await self.status("scanning", "Still looking — doing a wider scan")
+            device = await self._fallback_scan(BleakScanner)
         if device is None:
+            nearby = f" Nearby: {', '.join(self.seen)}." if self.seen else " No Bluetooth devices were visible at all."
             raise LinkError(
                 "not_found",
                 "No Approach R10 found. Power it on, hold the button until the LED is solid blue, "
-                "and make sure it isn't connected to the Garmin Golf app.",
+                "and make sure it isn't connected to the Garmin Golf app." + nearby,
             )
 
         self.device = {"name": device.name or P.R10_NAME, "address": device.address}
@@ -149,6 +198,8 @@ class BleLink(BaseLink):
             if "auth" in low or "pair" in low or "bond" in low or "insufficient" in low:
                 raise LinkError("pairing_failed", f"Pairing was rejected: {msg}") from e
             raise LinkError("connect_failed", f"Couldn't connect: {msg}") from e
+        except (OSError, ValueError, RuntimeError) as e:
+            raise LinkError("connect_failed", f"Couldn't connect: {e}") from e
 
         try:
             await self.status("handshake", "Securing link and arming radar", device=self.device)
@@ -171,6 +222,7 @@ class BleLink(BaseLink):
 
     def _on_notify(self, _char, data: bytearray) -> None:
         # bleak may call from a backend thread
+        self.last_rx = time.monotonic()
         if self._loop:
             self._loop.call_soon_threadsafe(self._rx_q.put_nowait, bytes(data))
 
@@ -194,6 +246,9 @@ class BleLink(BaseLink):
                     await self.client.write_gatt_char(P.CHAR_NOTIFY_REGISTER_UUID, data, response=True)
                 else:
                     await self.client.write_gatt_char(P.CHAR_WRITE_UUID, data, response=False)
+                    # Write-without-response can be dropped by some adapters when
+                    # flooded; a few ms between chunks keeps multi-chunk frames intact.
+                    await asyncio.sleep(0.004)
             except Exception as e:  # link dropped mid-write
                 log.warning("BLE write failed: %s", e)
                 self.disconnected.set()
@@ -224,30 +279,35 @@ class MockLink(BaseLink):
     name = "mock"
 
     def __init__(self, on_status: StatusCb, on_event: EventCb, auto_shot_interval: float = 0.0,
-                 fail: str | None = None):
+                 fail: str | None = None, drop_after: float = 0.0, fast: bool = False):
         super().__init__(on_status, on_event)
         self.fake: FakeR10 | None = None
         self.auto_shot_interval = auto_shot_interval
         self.fail = fail
+        self.drop_after = drop_after
+        self.speed = 0.05 if fast else 1.0
+        self.last_rx = 0.0
         self._auto_task: asyncio.Task | None = None
+        self._drop_task: asyncio.Task | None = None
         self._pending: list[bytes] = []
         self.rng = random.Random()
 
     async def connect(self, scan_timeout: float = 20.0, address: str | None = None) -> None:
+        k = self.speed
         await self.status("scanning", "Looking for an Approach R10 nearby")
-        await asyncio.sleep(1.6)
+        await asyncio.sleep(1.6 * k)
         if self.fail == "not_found":
-            await asyncio.sleep(2.0)
-            raise LinkError("not_found", "No Approach R10 found (simulated).")
+            await asyncio.sleep(2.0 * k)
+            raise LinkError("not_found", "No Approach R10 found (simulated). Nearby: Tyler's iPhone (-48 dBm), Living Room TV (-71 dBm).")
         self.device = {"name": "Approach R10 (Simulated)", "address": "MO:CK:R1:0:00:01"}
         await self.status("found", f"Found {self.device['name']}", device=self.device)
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.5 * k)
         await self.status("connecting", "Connecting and pairing", device=self.device)
-        await asyncio.sleep(0.9)
+        await asyncio.sleep(0.9 * k)
         if self.fail == "pairing_failed":
             raise LinkError("pairing_failed", "Pairing was rejected (simulated).")
         await self.status("handshake", "Securing link and arming radar", device=self.device)
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(0.4 * k)
 
         self.session = R10Session(self._to_device_data, self._to_device_register)
         self.fake = FakeR10(self._from_device)
@@ -256,6 +316,15 @@ class MockLink(BaseLink):
         await self._pump()
         if self.auto_shot_interval > 0:
             self._auto_task = asyncio.create_task(self._auto())
+        if self.drop_after > 0:
+            self._drop_task = asyncio.create_task(self._drop())
+
+    async def _drop(self) -> None:
+        await asyncio.sleep(self.drop_after)
+        log.info("mock: simulating a Bluetooth drop")
+        self.fake = None
+        self.session = None
+        self.disconnected.set()
 
     def _to_device_register(self, data: bytes) -> None:
         assert self.fake is not None
@@ -266,6 +335,7 @@ class MockLink(BaseLink):
         self.fake.on_data_write(chunk)
 
     def _from_device(self, chunk: bytes) -> None:
+        self.last_rx = time.monotonic()
         self._pending.append(chunk)
 
     async def _pump(self) -> None:
@@ -285,6 +355,10 @@ class MockLink(BaseLink):
         await super().send_shot_config(**kwargs)
         await self._pump()
 
+    async def wake(self) -> None:
+        await super().wake()
+        await self._pump()
+
     async def _auto(self) -> None:
         clubs = ["DR", "7I", "PW", "5I", "3W", "9I"]
         i = 0
@@ -294,9 +368,10 @@ class MockLink(BaseLink):
             i += 1
 
     async def disconnect(self) -> None:
-        if self._auto_task:
-            self._auto_task.cancel()
-            self._auto_task = None
+        for t in (self._auto_task, self._drop_task):
+            if t:
+                t.cancel()
+        self._auto_task = self._drop_task = None
         self.fake = None
         self.session = None
         self.disconnected.set()

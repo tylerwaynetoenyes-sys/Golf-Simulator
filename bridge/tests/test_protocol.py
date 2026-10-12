@@ -231,3 +231,97 @@ def test_static_serving_and_traversal(tmp_path):
     assert static_response(tmp_path, "/%2e%2e/%2e%2e/etc/passwd").status_code in (403, 404)
     assert static_response(tmp_path, "/.git/config").status_code == 404
     assert static_response(tmp_path, "/missing.js").status_code == 404
+
+
+def _ws_kwargs():
+    import websockets
+    return {"proxy": None} if int(websockets.__version__.split(".")[0]) >= 15 else {}
+
+
+async def _recv_until(ws, pred, timeout=10):
+    import asyncio as _a
+    end = _a.get_running_loop().time() + timeout
+    while True:
+        m = json.loads(await _a.wait_for(ws.recv(), max(0.1, end - _a.get_running_loop().time())))
+        if pred(m):
+            return m
+
+
+def test_reconnects_after_link_drop_and_heartbeat(monkeypatch):
+    pytest.importorskip("websockets")
+    from websockets.asyncio.client import connect
+    from r10bridge import server as S
+
+    monkeypatch.setattr(S, "HEARTBEAT_S", 0.3)
+
+    async def run():
+        bridge = S.Bridge(mock=True, mock_drop=0.8, mock_fast=True)
+        task = asyncio.create_task(S.serve("127.0.0.1", 8798, bridge))
+        await asyncio.sleep(0.3)
+        async with connect("ws://127.0.0.1:8798", **_ws_kwargs()) as ws:
+            await ws.recv()
+            await ws.send(json.dumps({"type": "pair"}))
+            await _recv_until(ws, lambda m: m.get("state") == "ready")
+            hb = await _recv_until(ws, lambda m: m["type"] == "heartbeat")
+            assert hb["link"] == "ready" and hb["mode"] == "mock"
+            await _recv_until(ws, lambda m: m.get("state") == "disconnected")
+            bridge.mock_drop = 0  # the next link stays up
+            await _recv_until(ws, lambda m: m.get("state") == "reconnecting")
+            await _recv_until(ws, lambda m: m.get("state") == "ready", timeout=15)
+            # radar re-arm + diagnostics
+            await ws.send(json.dumps({"type": "wake"}))
+            await ws.send(json.dumps({"type": "diag"}))
+            d = await _recv_until(ws, lambda m: m["type"] == "diag")
+            assert d["phase"] == "active"
+            await ws.send(json.dumps({"type": "mock_shot", "club": "DR"}))
+            s = await _recv_until(ws, lambda m: m["type"] == "shot")
+            assert s["shot"]["ball"]["speedMph"] > 100
+        task.cancel()
+        await asyncio.wait_for(asyncio.gather(task, return_exceptions=True), 5)
+
+    asyncio.run(run())
+
+
+def test_transient_failures_are_retried(monkeypatch):
+    from r10bridge import server as S
+    from r10bridge.links import LinkError
+
+    calls = []
+
+    async def run():
+        bridge = S.Bridge(mock=True, mock_fast=True)
+        real = bridge._connect
+
+        async def flaky(address, report=True):
+            calls.append(report)
+            if len(calls) < 3:
+                if report:
+                    await bridge.broadcast({"type": "status", "state": "error", "code": "connect_failed"})
+                return "connect_failed"
+            return await real(address, report)
+
+        bridge._connect = flaky
+        ok = await bridge._connect_with_retries(None)
+        assert ok and calls == [False, False, True]
+        assert bridge.last_status["state"] == "ready"
+        await bridge.shutdown()
+
+    asyncio.run(run())
+    del LinkError
+
+
+def test_lan_origins():
+    from r10bridge.server import _origin_ok
+
+    assert _origin_ok("http://192.168.1.20:8765", allow_lan=True)
+    assert _origin_ok("http://tylers-macbook.local:8765", allow_lan=True)
+    assert not _origin_ok("http://192.168.1.20:8765", allow_lan=False)
+    assert not _origin_ok("https://evil.example.com", allow_lan=True)
+
+
+def test_diagnose_mock(capsys):
+    from r10bridge.diagnose import run
+
+    assert asyncio.run(run(mock=True, wait_shot=3)) == 0
+    out = capsys.readouterr().out
+    assert "Radar armed" in out and "Shot received" in out
