@@ -216,6 +216,34 @@ class AudioEngine {
 
   // ── UI ──
 
+  /** Day: birds instead of crickets. */
+  setDaytime(day) { this.daytime = !!day; }
+
+  /** Wind roar follows the weather. */
+  setWind(mph) {
+    this.windMph = mph;
+    if (!this.ctx || !this._windGain) return;
+    const t = this.ctx.currentTime;
+    this._windGain.gain.setTargetAtTime(0.11 + Math.min(0.2, mph * 0.009), t, 1.2);
+    this._windLp.frequency.setTargetAtTime(340 + mph * 18, t, 1.2);
+  }
+
+  /** Putter on ball: a soft, short knock. */
+  putt() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._noise(t, 0.05, { type: 'bandpass', freq: 1900, q: 2.5, gain: 0.28 });
+    this._tone(t, 820, 0.06, { type: 'triangle', gain: 0.08 });
+  }
+
+  /** Ball catching the edge of the cup. */
+  lip() {
+    if (!this.ctx) return;
+    const t = this.ctx.currentTime;
+    this._tone(t, 1250, 0.09, { type: 'triangle', gain: 0.09, freqEnd: 900 });
+    this._noise(t + 0.03, 0.06, { type: 'highpass', freq: 3000, gain: 0.08 });
+  }
+
   tick() {
     if (!this.ok) return;
     this._tone(this.ctx.currentTime, 1900, 0.03, { type: 'sine', gain: 0.08, out: this.ui });
@@ -285,7 +313,9 @@ class AudioEngine {
     lp.type = 'lowpass';
     lp.frequency.value = 340;
     const windGain = ctx.createGain();
-    windGain.gain.value = 0.11;
+    windGain.gain.value = 0.11 + Math.min(0.2, (this.windMph || 0) * 0.009);
+    this._windGain = windGain;
+    this._windLp = lp;
     const lfo = ctx.createOscillator();
     lfo.frequency.value = 0.07;
     const lfoGain = ctx.createGain();
@@ -299,6 +329,7 @@ class AudioEngine {
     const cricket = (pan, base, rate) => {
       const loop = () => {
         if (!this.ctx) return;
+        if (this.daytime) { setTimeout(loop, 2000); return; }
         const t = ctx.currentTime;
         const n = 3 + Math.floor(Math.random() * 3);
         for (let i = 0; i < n; i++) {
@@ -323,6 +354,34 @@ class AudioEngine {
     cricket(0.6, 4720, 1.2);
     cricket(0.1, 4380, 1.6);
     cricket(-0.2, 4900, 2.4);
+
+    // Daytime: the odd songbird up on the bluff instead of crickets
+    const bird = () => {
+      if (!this.ctx) return;
+      if (this.daytime) {
+        const t = ctx.currentTime;
+        const base = 2400 + Math.random() * 1400;
+        const notes = 2 + Math.floor(Math.random() * 4);
+        const pan = Math.random() * 1.6 - 0.8;
+        for (let i = 0; i < notes; i++) {
+          const st = t + i * (0.11 + Math.random() * 0.05);
+          const o = ctx.createOscillator();
+          o.type = 'sine';
+          o.frequency.setValueAtTime(base * (1 + Math.random() * 0.25), st);
+          o.frequency.exponentialRampToValueAtTime(base * (0.7 + Math.random() * 0.5), st + 0.08);
+          const g = ctx.createGain();
+          g.gain.setValueAtTime(0.0001, st);
+          g.gain.exponentialRampToValueAtTime(0.018, st + 0.012);
+          g.gain.exponentialRampToValueAtTime(0.0001, st + 0.09);
+          const p = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
+          if (p) { p.pan.value = pan; o.connect(g).connect(p).connect(this.amb); } else o.connect(g).connect(this.amb);
+          o.start(st);
+          o.stop(st + 0.1);
+        }
+      }
+      setTimeout(bird, (3 + Math.random() * 7) * 1000);
+    };
+    setTimeout(bird, 2000);
 
     // Distant barge horn every couple of minutes
     const horn = () => {

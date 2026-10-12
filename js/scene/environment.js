@@ -127,7 +127,9 @@ export class Environment {
     // key light: moon at night, sun by day (dimmer through cloud)
     const key = w.range.moon;
     key.color.copy(lerpC(NIGHT.key, DAY.key, d));
-    key.intensity = THREE.MathUtils.lerp(NIGHT.keyIntensity * (1 - c * 0.6), DAY.keyIntensity * this.sunAmt, d);
+    // the course has no range floodlights over the fairways: a brighter moon there
+    const nightBoost = w.sceneMode === 'course' ? 1.9 : 1;
+    key.intensity = THREE.MathUtils.lerp(NIGHT.keyIntensity * nightBoost * (1 - c * 0.6), DAY.keyIntensity * this.sunAmt, d);
     const shadowSize = d > 0.5 ? 60 : 30;
     const cam = key.shadow.camera;
     if (cam.right !== shadowSize) {
@@ -137,7 +139,7 @@ export class Environment {
     const hemi = w.range.hemi;
     hemi.color.copy(lerpC(NIGHT.hemiSky, DAY.hemiSky, d));
     hemi.groundColor.copy(lerpC(NIGHT.hemiGround, DAY.hemiGround, d));
-    hemi.intensity = THREE.MathUtils.lerp(NIGHT.hemi, DAY.hemi * (1 + c * 0.35), d);
+    hemi.intensity = THREE.MathUtils.lerp(NIGHT.hemi * nightBoost, DAY.hemi * (1 + c * 0.35), d);
 
     // fog + post
     const fog = w.scene.fog;

@@ -7,6 +7,9 @@
 //   r10:device   {state}   raw device state (WAITING / RECORDING / PROCESSING ...)
 //   r10:error    {code, severity}   device-reported problem (tilt, saturation...)
 //   bridge:hello {mode, version}
+//   bridge:heartbeat {link, deviceState, phase, shots, lastShotAgo, lastRxAgo, ...}  every 5 s
+//   bridge:stale  no heartbeat for a while (socket half-open, laptop asleep)
+//   bridge:diag   reply to diag()
 import { bus } from '../core/events.js';
 
 const MPS_PER_MPH = 0.44704;
@@ -50,6 +53,23 @@ export class BridgeClient {
     this._retry = null;
     this._retryDelay = 1500;
     this._openPromise = null;
+    this.lastHeartbeat = null; // last heartbeat payload
+    this.lastHeartbeatAt = 0;
+    this.lastShotAt = 0;
+    this.stale = false;
+    this._watchdog = setInterval(() => this._checkStale(), 2000);
+  }
+
+  /** Heartbeats arrive every 5 s; 16 s of silence on an open socket means it is dead. */
+  _checkStale() {
+    if (!this.connected || !this.lastHeartbeatAt) return;
+    const quiet = Date.now() - this.lastHeartbeatAt;
+    if (quiet > 16000 && !this.stale) {
+      this.stale = true;
+      bus.emit('bridge:stale', { quiet });
+      // Force a clean reconnect: close, and the normal retry path takes over.
+      try { this.ws.close(); } catch { /* ignore */ }
+    }
   }
 
   get connected() { return this.ws && this.ws.readyState === WebSocket.OPEN; }
@@ -115,6 +135,9 @@ export class BridgeClient {
     switch (msg.type) {
       case 'hello':
         this.mode = msg.mode;
+        this.version = msg.version;
+        this.lastHeartbeatAt = Date.now();
+        this.stale = false;
         bus.emit('bridge:hello', msg);
         if (msg.status && msg.status.state === 'ready') {
           this._setState('ready', { message: msg.status.message, device: msg.status.device });
@@ -129,10 +152,27 @@ export class BridgeClient {
         break;
       case 'shot': {
         const launch = normalizeShot(msg);
+        this.lastShotAt = Date.now();
+        // (the bridge dedups by the R10's shot id before broadcasting)
         if (launch) bus.emit('r10:shot', launch);
         else bus.emit('r10:misread', msg);
         break;
       }
+      case 'misread':
+        bus.emit('r10:misread', msg);
+        break;
+      case 'heartbeat':
+        this.lastHeartbeat = msg;
+        this.lastHeartbeatAt = Date.now();
+        this.stale = false;
+        if (msg.deviceState) bus.emit('r10:device', { state: msg.deviceState });
+        bus.emit('bridge:heartbeat', msg);
+        break;
+      case 'diag':
+        this.lastHeartbeat = { ...this.lastHeartbeat, ...msg };
+        this.lastHeartbeatAt = Date.now();
+        bus.emit('bridge:diag', msg);
+        break;
       case 'device_state':
         bus.emit('r10:device', { state: msg.state });
         break;
@@ -200,6 +240,15 @@ export class BridgeClient {
     this.device = null;
     this._setState('idle', { message: 'Disconnected' });
   }
+
+  /** Re-arm the radar (it drops to standby after a while). */
+  wake() { return this.send({ type: 'wake' }); }
+
+  /** Drop and re-establish the Bluetooth link without re-pairing. */
+  reconnect() { this.wantPaired = true; return this.send({ type: 'reconnect' }); }
+
+  /** Ask for a diagnostics snapshot (reply arrives as bridge:diag). */
+  diag() { return this.send({ type: 'diag' }); }
 
   mockShot(club) { this.send({ type: 'mock_shot', club }); }
 

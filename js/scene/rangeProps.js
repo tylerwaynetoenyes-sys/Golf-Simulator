@@ -31,7 +31,7 @@ function canvasTex(w, h, draw) {
 }
 
 // Soft volumetric cone for floodlights (additive, fades with length and edge).
-function lightConeMaterial(color, strength) {
+export function lightConeMaterial(color, strength) {
   return new THREE.ShaderMaterial({
     uniforms: { uColor: { value: new THREE.Color(color) }, uStrength: { value: strength } },
     vertexShader: /* glsl */`
@@ -59,7 +59,7 @@ function lightConeMaterial(color, strength) {
   });
 }
 
-function makeFlag(color, poleHeight = 2.4, emissive = 1.2) {
+export function makeFlag(color, poleHeight = 2.4, emissive = 1.2) {
   const g = new THREE.Group();
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, poleHeight, 8), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.4 }));
   pole.position.y = poleHeight / 2;
@@ -91,7 +91,7 @@ function makeFlag(color, poleHeight = 2.4, emissive = 1.2) {
   return g;
 }
 
-function greenRing(radius, color, opacity = 0.5, width = 0.12) {
+export function greenRing(radius, color, opacity = 0.5, width = 0.12) {
   const m = new THREE.Mesh(
     new THREE.RingGeometry(radius - width, radius, 96).rotateX(-Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(1.6), transparent: true, opacity, depthWrite: false }),
@@ -467,6 +467,10 @@ export function createRange(scene, river, quality) {
     setCtp(x, z, visible = true) {
       ctp.position.set(x, groundHeight(x, z), z);
       ctp.visible = visible;
+    },
+    /** Hide the range itself but keep the shared moon/sun + sky light. */
+    setPropsVisible(v) {
+      for (const c of group.children) if (c !== hemi && c !== moon && c !== moon.target) c.visible = v;
     },
     setDecorVisible(v) {
       for (const [, o] of greenObjs) { o.flag.visible = v; o.rim.visible = v; }

@@ -1,6 +1,10 @@
 // Modal panels: mode picker, session & personal bests, settings, custom shot
-// entry, help, and end-of-round summaries.
+// entry, R10 help, players & teams, course setup, scorecards and summaries.
 import { $, esc, copyButtons, toast } from './dom.js';
+import { bus } from '../core/events.js';
+import { HOLES } from '../course/holes.js';
+import { CourseMode, fmtToPar } from '../game/courseMode.js';
+import { PLAYER_COLORS, TEAMS, MAX_PLAYERS } from '../game/roster.js';
 import { store } from '../data/store.js';
 import { CLUBS, clubById } from '../data/clubs.js';
 import * as U from '../core/units.js';
@@ -41,6 +45,7 @@ const MODE_ICONS = {
   ctp: '<svg viewBox="0 0 32 32"><path d="M11 28V5l12 5-12 5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"/><ellipse cx="13" cy="28" rx="9" ry="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/></svg>',
   targets: '<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="12" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="7" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="16" cy="16" r="2.5" fill="currentColor"/></svg>',
   ld: '<svg viewBox="0 0 32 32"><path d="M4 24h24M8 24V14M14 24V9M20 24V12M26 24V5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
+  course: '<svg viewBox="0 0 32 32"><path d="M3 27 Q16 -3 29 27" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><path d="M14 24V12l7 3-7 3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
 };
 
 function bestText(key, fmt) {
@@ -50,29 +55,37 @@ function bestText(key, fmt) {
 
 export function openModePicker(game) {
   const modes = Object.values(game.modes);
+  const course = modes.find((m) => m.id === 'course');
+  const others = modes.filter((m) => m.id !== 'course');
   const best = {
     range: bestText('range.longestDrive', (v) => `Longest drive ${U.dist(v)} ${U.distUnit()}`),
     ctp: bestText('ctp.closest', (v) => `Closest ever ${v === 0 ? 'holed' : U.proximity(v)}`),
     targets: bestText('targets.score', (v) => `Best ${v} pts`),
     ld: bestText('ld.best', (v) => `Best ${U.dist(v)} ${U.distUnit()}`),
+    course: [bestText('course.9', (v) => `Best 9: ${v}`), bestText('course.18', (v) => `Best 18: ${v}`)].filter(Boolean).join(' · '),
   };
+  const card = (m, wide = false) => `
+    <button class="mode-card ${wide ? 'wide' : ''}" data-mode="${m.id}" aria-current="${game.mode.id === m.id}">
+      <div class="mc-icon">${MODE_ICONS[m.id] || ''}</div>
+      <div class="mc-name">${esc(m.name)}</div>
+      <div class="mc-blurb">${esc(m.blurb)}</div>
+      ${best[m.id] ? `<div class="mc-best">★ ${esc(best[m.id])}</div>` : ''}
+    </button>`;
+  const ps = game.roster.players;
   const el = openPanel(`
     ${closeX}
     <h2>Choose a game</h2>
     <p class="panel-sub">Swap any time. Your session keeps every shot.</p>
+    <div class="setting" style="border:0;padding:10px 0 0"><div>${ps.map((p) => `<span class="tb-team" style="--pc:${p.color};margin-right:6px;display:inline-block">${esc(p.name)}</span>`).join('')}${game.roster.teamMode ? '<span class="hint" style="margin-left:6px">· teams</span>' : ''}</div><button class="btn btn-quiet" id="mpPlayers">Players &amp; teams</button></div>
     <div class="mode-grid">
-      ${modes.map((m) => `
-        <button class="mode-card" data-mode="${m.id}" aria-current="${game.mode.id === m.id}">
-          <div class="mc-icon">${MODE_ICONS[m.id] || ''}</div>
-          <div class="mc-name">${esc(m.name)}</div>
-          <div class="mc-blurb">${esc(m.blurb)}</div>
-          ${best[m.id] ? `<div class="mc-best">★ ${esc(best[m.id])}</div>` : ''}
-        </button>`).join('')}
+      ${course ? card(course, true) : ''}
+      ${others.map((m) => card(m)).join('')}
     </div>
     <h3>Closest to Pin distances</h3>
     <div class="seg" id="ctpDiff">
       ${['short', 'mixed', 'long'].map((d) => `<button data-d="${d}" aria-pressed="${game.modes.ctp.difficulty === d}">${{ short: 'Wedges 70–120', mixed: 'Mixed 85–200', long: 'Long 160–215' }[d]}</button>`).join('')}
-    </div>`);
+    </div>`, { wide: true });
+  el.querySelector('#mpPlayers').addEventListener('click', () => openPlayers(game, { then: () => openModePicker(game) }));
   el.querySelectorAll('[data-d]').forEach((b) => b.addEventListener('click', () => {
     game.modes.ctp.difficulty = b.dataset.d;
     el.querySelectorAll('[data-d]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
@@ -80,6 +93,7 @@ export function openModePicker(game) {
   }));
   el.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => {
     audio.click();
+    if (b.dataset.mode === 'course') { openCourseSetup(game); return; }
     closePanel();
     game.setMode(b.dataset.mode);
   }));
@@ -153,6 +167,9 @@ export function openSettings(game) {
     ${closeX}
     <h2>Settings</h2>
     <h3>Display</h3>
+    <div class="setting"><div><label>Screen</label><div class="hint">TV makes everything readable from the couch. Same as adding <code>?tv</code> to the address.</div></div>${seg('display', [['standard', 'Standard'], ['tv', 'TV / projector']])}</div>
+    <div class="setting"><div><label>Time of day</label></div>${seg('timeOfDay', [['night', 'Night'], ['day', 'Afternoon']])}</div>
+    <div class="setting"><div><label>Weather</label><div class="hint">Wind moves the ball in every mode.</div></div>${seg('weather', [['clear', 'Clear'], ['cloudy', 'Cloudy'], ['breezy', 'Light wind'], ['windy', 'Strong wind']])}</div>
     <div class="setting"><div><label>Units</label></div>${seg('units', [['imperial', 'Yards · mph'], ['metric', 'Metres · km/h']])}</div>
     <div class="setting"><div><label>Camera</label><div class="hint">Cinematic cuts to a landing camera on longer shots.</div></div>${seg('camera', [['cinematic', 'Cinematic'], ['follow', 'Follow'], ['tee', 'Tee']])}</div>
     <div class="setting"><div><label>Graphics quality</label><div class="hint">Lower it if the frame rate dips.</div></div>${seg('quality', [['high', 'High'], ['medium', 'Medium'], ['low', 'Low']])}</div>
@@ -220,35 +237,188 @@ export function openManual(game) {
   });
 }
 
-export function openHelp(url = 'ws://localhost:8765') {
-  openPanel(`
-    ${closeX}
-    <h2>Playing with a Garmin R10</h2>
-    <p class="panel-sub">Browsers can't talk to the R10 directly, so a small bridge app on this computer connects over Bluetooth and streams each shot to the game.</p>
-    <h3>1 · Start the bridge</h3>
-    <div class="cmd"><span>cd bridge &amp;&amp; pip install -r requirements.txt</span><button data-copy="cd bridge && pip install -r requirements.txt">Copy</button></div>
-    <div class="cmd"><span>python -m r10bridge</span><button data-copy="python -m r10bridge">Copy</button></div>
-    <p>The bridge also serves this game at <code>http://localhost:8765</code>, so one command runs everything. It listens for the game on <code>${esc(url)}</code>.</p>
-    <h3>2 · Put the R10 in pairing mode</h3>
-    <p>Turn it on, then hold the button until the LED is <b>solid blue</b>. Close the Garmin Golf app (the R10 only talks to one device at a time).</p>
-    <h3>3 · Pair</h3>
-    <p>Press <b>Pair Garmin R10</b>. Garmin's guidance: put the R10 on the ground <b>1.8–2.4 m (6–8 ft) behind the ball</b>, level, with its red alignment line pointing at your target. Indoors, leave at least 2.4 m (8 ft) between the ball and the net.</p>
-    <h3>No R10?</h3>
-    <p><code>python -m r10bridge --mock</code> simulates one through the full protocol, and demo mode needs no bridge at all.</p>
-    <h3>Controls</h3>
-    <table class="data"><tbody>
-      <tr><td>Hold / release Space</td><td>Demo swing (power meter)</td></tr>
-      <tr><td>← →</td><td>Aim</td></tr>
-      <tr><td>1–7 or ↑ ↓</td><td>Select club</td></tr>
-      <tr><td>Enter</td><td>Skip to result</td></tr>
-      <tr><td>C</td><td>Cycle camera</td></tr>
-      <tr><td>M</td><td>Choose game</td></tr>
-      <tr><td>Tab</td><td>Session & bests</td></tr>
-    </tbody></table>
-    <div class="panel-actions"><button class="btn btn-primary" data-close>Got it</button></div>`);
+// ── Help: pairing, troubleshooting, TV, controls (with live bridge diagnostics) ──
+
+const HELP_TABS = [
+  ['pairing', 'Pair your R10'],
+  ['fix', 'Troubleshooting'],
+  ['tv', 'TV & projector'],
+  ['controls', 'Controls'],
+];
+
+const cmd = (text) => `<div class="cmd"><span>${esc(text)}</span><button data-copy="${esc(text)}">Copy</button></div>`;
+
+function gameUrl(path = '/?tv') {
+  const served = location.protocol.startsWith('http') && location.port === '8765';
+  return served ? `${location.protocol}//${location.host}${path}` : `http://localhost:8765${path}`;
 }
 
-export function openSummary(summary, { onAgain, onRange }) {
+function helpPairing() {
+  return `
+    <p>Browsers can't talk Bluetooth to the R10 directly, so a small <b>bridge</b> runs on a Mac or PC near the hitting area. It connects to the R10 and passes every shot to the game. An iPad can be the screen, but the bridge has to run on a computer.</p>
+    <ol class="help-steps">
+      <li><b>Start the bridge</b> on the computer (first time only: install).
+        ${cmd('cd bridge && pip install -r requirements.txt')}
+        ${cmd('python -m r10bridge')}
+        It also serves the game: open <code>http://localhost:8765</code>. Leave the terminal open.</li>
+      <li><b>Bluetooth on.</b> On a Mac: Control Center → Bluetooth. The first run asks to let Terminal use Bluetooth: click <b>Allow</b>. If you said no, turn it on in System Settings → Privacy &amp; Security → Bluetooth, then quit and reopen Terminal.</li>
+      <li><b>Free the R10 from your phone.</b> Close the Garmin Golf app, or switch the phone's Bluetooth off. The R10 talks to one device at a time. A <b>flashing blue</b> light means it's trying to reach your phone.</li>
+      <li><b>Pairing mode.</b> Hold the R10's button until the status light is <b>solid blue</b>. If that doesn't work from off, turn it on first, then hold the button again.</li>
+      <li><b>Press “Pair Garmin R10”</b> in the game. When it says <b>R10 Connected</b>, the R10's light <b>flashes green</b>, meaning it's ready for a shot. Solid red means it's busy reading a shot.</li>
+      <li><b>Place it.</b> On the ground <b>6–8 ft (1.8–2.4 m) behind the ball</b>, level, pointed down your target line through the ball. Indoors, leave <b>at least 8 ft (2.4 m)</b> from the ball to the net or screen. 10 ft or more reads better. Set the exact distance in Settings → R10 to ball.</li>
+    </ol>
+    <div class="callout">No R10 handy? <code>python -m r10bridge --mock</code> runs a pretend R10 through the full protocol, and demo mode needs no bridge at all.</div>`;
+}
+
+function helpFix() {
+  return `
+    <div class="fixes">
+      <details open><summary>Shots don't register</summary><div><ol>
+        <li>Check the pill at the top right. It should say <b>R10 Connected · Ready</b>. If it says <i>Waking…</i>, press <b>Re-arm radar</b> below. The bridge also re-arms it after standby by itself.</li>
+        <li>The R10's light should be <b>flashing green</b> before you swing. Solid red means busy: wait a second between shots.</li>
+        <li><b>Distance and line:</b> 6–8 ft directly behind the ball, aimed through the ball at the target. Being off to one side is the usual cause of missed reads.</li>
+        <li><b>Level ground.</b> A “tilted” warning means level it, then try again.</li>
+        <li>Indoors: at least 8 ft of ball flight before the net, and nothing moving or shiny in front of the radar (fans, mirrors, a swinging net). A “radar saturated” warning means clear those away.</li>
+        <li>“Saw the swing but not the ball” means the radar saw the club only. Check the line and the distance.</li>
+        <li>Still nothing: <b>Reconnect</b> below, or power-cycle the R10 (hold the button until it turns off), then pair again.</li>
+      </ol></div></details>
+      <details><summary>“Bridge not running”</summary><div><ul>
+        <li>Start it: ${cmd('python -m r10bridge')} The terminal should say it's listening on port 8765.</li>
+        <li>Open the game from <code>http://localhost:8765</code>, not by double-clicking the file.</li>
+        <li>Port taken? Use <code>python -m r10bridge --port 8766</code> and set Settings → Bridge address to <code>ws://localhost:8766</code>.</li>
+        <li>Using an iPad? Start the bridge with <code>--lan</code> and open the address it prints on the iPad (see TV &amp; projector).</li>
+      </ul></div></details>
+      <details><summary>“No R10 found”</summary><div><ul>
+        <li>The status light must be <b>solid blue</b> (pairing mode) while the bridge searches.</li>
+        <li>Phone app closed, or the phone's Bluetooth off.</li>
+        <li>Keep it within a few metres of the computer, with no metal in between.</li>
+        <li>Run the step-by-step check: ${cmd('python -m r10bridge --diagnose')} It lists every Bluetooth device it can see and where it stops.</li>
+      </ul></div></details>
+      <details><summary>Pairing fails, or connects and then drops</summary><div><ul>
+        <li><b>macOS:</b> System Settings → Bluetooth → find “Approach R10” → ⓘ → <b>Forget This Device</b>, then pair again from the game.</li>
+        <li><b>Windows:</b> Settings → Bluetooth &amp; devices → remove “Approach R10”, then pair again.</li>
+        <li>Power-cycle the R10. If its light flashes red (error), reset it as Garmin's manual describes, then pair again.</li>
+        <li>A laptop that sleeps drops the link. On a Mac, keep it awake while you play: ${cmd('caffeinate -dims python -m r10bridge')}</li>
+      </ul></div></details>
+      <details><summary>iPad / iPhone notes</summary><div><ul>
+        <li>iPadOS can't run the bridge. Use the iPad as the screen and run the bridge on a Mac or PC with <code>--lan</code>.</li>
+        <li>Both devices on the same Wi-Fi. If the iPad can't reach <code>http://your-mac.local:8765</code>, use the IP address the bridge prints.</li>
+        <li>On a Mac, the first <code>--lan</code> run may ask to allow incoming connections for Python: click <b>Allow</b>.</li>
+        <li>Turn the iPad's Auto-Lock off (Settings → Display &amp; Brightness) or keep it plugged in. The game also asks the screen to stay on.</li>
+      </ul></div></details>
+      <details><summary>Distances look wrong</summary><div><ul>
+        <li>Check Settings → R10 to ball matches the real distance.</li>
+        <li>Indoors, short flights into a net limit spin reads; a longer ball flight helps.</li>
+        <li>Keep the R10's firmware current through the Garmin Golf app.</li>
+      </ul></div></details>
+    </div>`;
+}
+
+function helpTv() {
+  return `
+    <p>Turn on <b>TV mode</b> for a couch-distance screen: bigger type, thicker tracer, bigger ball. Add <code>?tv</code> to the address, or use Settings → Display.</p>
+    <h3>MacBook → TV or projector (recommended)</h3>
+    <ol class="help-steps">
+      <li>Connect with an HDMI / USB-C cable, or use AirPlay: Control Center → <b>Screen Mirroring</b> → choose the Apple TV or AirPlay TV.</li>
+      <li>Start the bridge on the Mac with the R10 next to you: ${cmd('python -m r10bridge')}</li>
+      <li>Open the game on the TV-side display, then go full screen (Chrome / Safari: <b>⌃⌘F</b>): ${cmd(gameUrl('/?tv'))}</li>
+      <li>Tip: use the TV as a <b>separate display</b> (System Settings → Displays) so the terminal stays on the laptop.</li>
+    </ol>
+    <h3>iPad → TV</h3>
+    <ol class="help-steps">
+      <li>On the Mac or PC: ${cmd('python -m r10bridge --lan')} It prints an address like <code>http://your-mac.local:8765/?tv</code>.</li>
+      <li>Open that address in Safari on the iPad. Share → <b>Add to Home Screen</b> gives you a full-screen app with no browser bars.</li>
+      <li>Mirror the iPad: Control Center → Screen Mirroring → Apple TV, or a USB-C / Lightning HDMI adapter.</li>
+    </ol>
+    <div class="callout warn">For a projector in a bright room, Afternoon conditions read better than the night range. Turn the room lights down for night.</div>`;
+}
+
+function helpControls() {
+  const rows = [
+    ['Hold / release Space', 'Demo swing, or putt when on the green'],
+    ['Enter', 'Auto putt (on the green) · skip the replay'],
+    ['← →', 'Aim (finer on the green) · R resets aim'],
+    ['1–7 or ↑ ↓', 'Select club'],
+    ['M', 'Choose game'],
+    ['P', 'Players & teams'],
+    ['S / Tab', 'Scorecard (course) · session & bests'],
+    ['N', 'Switch day / night'],
+    ['C', 'Cycle camera'],
+    ['H or ?', 'This help'],
+    ['Esc', 'Close panels'],
+  ];
+  return `<table class="data"><tbody>${rows.map(([k, v]) => `<tr><td style="text-align:left"><span class="prompt-key">${esc(k)}</span></td><td style="text-align:left">${esc(v)}</td></tr>`).join('')}</tbody></table>
+    <p class="hint" style="margin-top:12px">With an R10 connected you just swing: aim with ← →, and the game does the rest. On an iPad, use the on-screen buttons.</p>`;
+}
+
+function diagHtml(game) {
+  const c = game.client;
+  const hb = c.lastHeartbeat;
+  const ago = (sec) => (sec == null ? '—' : sec < 60 ? `${Math.round(sec)} s ago` : `${Math.round(sec / 60)} min ago`);
+  const bridgeOk = c.connected && !c.stale;
+  const linked = c.state === 'ready';
+  const ds = hb?.deviceState || (linked ? 'WAITING' : null);
+  const dsText = { WAITING: 'Ready', RECORDING: 'Recording', PROCESSING: 'Processing', STANDBY: 'Standby', INTERFERENCE_TEST: 'Calibrating', ERROR: 'Error' }[ds] || '—';
+  const cell = (label, value, cls = '') => `<div><div class="dv ${cls}">${esc(value)}</div><div class="dl">${label}</div></div>`;
+  return `
+    ${cell('Bridge', bridgeOk ? `Running${hb?.version ? ` · v${hb.version}` : ''}` : c.connected ? 'Quiet…' : 'Not reached', bridgeOk ? 'ok' : 'bad')}
+    ${cell('R10 link', linked ? (c.mode === 'mock' ? 'Connected · sim' : 'Connected') : { scanning: 'Searching', connecting: 'Connecting', handshake: 'Arming', reconnecting: 'Reconnecting', bridge_lost: 'Bridge lost' }[c.state] || 'Not paired', linked ? 'ok' : 'meh')}
+    ${cell('Radar', dsText, ds === 'WAITING' ? 'ok' : ds === 'STANDBY' || ds === 'ERROR' ? 'bad' : '')}
+    ${cell('Shots', hb ? `${hb.shots ?? 0} · last ${ago(hb.lastShotAgo)}` : '—')}
+    ${cell('Heartbeat', c.lastHeartbeatAt ? ago((Date.now() - c.lastHeartbeatAt) / 1000) : '—', c.stale ? 'bad' : '')}`;
+}
+
+export function openHelp(game, tab = 'pairing') {
+  if (tab === 'bridge') tab = 'fix';
+  const render = { pairing: helpPairing, fix: helpFix, tv: helpTv, controls: helpControls };
+  const el = openPanel(`
+    ${closeX}
+    <h2>R10 help</h2>
+    <p class="panel-sub">Follow it top to bottom on a laptop or an iPad. Every command has a Copy button.</p>
+    <h3>Live status</h3>
+    <div class="diag" id="diagGrid">${diagHtml(game)}</div>
+    <div class="panel-actions" style="justify-content:flex-start;margin-top:4px">
+      <button class="btn btn-primary" id="hPair">${game.client.state === 'ready' ? 'Re-pair' : 'Pair Garmin R10'}</button>
+      <button class="btn btn-quiet" id="hWake">Re-arm radar</button>
+      <button class="btn btn-quiet" id="hReconnect">Reconnect</button>
+      <button class="btn btn-quiet" id="hTest">Test bridge</button>
+    </div>
+    <div class="tabs" role="tablist">${HELP_TABS.map(([id, label]) => `<button role="tab" data-tab="${id}" aria-selected="${id === tab}">${label}</button>`).join('')}</div>
+    <div class="help-body" id="helpBody">${render[tab]()}</div>
+    <div class="panel-actions"><button class="btn btn-ghost" data-close>Done</button></div>`, {
+    wide: true,
+    onClosed: () => { bus.off?.('bridge:heartbeat', refresh); bus.off?.('bridge:diag', refresh); bus.off?.('r10:status', refresh); },
+  });
+  const refresh = () => { const g = el.querySelector('#diagGrid'); if (g) g.innerHTML = diagHtml(game); };
+  bus.on('bridge:heartbeat', refresh);
+  bus.on('bridge:diag', refresh);
+  bus.on('r10:status', refresh);
+  el.querySelectorAll('[data-tab]').forEach((b) => b.addEventListener('click', () => {
+    el.querySelectorAll('[data-tab]').forEach((x) => x.setAttribute('aria-selected', String(x === b)));
+    const hb = el.querySelector('#helpBody');
+    hb.innerHTML = render[b.dataset.tab]();
+    copyButtons(hb);
+    audio.tick();
+  }));
+  el.querySelector('#hPair').addEventListener('click', () => { closePanel(); game.pairing.startPairing(); });
+  el.querySelector('#hWake').addEventListener('click', () => {
+    if (game.client.wake()) toast('Re-arming the radar', { kind: 'info', sub: 'Light should flash green' });
+    else toast('Bridge not connected', { kind: 'warn' });
+  });
+  el.querySelector('#hReconnect').addEventListener('click', async () => {
+    if (!game.client.connected) await game.client.open();
+    if (game.client.reconnect()) toast('Reconnecting to the R10…', { kind: 'info' });
+    else toast('Bridge not running', { kind: 'err', sub: 'Start: python -m r10bridge' });
+  });
+  el.querySelector('#hTest').addEventListener('click', async () => {
+    const ok = game.client.connected || await game.client.open(2500);
+    if (ok) { game.client.diag(); toast('Bridge is running', { kind: 'ok', sub: game.client.url.replace('ws://', '') }); } else toast('No bridge found', { kind: 'err', sub: `Tried ${game.client.candidates.map((u) => u.replace('ws://', '')).join(', ')}` });
+    refresh();
+  });
+}
+
+export function openSummary(summary, { onAgain, onRange, onScorecard } = {}) {
+  const teams = summary.teams?.length > 1 ? summary.teams : null;
   const el = openPanel(`
     <div class="summary">
       <div class="sum-label">${esc(summary.title)}</div>
@@ -256,10 +426,232 @@ export function openSummary(summary, { onAgain, onRange }) {
       <div class="sum-label">${esc(summary.scoreLabel || '')}</div>
       ${summary.isBest ? '<div class="sum-best">Personal best</div>' : ''}
       <div class="sum-verdict">${esc(summary.verdict || '')}</div>
-      ${summary.rows?.length ? `<table class="data"><tbody>${summary.rows.map((r) => `<tr><td>${esc(r.label)}</td><td>${esc(r.value)}</td><td>${esc(r.extra || '')}</td></tr>`).join('')}</tbody></table>` : ''}
+      ${teams ? `<div class="sum-teams">${teams.map((t, i) => `<div style="--pc:${t.color}"><b>${i + 1}. ${esc(t.name)}</b> · ${esc(t.display)}</div>`).join('')}</div>` : ''}
+      ${summary.rows?.length ? `<table class="data"><tbody>${summary.rows.map((r) => `<tr><td style="text-align:left">${r.color ? `<span class="lb-dot" style="display:inline-block;margin-right:8px;--pc:${r.color}"></span>` : ''}${esc(r.label)}</td><td>${esc(r.value)}</td><td>${esc(r.extra || '')}</td></tr>`).join('')}</tbody></table>` : ''}
       ${summary.footer ? `<p>${esc(summary.footer)}</p>` : ''}
-      <div class="panel-actions" style="justify-content:center"><button class="btn btn-ghost" id="sumRange">Back to the range</button><button class="btn btn-primary" id="sumAgain">Play again</button></div>
+      <div class="panel-actions" style="justify-content:center">
+        <button class="btn btn-ghost" id="sumRange">Back to the range</button>
+        ${onScorecard ? '<button class="btn btn-ghost" id="sumCard">Scorecard</button>' : ''}
+        <button class="btn btn-primary" id="sumAgain">Play again</button>
+      </div>
     </div>`, { onClosed: () => onAgain?.('closed') });
   el.querySelector('#sumAgain').addEventListener('click', () => { onClose = null; closePanel(); onAgain?.('again'); });
   el.querySelector('#sumRange').addEventListener('click', () => { onClose = null; closePanel(); onRange?.(); });
+  el.querySelector('#sumCard')?.addEventListener('click', () => { onClose = null; onScorecard(); });
 }
+
+// ── course: hole result, scorecard, setup ──
+
+function scoreClass(v, par) {
+  if (v == null) return '';
+  const d = v - par;
+  return d <= -2 ? 'eagle' : d === -1 ? 'birdie' : d === 0 ? '' : d === 1 ? 'bogey' : 'double';
+}
+
+export function openHoleSummary(game, data, onNext) {
+  const h = data.hole;
+  const m = game.mode;
+  const last = m.holeIdx >= m.holes.length - 1;
+  let next = () => { onClose = null; closePanel(); onNext?.(); };
+  const el = openPanel(`
+    <div class="summary">
+      <div class="sum-label">Hole ${h.n} · Par ${h.par}</div>
+      <div class="sum-score" style="font-size:40px">${esc(h.name)}</div>
+      <ol class="hole-result">${data.rows.map((r) => `<li style="--pc:${r.color}"><span class="dot"></span><span><b>${esc(r.name)}</b> <span class="hr-label">${esc(r.label)}</span></span><span class="hr-score">${r.strokes}</span><span class="hr-total">${esc(r.total)}</span></li>`).join('')}</ol>
+      <div class="panel-actions" style="justify-content:center">
+        <button class="btn btn-ghost" id="hsCard">Scorecard</button>
+        <button class="btn btn-primary" id="hsNext">${last ? 'Finish' : `Hole ${m.holes[m.holeIdx + 1]?.n ?? ''} ›`}</button>
+      </div>
+      <p class="hint" style="margin-top:12px;color:var(--text-3);font-size:12px">Or just take your next swing: the R10 moves things along.</p>
+    </div>`, { onClosed: () => next() });
+  el.querySelector('#hsNext').addEventListener('click', () => { audio.click(); next(); });
+  el.querySelector('#hsCard').addEventListener('click', () => { onClose = null; openScorecard(game, { onContinue: () => onNext?.() }); });
+  return () => { next = () => {}; };
+}
+
+export function openScorecard(game, { onContinue } = {}) {
+  const m = game.mode;
+  if (!m.course || !m.scorecard) { openSession(game); return; }
+  const sc = m.scorecard();
+  const n = sc.holes.length;
+  const split = n === 18;
+  const cols = split ? [...sc.holes.slice(0, 9).map((_, i) => i), 'out', ...sc.holes.slice(9).map((_, i) => i + 9), 'in', 'tot'] : [...sc.holes.map((_, i) => i), 'tot'];
+  const sum = (card, a, b) => { let t = 0, any = false; for (let i = a; i < b; i++) if (card[i] != null) { t += card[i]; any = true; } return any ? t : ''; };
+  const pars = sc.holes.map((h) => h.par);
+  const cell = (card, c, isPar = false) => {
+    if (c === 'out') return `<td class="tot">${sum(card, 0, 9)}</td>`;
+    if (c === 'in') return `<td class="tot">${sum(card, 9, 18)}</td>`;
+    if (c === 'tot') return `<td class="tot">${sum(card, 0, n)}</td>`;
+    const v = card[c];
+    const cur = c === sc.current ? ' cur' : '';
+    if (isPar) return `<td class="${cur}">${v}</td>`;
+    return `<td class="${cur}">${v == null ? '' : `<span class="sc ${scoreClass(v, pars[c])}">${v}</span>`}</td>`;
+  };
+  const head = cols.map((c) => `<th class="${c === sc.current ? 'cur' : ''}">${typeof c === 'number' ? sc.holes[c].n : c === 'tot' ? 'Tot' : c === 'out' ? 'Out' : 'In'}</th>`).join('');
+  const row = (name, color, card, extra = '', isPar = false) => `<tr><td class="name" style="--pc:${color || 'transparent'}">${color ? '<span class="dot"></span>' : ''}${esc(name)}</td>${cols.map((c) => cell(card, c, isPar)).join('')}<td class="tot">${extra}</td></tr>`;
+  const el = openPanel(`
+    ${closeX}
+    <div class="panel-head"><div><h2>Scorecard</h2><p class="panel-sub">${esc(m.name)} · ${n} holes · par ${sc.par}${sc.teams.length ? ' · teams play best ball' : ''}</p></div></div>
+    <div class="scorecard-wrap"><table class="scorecard">
+      <thead><tr><th class="name">Hole</th>${head}<th>±</th></tr></thead>
+      <tbody>
+        ${row('Par', null, pars, '', true)}
+        ${sc.players.map((p) => row(p.name, p.color, p.card, fmtToPar(p.toPar))).join('')}
+        ${sc.teams.map((t) => {
+          let tp = 0; t.card.forEach((v, i) => { if (v != null) tp += v - pars[i]; });
+          return row(t.name, t.color, t.card, fmtToPar(tp));
+        }).join('')}
+      </tbody></table></div>
+    <div class="hint" style="margin-top:10px;font-size:12px;color:var(--text-3)">○ birdie · ◎ eagle · □ bogey · ▣ double or worse</div>
+    <div class="panel-actions">
+      ${m.roundOver ? '' : '<button class="btn btn-quiet" id="scQuit">End round</button>'}
+      <button class="btn btn-primary" id="scDone">${onContinue ? 'Continue' : 'Done'}</button>
+    </div>`, { wide: true, onClosed: () => onContinue?.() });
+  el.querySelector('#scDone').addEventListener('click', () => closePanel());
+  const q = el.querySelector('#scQuit');
+  q?.addEventListener('click', () => {
+    if (!q.dataset.confirm) { q.dataset.confirm = '1'; q.textContent = 'Tap again to end the round'; return; }
+    onClose = null;
+    closePanel();
+    game.setMode('range');
+  });
+}
+
+export function openCourseSetup(game) {
+  const s = store.settings;
+  const saved = CourseMode.savedRound(game.roster);
+  let length = s.courseLength || 9;
+  let start = s.courseStart || 1;
+  let gimme = s.gimme ?? 2;
+  const pick = () => (length === 18 ? HOLES : HOLES.slice(start - 1, start + 8));
+  const holeList = () => {
+    const hs = pick();
+    return `<div class="tiles" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${hs.map((h) => `<div class="tile" style="padding:10px 12px"><div style="font-size:12px;color:var(--text-3)">${h.n} · Par ${h.par}</div><div style="font-weight:600;font-size:14px">${esc(h.name)}</div></div>`).join('')}</div>`;
+  };
+  const players = game.roster.players;
+  const el = openPanel(`
+    ${closeX}
+    <h2>The Confluence Course</h2>
+    <p class="panel-sub">Eighteen holes past the Arch, Chain of Rocks, Cahokia, the Basilica and the old Alton riverfront. Stroke play; teams play best ball.</p>
+    ${saved ? `<div class="callout" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>Round in progress: hole ${HOLES[saved.first - 1 + saved.holeIdx]?.n ?? saved.holeIdx + 1}, ${saved.length} holes</span><button class="btn btn-primary" id="csResume">Resume round</button></div>` : ''}
+    <h3>Holes</h3>
+    <div class="seg" id="csLen">
+      <button data-v="f9" aria-pressed="${length === 9 && start === 1}">Front 9</button>
+      <button data-v="b9" aria-pressed="${length === 9 && start === 10}">Back 9</button>
+      <button data-v="18" aria-pressed="${length === 18}">Full 18</button>
+    </div>
+    <div id="csHoles" style="margin-top:12px">${holeList()}</div>
+    <h3>Gimmes</h3>
+    <div class="setting" style="border:0;padding-top:0"><div><div class="hint">Putts this close count as holed, one stroke. Keeps a six-ball moving.</div></div>
+      <div class="seg" id="csGimme">${[[0, 'Off'], [2, '2 ft'], [4, '4 ft']].map(([v, l]) => `<button data-v="${v}" aria-pressed="${gimme === v}">${l}</button>`).join('')}</div></div>
+    <h3>Players</h3>
+    <div class="setting" style="border:0;padding-top:0"><div>${players.map((p) => `<span class="tb-team" style="--pc:${p.color};margin-right:6px;display:inline-block;margin-bottom:4px">${esc(p.name)}</span>`).join('')}
+      ${game.roster.teamMode ? `<div class="hint">Teams: ${game.roster.teams().map((t) => `${esc(t.name)} (${t.members.length})`).join(' vs ')}</div>` : ''}</div>
+      <button class="btn btn-quiet" id="csPlayers">Edit players</button></div>
+    <div class="panel-actions"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="csStart">Tee off</button></div>`, { wide: true });
+  el.querySelectorAll('#csLen button').forEach((b) => b.addEventListener('click', () => {
+    el.querySelectorAll('#csLen button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    length = b.dataset.v === '18' ? 18 : 9;
+    start = b.dataset.v === 'b9' ? 10 : 1;
+    el.querySelector('#csHoles').innerHTML = holeList();
+    audio.tick();
+  }));
+  el.querySelectorAll('#csGimme button').forEach((b) => b.addEventListener('click', () => {
+    el.querySelectorAll('#csGimme button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    gimme = Number(b.dataset.v);
+    audio.tick();
+  }));
+  el.querySelector('#csPlayers').addEventListener('click', () => openPlayers(game, { then: () => openCourseSetup(game) }));
+  el.querySelector('#csStart').addEventListener('click', () => {
+    store.setSetting('courseLength', length);
+    store.setSetting('courseStart', start);
+    store.setSetting('gimme', gimme);
+    onClose = null;
+    closePanel();
+    audio.click();
+    game.setMode('course', { length, gimme, startHole: start });
+  });
+  el.querySelector('#csResume')?.addEventListener('click', () => {
+    onClose = null;
+    closePanel();
+    game.setMode('course', { length: saved.length, gimme: saved.gimme, startHole: saved.first, resume: saved });
+  });
+}
+
+// ── players & teams ──
+
+export function openPlayers(game, { then } = {}) {
+  const r = game.roster;
+  const before = r.players.map((p) => p.id).join(',');
+  const render = () => {
+    const teams = r.teamMode;
+    return `
+      ${closeX}
+      <h2>Players</h2>
+      <p class="panel-sub">Up to ${MAX_PLAYERS}. Everyone shares one R10: the game says whose turn it is before each swing.</p>
+      <ol class="players">${r.players.map((p) => `
+        <li data-id="${p.id}" style="--pc:${p.color}">
+          <button class="swatch" data-color title="Change colour"></button>
+          <input value="${esc(p.name)}" maxlength="18" data-name aria-label="Player name" />
+          ${teams ? `<div class="team-pick">${TEAMS.map((t, i) => `<button data-team="${i}" style="--tc:${t.color}" aria-pressed="${p.team === i}">${t.name}</button>`).join('')}</div>` : '<span></span>'}
+          <button class="remove" data-remove title="Remove" ${r.players.length <= 1 ? 'disabled' : ''}>×</button>
+        </li>`).join('')}
+      </ol>
+      <div class="panel-actions" style="justify-content:flex-start;margin-top:0">
+        <button class="btn btn-ghost" id="plAdd" ${r.players.length >= MAX_PLAYERS ? 'disabled' : ''}>+ Add player</button>
+      </div>
+      <h3>Teams</h3>
+      <div class="setting"><div><label>Play as teams</label><div class="hint">Course: best ball. Range games: team totals.</div></div><button class="toggle" role="switch" id="plTeams" aria-checked="${teams}"></button></div>
+      ${teams ? `<div class="setting"><label>Quick split</label><div class="seg" id="plPreset">
+        <button data-p="auto">Even 2 teams</button>
+        ${r.players.length === 4 ? '<button data-p="2v2">2 v 2</button>' : ''}
+        ${r.players.length === 6 ? '<button data-p="3v3">3 v 3</button><button data-p="2v2v2">2 v 2 v 2</button>' : ''}
+      </div></div>` : ''}
+      <div class="setting"><div><label>Take turns on the range</label><div class="hint">Off: the first player hits every range ball.</div></div><button class="toggle" role="switch" id="plRotate" aria-checked="${r.rotateRange}"></button></div>
+      <div class="panel-actions"><button class="btn btn-primary" id="plDone">Done</button></div>`;
+  };
+  const finish = () => {
+    const changed = r.players.map((p) => p.id).join(',') !== before;
+    game.onRosterChanged(changed);
+    then?.();
+  };
+  const el = openPanel(render(), { onClosed: finish });
+  const bind = () => {
+    el.querySelectorAll('[data-close]').forEach((b) => b.addEventListener('click', () => closePanel()));
+    el.querySelectorAll('.players li').forEach((li) => {
+      const id = li.dataset.id;
+      li.querySelector('[data-name]').addEventListener('change', (e) => r.rename(id, e.target.value));
+      li.querySelector('[data-name]').addEventListener('keydown', (e) => { if (e.key === 'Enter') e.target.blur(); });
+      li.querySelector('[data-color]').addEventListener('click', () => {
+        const p = r.byId(id);
+        const used = new Set(r.players.filter((x) => x !== p).map((x) => x.color));
+        const i = PLAYER_COLORS.indexOf(p.color);
+        for (let k = 1; k <= PLAYER_COLORS.length; k++) {
+          const c = PLAYER_COLORS[(i + k) % PLAYER_COLORS.length];
+          if (!used.has(c)) { p.color = c; break; }
+        }
+        r.save(); audio.tick(); redraw();
+      });
+      li.querySelector('[data-remove]').addEventListener('click', () => { r.remove(id); audio.tick(); redraw(); });
+      li.querySelectorAll('[data-team]').forEach((b) => b.addEventListener('click', () => { r.setTeam(id, Number(b.dataset.team)); audio.tick(); redraw(); }));
+    });
+    el.querySelector('#plAdd').addEventListener('click', () => {
+      const p = r.add();
+      audio.tick();
+      redraw();
+      if (p) { const inp = el.querySelector(`li[data-id="${p.id}"] input`); inp?.focus(); inp?.select(); }
+    });
+    el.querySelector('#plTeams').addEventListener('click', () => { r.setTeamMode(!r.teamMode); audio.tick(); redraw(); });
+    el.querySelector('#plRotate').addEventListener('click', () => { r.rotateRange = !r.rotateRange; r.save(); audio.tick(); redraw(); });
+    el.querySelectorAll('#plPreset [data-p]').forEach((b) => b.addEventListener('click', () => { r.preset(b.dataset.p); audio.tick(); redraw(); }));
+    el.querySelector('#plDone').addEventListener('click', () => closePanel());
+  };
+  const redraw = () => {
+    // keep any name being typed
+    el.querySelectorAll('.players li').forEach((li) => { const v = li.querySelector('[data-name]').value; if (v) r.rename(li.dataset.id, v); });
+    el.innerHTML = render();
+    bind();
+  };
+  bind();
+}
+

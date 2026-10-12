@@ -27,7 +27,7 @@ function seeded(seed) {
 // ── Gateway Arch ────────────────────────────────────────────────────────────
 // Centroid curve from the NPS formula: y = 693.8597 - 68.7672 cosh(0.0100333 x) (ft),
 // |x| <= 299.2239 ft. Equilateral triangular section tapering 54 ft -> 17 ft.
-function archGeometry(scale) {
+export function archGeometry(scale) {
   const N = 140;
   const xMax = 299.2239;
   const pts = [], tangents = [], sides = [];
@@ -78,7 +78,7 @@ function archGeometry(scale) {
   return { geometry: g, top, span: 2 * xMax * FT * scale, pts };
 }
 
-function archMaterial() {
+export function archMaterial() {
   return new THREE.ShaderMaterial({
     vertexShader: /* glsl */`
       attribute float aH;

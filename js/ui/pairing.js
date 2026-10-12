@@ -91,7 +91,12 @@ export class PairingUI {
 
     bus.on('r10:status', (s) => this.onStatus(s));
     bus.on('bridge:hello', (h) => { this.mode = h.mode; this.renderPill(); });
-    bus.on('r10:device', ({ state }) => { this.deviceState = state; this.renderPill(); });
+    bus.on('r10:device', ({ state }) => { if (state !== this.deviceState) { this.deviceState = state; this.renderPill(); } });
+    bus.on('bridge:heartbeat', () => { if (!this.pop.hidden) this.renderPill(); });
+    bus.on('bridge:stale', () => toast('Bridge went quiet', { kind: 'warn', sub: 'Reconnecting… (is the laptop asleep?)' }));
+    bus.on('r10:misread', () => { this.pill.classList.remove('flash'); void this.pill.offsetWidth; this.pill.classList.add('flash'); });
+    $('#popRearm')?.addEventListener('click', () => { this.client.wake(); toast('Re-arming the radar', { kind: 'info', sub: 'Give it two seconds' }); });
+    $('#popHelp')?.addEventListener('click', () => { this.pop.hidden = true; bus.emit('ui:help', 'pairing'); });
     bus.on('r10:error', (e) => {
       const map = { PLATFORM_TILTED: 'R10 is tilted. Level it and recalibrate.', RADAR_SATURATION: 'Radar saturated. Clear reflective objects nearby.', OVERHEATING: 'R10 is overheating. Give it a minute.' };
       toast(map[e.code] || `R10 reported ${e.code}`, { kind: e.severity === 'WARNING' ? 'warn' : 'err' });
@@ -226,6 +231,7 @@ export class PairingUI {
           help: e.help(this.client.candidates[this.client.candidates.length - 1] || this.client.url),
           actions: [
             { label: 'Try again', primary: true, run: () => this.startPairing() },
+            { label: 'Pairing guide', run: () => { this.closeSheet(); bus.emit('ui:help', s.code === 'bridge_unavailable' ? 'bridge' : 'pairing'); } },
             { label: this.inGame ? 'Keep playing in demo mode' : 'Play in Demo Mode', run: () => { this.closeSheet(); this.enterGame('demo'); } },
           ],
         });
@@ -285,6 +291,12 @@ export class PairingUI {
       if (d.firmware) meta.push(['Firmware', d.firmware]);
       meta.push(['Radar', this.deviceState ? this.deviceState.toLowerCase().replace('_', ' ') : 'waiting']);
       meta.push(['Bridge', this.client.url.replace('ws://', '')]);
+      const hb = this.client.lastHeartbeat;
+      const ago = (sec) => (sec == null ? '—' : sec < 60 ? `${Math.round(sec)} s ago` : `${Math.round(sec / 60)} min ago`);
+      if (hb) {
+        meta.push(['Shots', `${hb.shots ?? 0} · last ${ago(hb.lastShotAgo)}`]);
+        meta.push(['Heartbeat', this.client.stale ? 'stale' : ago((Date.now() - this.client.lastHeartbeatAt) / 1000)]);
+      }
     } else {
       meta.push(['Bridge', this.client.url.replace('ws://', '')]);
     }
@@ -292,6 +304,8 @@ export class PairingUI {
     $('#popSimulate').hidden = !(s === 'ready' && this.mode === 'mock');
     $('#popPair').hidden = s === 'ready' || st === 'busy';
     $('#popDisconnect').hidden = s !== 'ready' && st !== 'lost';
+    const rearm = $('#popRearm');
+    if (rearm) rearm.hidden = s !== 'ready';
   }
 
   togglePopover() {

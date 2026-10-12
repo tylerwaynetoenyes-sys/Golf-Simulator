@@ -105,6 +105,58 @@ const LINES = {
     "Outside the grid. Missouri doesn't count.",
     'Long, but the rules are the rules.',
   ],
+  // ── course ──
+  eagle: [
+    'Eagle. The Piasa spread its wings for that one.',
+    'Two under. Somebody check the scorecard twice.',
+    "Eagle. That's going in the newsletter.",
+  ],
+  birdie: [
+    'Birdie. Tidy.',
+    'One under. The landmarks nod politely.',
+    "Birdie. Act like you've been here before.",
+    'Red number. Well played.',
+  ],
+  par: [
+    'Par. Nobody gets hurt.',
+    'Par. The backbone of civilization.',
+    'Fours are fine. Fours are honest.',
+  ],
+  bogey: [
+    'Bogey. It happens to rivers too.',
+    'One over. Plenty of golf left.',
+  ],
+  double: [
+    'That hole owes you one.',
+    'A number. Next tee.',
+    'Moving on. The next landmark is friendlier.',
+  ],
+  longPutt: [
+    'From downtown. Way downtown.',
+    'Rolled it in from the next zip code.',
+    'Drained it. The green had no say.',
+  ],
+  pickup: [
+    'Picked up. Mercy is a virtue.',
+    'Pocketed. Some holes are just scenery.',
+  ],
+  sand: [
+    'Beach. The Mississippi has those too.',
+    'In the sand. Dig in.',
+  ],
+  gir: [
+    'On in regulation. Very civilized.',
+    'Green hit. Putter out.',
+  ],
+  lagMiss: [
+    'Lagged it. Mostly.',
+    'Speed was a suggestion.',
+  ],
+  courseWater: [
+    'Wet. One-stroke tax.',
+    'The water hazard did its job.',
+    'Splash. Drop it and carry on.',
+  ],
   welcome: [
     'Lights are on. River\'s running. Hit when ready.',
     'Range is open. The Arch is watching. Loosely.',
@@ -135,8 +187,34 @@ export function line(category) {
  * Pick a line for a finished shot (or null to stay quiet).
  * @param {object} ctx {result, launch, club, mode, outcome}
  */
-export function commentFor({ result, launch, club, outcome }) {
+const HOLE_LINES = {
+  arch: { birdie: 'Birdie under the Arch. Very on brand.', water: 'The Arch has seen a lot of balls go in that river.' },
+  wadlow: { bomb: 'Long. Robert Wadlow would still have out-walked it.', birdie: 'Birdie. Standing tall, 8 feet 11 tall.' },
+  cahokia: { birdie: 'A thousand years of history, and one tidy birdie.' },
+  chainofrocks: { bomb: "Long enough to make the bridge's turn." },
+  piasa: { birdie: 'The Piasa approves. Probably.' },
+  riverboat: { water: 'Paddlewheel optional.' },
+  locks: { water: 'Through the locks without a ticket.' },
+};
+
+export function commentFor({ result, launch, club, outcome, hole }) {
   if (outcome?.ace) return line('ctpAce');
+  const special = hole && HOLE_LINES[hole.lm?.type];
+  if (hole) {
+    // on the course, putts and lies speak through the outcome; quiet is fine
+    const cat = outcome?.category;
+    const wet = cat === 'water';
+    if (special && Math.random() < 0.6) {
+      if (wet && special.water) return special.water;
+      if ((cat === 'birdie' || cat === 'eagle') && special.birdie) return special.birdie;
+    }
+    if (wet) return line('courseWater');
+    if (cat === 'par' || cat === 'bogey' || cat === 'gir' || cat === 'lagMiss' || cat === 'sand') return Math.random() < 0.45 ? line(cat) : null;
+    if (cat) return line(cat);
+    if (result.putt) return null;
+    const yd = result.carry / 0.9144;
+    if ((club?.id === 'DR') && yd > 280 && special?.bomb && Math.random() < 0.6) return special.bomb;
+  }
   if (result.lost) return line(result.restSurface === 'water' || result.events.some((e) => e.surface === 'water') ? 'water' : 'oob');
   if (outcome?.isBest && outcome?.bestLine) return line('pb');
   if (outcome?.category) return line(outcome.category);

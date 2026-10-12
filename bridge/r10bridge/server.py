@@ -384,7 +384,7 @@ CONTENT_TYPES = {
     ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".glb": "model/gltf-binary",
     ".gltf": "model/gltf+json", ".bin": "application/octet-stream", ".ktx2": "image/ktx2", ".hdr": "application/octet-stream",
     ".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".woff2": "font/woff2", ".ico": "image/x-icon",
-    ".txt": "text/plain; charset=utf-8", ".md": "text/plain; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8", ".md": "text/plain; charset=utf-8", ".webmanifest": "application/manifest+json",
 }
 
 

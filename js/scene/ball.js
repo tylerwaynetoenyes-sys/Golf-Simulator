@@ -70,15 +70,23 @@ export class Ball {
     this.shadow.renderOrder = 3;
     scene.add(this.shadow);
 
+    this.ground = groundHeight;
     this.spinAxis = new THREE.Vector3(1, 0, 0);
     this.spinRate = 0;
     this.visible = true;
     this.placeOnTee();
   }
 
-  placeOnTee() {
-    this.setPosition(0, 0.07 + BALL.radius, 0);
+  setGround(fn) { this.ground = fn || groundHeight; }
+
+  placeOnTee() { this.placeAt(0, 0, 0, true); }
+
+  /** Rest the ball at (x, z): on a tee peg, or sitting on the ground. */
+  placeAt(x, y, z, teed = false) {
+    const gy = this.ground(x, z);
+    this.setPosition(x, (teed ? Math.max(gy, y) + 0.07 : gy) + BALL.radius, z);
     this.spinRate = 0;
+    this.mesh.rotation.set(0, 0, 0);
     this.setVisible(true);
   }
 
@@ -92,7 +100,7 @@ export class Ball {
   setPosition(x, y, z) {
     this.mesh.position.set(x, y, z);
     this.glow.position.set(x, y, z);
-    const gh = groundHeight(x, z);
+    const gh = this.ground(x, z);
     const hgt = Math.max(0, y - gh);
     this.shadow.position.set(x, gh + 0.015, z);
     const sz = 0.09 + hgt * 0.02;
@@ -100,13 +108,16 @@ export class Ball {
     this.shadow.material.opacity = Math.max(0, 0.75 - hgt * 0.025);
   }
 
+  /** Bigger on-screen glow for TV / projector viewing. */
+  setScale(s) { this.glowScale = s; }
+
   update(dt, camera) {
     if (this.spinRate) this.mesh.rotateOnWorldAxis(this.spinAxis, this.spinRate * dt);
     const d = camera.position.distanceTo(this.mesh.position);
     // fade the screen-space glow in once the ball is small on screen
     const a = THREE.MathUtils.smoothstep(d, 4, 18);
     this.glow.material.opacity = a;
-    const px = THREE.MathUtils.clamp(0.012 + d * 0.00004, 0.012, 0.022);
+    const px = THREE.MathUtils.clamp(0.012 + d * 0.00004, 0.012, 0.022) * (this.glowScale || 1);
     this.glow.scale.set(px, px, 1);
   }
 }

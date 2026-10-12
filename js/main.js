@@ -5,6 +5,7 @@ import { World } from './scene/world.js';
 import { BridgeClient } from './net/bridgeClient.js';
 import { PairingUI } from './ui/pairing.js';
 import { HUD } from './ui/hud.js';
+import { PiasaMascot } from './ui/mascot.js';
 import { Game } from './game/game.js';
 import { store } from './data/store.js';
 import { audio } from './audio/audio.js';
@@ -53,7 +54,8 @@ async function boot() {
   let game;
   const pairing = new PairingUI(client, { onEnterGame: (how) => game.start(how) });
   const hud = new HUD({ onClub: (id) => game.selectClub(id) });
-  game = new Game(world, hud, client, pairing);
+  const piasa = new PiasaMascot($('#piasaMascot'));
+  game = new Game(world, hud, client, pairing, piasa);
   window.__game = game;
 
   // Quietly check whether a bridge is already running so the launch screen

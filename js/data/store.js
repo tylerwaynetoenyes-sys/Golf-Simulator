@@ -22,6 +22,12 @@ const DEFAULT_SETTINGS = {
   bridgeUrl: 'ws://localhost:8765',
   r10Distance: 7, // feet from the R10 to the ball
   handedness: 'right',
+  display: 'standard', // standard | tv
+  timeOfDay: 'night', // night | day
+  weather: 'clear', // clear | cloudy | breezy | windy
+  gimme: 2, // feet
+  courseLength: 9,
+  courseStart: 1,
 };
 
 class Store {
@@ -126,10 +132,10 @@ class Store {
   }
 
   toCSV(unitsLabel) {
-    const head = ['#', 'time', 'mode', 'club', 'source', 'ball_speed_mps', 'launch_deg', 'direction_deg',
+    const head = ['#', 'time', 'mode', 'player', 'club', 'source', 'ball_speed_mps', 'launch_deg', 'direction_deg',
       'spin_rpm', 'spin_axis_deg', 'club_speed_mps', 'carry_m', 'total_m', 'offline_m', 'apex_m', 'descent_deg', 'result'];
     const rows = this.session.shots.map((s, i) => [
-      i + 1, new Date(s.at).toISOString(), s.mode, s.club, s.source, s.ballSpeed.toFixed(2), s.launchAngle.toFixed(1),
+      i + 1, new Date(s.at).toISOString(), s.mode, JSON.stringify(s.player || ''), s.club, s.source, s.ballSpeed.toFixed(2), s.launchAngle.toFixed(1),
       s.launchDirection.toFixed(1), s.totalSpin.toFixed(0), s.spinAxis.toFixed(1), (s.clubSpeed || 0).toFixed(2),
       s.carry.toFixed(1), s.total.toFixed(1), s.offline.toFixed(1), s.apex.toFixed(1), s.descent.toFixed(1),
       JSON.stringify(s.result || ''),

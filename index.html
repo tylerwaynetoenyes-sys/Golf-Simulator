@@ -6,6 +6,11 @@
   <title>Alton Range</title>
   <meta name="description" content="A night driving range on the Mississippi bluffs above Alton, with live Garmin Approach R10 support." />
   <meta name="theme-color" content="#06090f" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Alton Range" />
+  <link rel="manifest" href="manifest.webmanifest" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2306090f'/%3E%3Cpath d='M14 50 Q32 2 50 50' fill='none' stroke='%23ffb46b' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='50' r='4' fill='%23fff'/%3E%3C/svg%3E" />
   <link rel="stylesheet" href="css/app.css" />
   <script type="importmap">
@@ -45,11 +50,22 @@
           <span class="r10-label" id="r10Label">Demo Mode</span>
           <span class="r10-sub" id="r10Sub">Pair R10</span>
         </button>
-        <button class="icon-btn glass" id="sessionButton" title="Session & personal bests (Tab)" aria-label="Session">
+        <button class="icon-btn glass" id="envButton" title="Time of day & weather (N)" aria-label="Time and weather" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" class="env-moon"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+          <svg viewBox="0 0 24 24" class="env-sun"><circle cx="12" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="icon-btn glass" id="playersButton" title="Players & teams (P)" aria-label="Players">
+          <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3 19c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="17" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M16.5 13.6c2.6.2 4.5 2 4.5 4.6" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+          <span class="badge" id="playersBadge" hidden></span>
+        </button>
+        <button class="icon-btn glass" id="sessionButton" title="Scorecard / session (Tab)" aria-label="Session">
           <svg viewBox="0 0 24 24"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </button>
+        <button class="icon-btn glass" id="helpButton" title="R10 help & troubleshooting (H)" aria-label="Help">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.8.4-1.2 1-1.2 1.8v.5M12 17v.3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
         <button class="icon-btn glass" id="settingsButton" title="Settings" aria-label="Settings">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.6M12 18.9v2.6M4.6 4.6l1.9 1.9M17.5 17.5l1.9 1.9M2.5 12h2.6M18.9 12h2.6M4.6 19.4l1.9-1.9M17.5 6.5l1.9-1.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          <svg viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="15" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
         </button>
       </div>
     </header>
@@ -66,10 +82,42 @@
       <dl class="pop-meta" id="popMeta"></dl>
       <div class="pop-actions">
         <button class="btn btn-quiet" id="popSimulate" hidden>Simulate swing</button>
+        <button class="btn btn-quiet" id="popRearm" hidden>Re-arm radar</button>
+        <button class="btn btn-quiet" id="popHelp">Help</button>
         <button class="btn btn-quiet" id="popPair">Pair R10</button>
         <button class="btn btn-danger-quiet" id="popDisconnect">Disconnect</button>
       </div>
     </div>
+
+    <!-- time & weather -->
+    <div class="popover glass env-pop" id="envPopover" hidden>
+      <div class="pop-title">Conditions</div>
+      <div class="env-label">Time</div>
+      <div class="seg env-seg" id="envTime">
+        <button data-time="night">Night</button>
+        <button data-time="day">Afternoon</button>
+      </div>
+      <div class="env-label">Weather</div>
+      <div class="env-weather" id="envWeather">
+        <button data-weather="clear"><b>Clear</b><small>Calm air</small></button>
+        <button data-weather="cloudy"><b>Cloudy</b><small>Light breeze</small></button>
+        <button data-weather="breezy"><b>Light wind</b><small>~8 mph, gusty</small></button>
+        <button data-weather="windy"><b>Strong wind</b><small>~20 mph, gusty</small></button>
+      </div>
+      <div class="env-note" id="envNote">Wind changes ball flight in every mode.</div>
+    </div>
+
+    <!-- leaderboard -->
+    <aside class="leaderboard glass" id="leaderboard" data-visible="false" aria-live="polite"></aside>
+
+    <!-- hole intro card -->
+    <div class="hole-card glass-strong" id="holeCard" data-visible="false" role="button" tabindex="0"></div>
+
+    <!-- name tags over other players' balls -->
+    <div class="ball-tags" id="ballTags" aria-hidden="true"></div>
+
+    <!-- the Piasa, perched -->
+    <div class="piasa-mascot" id="piasaMascot" role="button" aria-label="The Piasa"></div>
 
     <!-- club rail -->
     <nav class="club-rail glass" id="clubRail" aria-label="Club"></nav>
@@ -78,6 +126,7 @@
     <section class="shot-card glass" id="shotCard" data-visible="false" aria-live="polite">
       <div class="shot-head">
         <span class="shot-club" id="shotClub">7 Iron</span>
+        <span class="shot-player" id="shotPlayer" hidden></span>
         <span class="shot-source" id="shotSource">Demo</span>
       </div>
       <div class="shot-outcome" id="shotOutcome" hidden>
@@ -105,6 +154,9 @@
 
     <!-- bottom: prompt + swing meter -->
     <div class="bottom-center">
+      <div class="turn-banner glass" id="turnBanner" data-visible="false">
+        <span class="tb-dot"></span><span class="tb-name" id="tbName"></span><span class="tb-team" id="tbTeam" hidden></span><span class="tb-detail" id="tbDetail" hidden></span>
+      </div>
       <div class="prompt" id="prompt">
         <span class="prompt-key">Space</span> hold to swing, release to hit · <span class="prompt-key">← →</span> aim
       </div>
@@ -119,6 +171,7 @@
       </div>
       <div class="action-row">
         <button class="btn btn-swing" id="swingButton" aria-label="Hold to swing">Hold to swing</button>
+        <button class="btn btn-primary" id="autoPuttButton" hidden title="Putt with a Tour-average stroke (Enter)">Auto putt</button>
         <button class="btn btn-quiet" id="manualButton" title="Enter launch numbers">Custom shot</button>
         <button class="btn btn-quiet" id="skipButton" hidden>Skip ›</button>
       </div>
@@ -150,6 +203,7 @@
         <button class="btn btn-ghost btn-xl" id="demoButton">Play in Demo Mode</button>
       </div>
       <button class="link-btn" id="bridgeHelpButton">How to run the R10 bridge</button>
+      <div class="launch-foot"><button class="link-btn" id="launchTvButton">Playing on a TV or projector?</button></div>
     </div>
   </div>
 

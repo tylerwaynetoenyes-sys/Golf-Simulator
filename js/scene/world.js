@@ -12,7 +12,9 @@ import { Tracer } from './tracer.js';
 import { Effects } from './effects.js';
 import { CameraRig } from './cameraRig.js';
 import { Characters, ASSET_MANIFEST, loadSlot } from './assets.js';
-import { CTP_GREEN } from './layout.js';
+import { CTP_GREEN, terrain as rangeTerrain, groundHeight as rangeGround } from './layout.js';
+import { CourseWorld } from '../course/courseWorld.js';
+import { PlayerMarkers } from './markers.js';
 import { Environment } from './environment.js';
 
 export class World {
@@ -32,6 +34,11 @@ export class World {
     this.effects = new Effects(scene);
     this.rig = new CameraRig(camera);
     this.characters = new Characters(scene);
+    this.course = new CourseWorld(scene);
+    this.markers = new PlayerMarkers(scene);
+    this.sceneMode = 'range';
+    this.terrainFn = rangeTerrain;
+    this.groundFn = rangeGround;
     this.time = 0;
     this._focusV = new THREE.Vector3();
     this.env = new Environment(this);
@@ -62,6 +69,43 @@ export class World {
     }
   }
 
+  /** 'range' (the bluff) or 'course' (a Confluence Course hole). */
+  setScene(mode) {
+    if (mode === this.sceneMode) return;
+    this.sceneMode = mode;
+    const course = mode === 'course';
+    this.terrain.group.visible = !course;
+    this.range.group.visible = !course;
+    this.river.mesh.visible = !course;
+    this.skyline.bridgeGroup.visible = !course;
+    this.skyline.setNearVisible?.(!course);
+    this.course.setVisible(course);
+    if (!course) {
+      this.terrainFn = rangeTerrain;
+      this.groundFn = rangeGround;
+      this.ball.setGround(rangeGround);
+      this.rig.setGround(rangeGround);
+      this.rig.setAddress(new THREE.Vector3(0, 0.1, 0), 0);
+      this.markers.set([]);
+    }
+    // the moon/sun key light lives in the range group; keep it lit everywhere
+    this.range.group.visible = true;
+    this.range.setPropsVisible(!course);
+    this.env?.apply();
+  }
+
+  /** Build a course hole and point physics/camera/ball at its terrain. */
+  loadHole(hole) {
+    this.setScene('course');
+    const T = this.course.load(hole);
+    this.terrainFn = T.terrain;
+    this.groundFn = T.groundHeight;
+    this.ball.setGround(T.groundHeight);
+    this.rig.setGround(T.groundHeight);
+    this.env.apply();
+    return T;
+  }
+
   setQuality(name) {
     this.r.setQuality(name);
     this.river.setBudget(this.r.quality.waterLights);
@@ -87,6 +131,8 @@ export class World {
     this.tracer.update(dt);
     this.effects.update(dt);
     this.characters.update(dt);
+    if (this.sceneMode === 'course') this.course.update(t);
+    this.markers.update(t);
     if (render) this.r.render();
   }
 }

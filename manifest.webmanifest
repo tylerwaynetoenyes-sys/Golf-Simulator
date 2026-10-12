@@ -1,0 +1,13 @@
+{
+  "name": "Alton Range",
+  "short_name": "Alton Range",
+  "description": "Golf on the Mississippi bluffs, with Garmin R10 support.",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#06090f",
+  "theme_color": "#06090f",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

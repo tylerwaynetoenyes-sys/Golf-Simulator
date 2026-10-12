@@ -19,6 +19,8 @@ export const ASSET_MANIFEST = {
   riverboat: { url: null, replaces: 'riverboat' },
   canopy: { url: null, replaces: 'canopy' },
   sign: { url: null, replaces: 'altonSign' },
+  // 2-D artwork: your own Piasa image (png/jpg/svg) for the bluff mural + HUD mascot
+  piasa: { url: null },
 };
 
 const loader = new GLTFLoader();
