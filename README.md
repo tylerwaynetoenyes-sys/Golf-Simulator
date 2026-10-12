@@ -1,36 +1,46 @@
 # Alton Range
 
-A night driving range on the bluffs above the Mississippi, in the browser.
-The Gateway Arch glows on the horizon, barges work the river below, and every
-swing from a **Garmin Approach R10** lands live with a glowing tracer, a
-cinematic camera and the full set of numbers.
+Golf on the bluffs above the Mississippi, in the browser. A night (or
+afternoon) driving range with the Gateway Arch on the horizon, an 18-hole
+course built around St. Louis and Alton landmarks, up to six players with
+teams, and every swing from a **Garmin Approach R10** landing live with a
+glowing tracer, a cinematic camera and the full set of numbers.
 
 ![Ball flight down the range at night](docs/screenshots/02-ball-flight.jpg)
 
 | | |
 |---|---|
-| ![Landing camera](docs/screenshots/03-landing-cam.jpg) | ![Shot card](docs/screenshots/04-shot-card.jpg) |
-| ![Pairing](docs/screenshots/08-pair-connected.jpg) | ![Closest to pin](docs/screenshots/05-closest-to-pin.jpg) |
+| ![Hole intro](docs/screenshots/10-course-intro.jpg) | ![Afternoon on the course](docs/screenshots/11-course-day.jpg) |
+| ![Landing camera](docs/screenshots/03-landing-cam.jpg) | ![Four players, two teams](docs/screenshots/12-multiplayer.jpg) |
+| ![Pairing](docs/screenshots/08-pair-connected.jpg) | ![R10 help](docs/screenshots/13-r10-help.jpg) |
 
 ## Quick start
 
-**With the R10 (or to try the pairing flow):**
+**Open the game (with or without an R10):**
 
 ```bash
 cd bridge
-pip install -r requirements.txt
+pip install -r requirements.txt     # first time only (Python 3.10+)
 python -m r10bridge --open          # serves the game at http://localhost:8765
 ```
 
-Then press **Pair Garmin R10**. No R10 handy? Run `python -m r10bridge --mock --open`
-for a simulated R10 that goes through the full Bluetooth protocol stack.
+Open **<http://localhost:8765>**, then press **Pair Garmin R10**, or **Play in
+Demo Mode**. No R10 handy? `python -m r10bridge --mock --open` runs a simulated
+R10 through the full Bluetooth protocol stack.
 
-**Demo mode only (no Python needed):** serve the folder with any static server
-and open it in a browser. ES modules don't load from `file://`.
+| You want | Run on the computer | Open |
+|---|---|---|
+| Play on this computer | `python -m r10bridge` | `http://localhost:8765` |
+| Play on a TV or projector from the computer | `python -m r10bridge` | `http://localhost:8765/?tv` |
+| Use an iPad as the screen | `python -m r10bridge --lan` | `http://<computer-name>.local:8765/?tv` on the iPad (the bridge prints the exact address) |
+| Check the Bluetooth setup step by step | `python -m r10bridge --diagnose` | — |
+| Rehearse without hardware | `python -m r10bridge --mock` | `http://localhost:8765` |
+
+**Demo mode only (no Python needed):** serve the folder with any static server.
+ES modules don't load from `file://`.
 
 ```bash
 python -m http.server 8000          # then open http://localhost:8000
-# or: npx serve .
 ```
 
 Requires a WebGL 2 browser: current Chrome, Edge, Safari or Firefox.
@@ -61,38 +71,116 @@ If the R10 isn't found or pairing fails, you get specific fixes, plus a way
 straight into demo mode. If the link drops mid-session, the bridge reconnects
 on its own and the game keeps playing in demo mode until it's back.
 
+Press **?** (or the help button, top right) in the game at any time for the
+**R10 help** panel. It shows live bridge status (heartbeat, radar state, shot
+count), has **Re-arm radar**, **Reconnect** and **Test bridge** buttons, and
+walks through pairing, troubleshooting ("shots don't register", "no R10
+found", macOS/iPad issues) and TV setup. It's written to follow on an iPad or
+a MacBook.
+
+**Reliability.** The bridge retries transient Bluetooth errors, re-sends the
+handshake if the R10 is slow to arm, reconnects without limit if the link
+drops, re-arms the radar when it falls into standby, and sends a heartbeat
+every 5 seconds. The game treats a silent bridge (a sleeping laptop) as lost
+and reconnects. Shots are de-duplicated by the R10's shot ID, and a swing the
+radar saw without the ball shows a "check alignment" toast instead of
+vanishing. A rotating log goes to `~/.r10bridge/bridge.log`.
+
+On a Mac that might sleep mid-round: `caffeinate -dims python -m r10bridge`.
+
 OS notes, CLI options and the WebSocket message format are in
 [`bridge/README.md`](bridge/README.md).
+
+## Big screen: TV, projector, iPad
+
+TV mode scales the whole interface for couch distance (3–4 m) and thickens
+the tracer and ball. Turn it on with `?tv` in the address or *Settings → Screen*.
+
+- **MacBook → TV (recommended).** Connect HDMI / USB-C, or AirPlay
+  (*Control Center → Screen Mirroring*). Use the TV as a separate display so
+  the terminal stays on the laptop. Run `python -m r10bridge`, open
+  `http://localhost:8765/?tv` on the TV display, and go full screen (⌃⌘F).
+- **iPad → TV.** iPadOS can't run the bridge, so run it on a Mac or PC with
+  `python -m r10bridge --lan`. It prints the address to open on the iPad, e.g.
+  `http://your-mac.local:8765/?tv`. In Safari use *Share → Add to Home Screen*
+  for a full-screen app, then mirror the iPad to an Apple TV or through a
+  USB-C / Lightning HDMI adapter. The game keeps the screen awake while you play.
+- **Projector.** Same as the MacBook setup. Afternoon conditions read better
+  in a bright room; turn the lights down for the night range.
+
+`--lan` lets other devices on your network open the game and connect to the
+bridge. Use it on your home Wi-Fi, not on a network you don't trust.
 
 ## Playing
 
 | Input | Action |
 |---|---|
+| **Swing with the R10** | Every swing is a shot for whoever's turn it is |
 | **Hold Space / hold the Swing button** | Demo swing: release in the green zone (84–98%) for a pure strike; soft swings stay clean, over-swings get wild |
-| **← →** | Aim (also rotates R10 shots, like any simulator's target line) |
-| **1–7** or **↑ ↓** | Club |
-| **Enter** / double-click | Skip to the result |
+| **← →** | Aim (also rotates R10 shots, like any simulator's target line); finer on the green; **R** resets |
+| **1–7** or **↑ ↓** | Club (the course picks one for you each shot) |
+| **Enter** | On the green: auto putt. Otherwise: skip to the result |
+| **M** / **P** / **S** | Choose a game / players & teams / scorecard |
+| **N** | Day ↔ night |
 | **C** | Camera: Cinematic → Follow → Tee |
-| **M** | Choose a game |
 | **Tab** | Session stats and personal bests |
+| **H** or **?** | R10 help |
 | **Custom shot** | Type in launch numbers from any monitor |
 
 ### Games
 
-- **Driving Range.** Free practice with ghost tracers of your last six shots,
-  a dispersion mini-map and five lit target greens.
-- **Closest to Pin** (featured). Five holes at varied distances (wedges, mixed
-  or long), wind per hole, a pin marker in view, and proximity scoring
-  (100 points × e^(−metres/6); 250 for an ace). In demo mode the prompt shows
-  the swing % your club needs for the hole.
-- **Target Practice.** Three targets, three balls each, scored by where the
-  ball lands: bullseye 50, inner 30, on target 15, near miss 5.
-- **Longest Drive.** Six balls into a 50-yard grid, with the best ball counting.
-  The bluff edge sits at about 330 yards, so a big enough drive will find the
-  Mississippi.
+- **The Confluence Course.** Front 9, back 9, or all 18 (par 70). Each hole
+  is themed on a landmark: the Gateway Arch, the Old Courthouse, Eads Bridge,
+  the Alton riverfront, the Piasa bluff, Chain of Rocks Bridge and its bend,
+  Monks Mound at Cahokia, the Cathedral Basilica, a riverboat, Union Station,
+  the Climatron, the Grand Avenue Water Tower, the confluence of the Missouri
+  and Mississippi, Mel Price Locks & Dam, the World's Fair Pavilion, the Jewel
+  Box, Robert Wadlow (the Alton giant), and the Arch again to finish. Holes
+  have elevation, doglegs, sloped greens, bunkers, creeks, ponds and an island
+  green. Each hole opens with a fly-over and a hole card. Rules: rough and sand
+  cost distance and spin, water is a one-stroke drop, out of bounds is stroke
+  and distance, gimmes (off / 2 ft / 4 ft), and a pick-up at par + 4 keeps a
+  six-ball moving. **Putting:** press Enter for an auto putt (Tour make
+  percentages by distance, rolled for real on the slope), or hold Space to
+  putt yourself with the read shown on screen. The round saves after every
+  hole and resumes after a reload.
+- **Driving Range.** Free practice with ghost tracers, a dispersion mini-map
+  and five lit target greens.
+- **Closest to Pin.** Five holes at varied distances (wedges, mixed or long),
+  wind per hole, and proximity scoring (100 points × e^(−metres/6); 250 for an ace).
+- **Target Practice.** Three targets, three balls each: bullseye 50, inner 30,
+  on target 15, near miss 5.
+- **Longest Drive.** Balls into a 50-yard grid, best ball counts. The bluff
+  edge sits at about 330 yards, so a big enough drive finds the Mississippi.
+
+### Players and teams
+
+One to six players share one R10. The game says whose turn it is before each
+swing, colours the tracer per player, and keeps a live leaderboard. On the
+course, everyone tees off in honour order and then the player farthest from the
+hole plays, with name tags over everyone's ball. Turn on **teams** for 2 v 2,
+3 v 3, 2 v 2 v 2 or any custom split: the course plays best ball, and the range
+games add up team totals. Names and colours are remembered.
+
+### Conditions
+
+The sun/moon button switches **Night ↔ Afternoon** with a smooth transition and
+sets the weather: **Clear, Cloudy, Light wind (~8 mph, gusty), Strong wind
+(~20 mph, gusty)**. Wind moves the ball in every mode, shows in the HUD as an
+arrow relative to your target, and turns with each hole on the course.
+
+### The Piasa
+
+The Piasa, the creature Marquette and Jolliet recorded painted on the bluffs
+near Alton in 1673, perches in the corner of the screen. It beats its wings at
+birdies, eagles and big drives, winces at water, and otherwise leaves you alone.
+Tap it for a line of history. It's also painted on the cliff behind hole 5. The
+artwork is original; to use your own Piasa image, set `ASSET_MANIFEST.piasa.url`
+in `js/scene/assets.js`.
 
 Personal bests (longest drive, top ball speed, carry by club, closest to pin,
-best rounds) persist in the browser. Sessions export to CSV.
+best rounds, best 9 and 18) persist in the browser. Sessions export to CSV with
+the player name on every shot.
 
 ## Ball physics
 
@@ -122,14 +210,16 @@ js/core/                     physics, units, event bus
 js/scene/                    renderer, sky, terrain, river shader, skyline (Arch, bridge,
                              barges, riverboat), range props, ball, tracer, effects, camera,
                              asset slots (glTF / characters)
-js/game/                     game controller, modes, commentary
+js/game/                     game controller, range modes, course mode, roster, commentary
+js/course/                   hole data, analytic hole terrain, landmarks, course scene
 js/net/bridgeClient.js       WebSocket client for the bridge
-js/ui/                       pairing flow, HUD, panels
+js/ui/                       pairing flow, HUD, panels (help, players, scorecard), Piasa
 js/audio/audio.js            procedural WebAudio sound (impacts, flight, splash, ambience, UI)
 js/data/                     clubs, session store, personal bests
 bridge/                      Python R10 bridge (port of 10over) + tests
 vendor/three/                three.js r186, vendored so the game works offline
 tools/calibrate.mjs          physics calibration check
+tools/holes-check.mjs        course sanity check (tees, greens, hazards, par)
 ```
 
 ## Adding Blender / glTF assets and scanned characters

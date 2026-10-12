@@ -404,7 +404,8 @@ export class Game {
     const club = launch.putt ? { id: 'PT', name: 'Putter', short: 'PT', ballMph: 5, smash: 1.5 } : this.club;
     const player = this.player;
     const outcome = this.mode.evaluate(result, launch, club, player) || {};
-    if (!launch.putt) this._globalBests(result, launch, club, outcome);
+    // personal bests are personal: only tracked when one player is on the tee
+    if (!launch.putt && !this.roster.multi) this._globalBests(result, launch, club, outcome);
 
     if (!launch.putt) {
       store.addShot({
