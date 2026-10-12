@@ -72,18 +72,22 @@ function makeFlag(color, poleHeight = 2.4, emissive = 1.2) {
   });
   flagMat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = { value: 0 };
+    sh.uniforms.uWind = { value: 0.3 };
     flagMat.userData.shader = sh;
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;')
+      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWind;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
         float k = position.x / 0.55;
-        transformed.z += sin(position.x * 9.0 - uTime * 6.0) * 0.06 * k;
-        transformed.y += sin(position.x * 7.0 - uTime * 4.0) * 0.02 * k;`);
+        float amp = 0.02 + 0.09 * uWind;
+        float spd = 3.0 + 9.0 * uWind;
+        transformed.z += sin(position.x * 9.0 - uTime * spd) * amp * k;
+        transformed.y += sin(position.x * 7.0 - uTime * spd * 0.7) * amp * 0.35 * k - (1.0 - uWind) * 0.12 * k * k;`);
   };
   const flag = new THREE.Mesh(flagGeo, flagMat);
   flag.position.y = poleHeight - 0.2;
   g.add(flag);
   g.userData.flagMat = flagMat;
+  g.userData.baseEmissive = emissive;
   return g;
 }
 
@@ -99,6 +103,8 @@ function greenRing(radius, color, opacity = 0.5, width = 0.12) {
 export function createRange(scene, river, quality) {
   const group = new THREE.Group();
   const rand = seeded(2026);
+  let windAmt = 0.3;
+  let signLightBase = 30;
   const flags = [];
   const updaters = [];
 
@@ -183,8 +189,10 @@ export function createRange(scene, river, quality) {
   bayLight.shadow.mapSize.set(1024, 1024);
   bayLight.shadow.bias = -0.0005;
   group.add(bayLight, bayLight.target);
+  const bayLights = [bayLight];
   for (const sx of [-12.6, 12.6]) {
     const l = new THREE.SpotLight(AMBER, 12, 16, 1.1, 0.7, 1.6);
+    bayLights.push(l);
     l.position.set(sx, 3.68, 2.2);
     l.target.position.set(sx, 0, 0);
     group.add(l, l.target);
@@ -192,6 +200,7 @@ export function createRange(scene, river, quality) {
 
   // ── Floodlight towers ──
   const towerZs = [-30, -115, -205];
+  const floods = [];
   const coneMat = lightConeMaterial(0xffc58a, 0.05);
   const lampHeadMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd29a).multiplyScalar(6) });
   for (const z of towerZs) {
@@ -221,6 +230,7 @@ export function createRange(scene, river, quality) {
       group.add(head);
 
       const spot = new THREE.SpotLight(0xffbf80, 3200, 260, 0.62, 0.75, 1.7);
+      floods.push(spot);
       spot.position.set(x, baseY + h, z);
       spot.target.position.copy(target);
       group.add(spot, spot.target);
@@ -358,7 +368,7 @@ export function createRange(scene, river, quality) {
     const on = flick > 0 ? (Math.sin(t * 60) > 0.2 ? 1 : 0.15) : 1;
     if (flick < -6 - Math.random() * 10) flick = 0.4 + Math.random() * 0.5;
     signLamps[1].material = on > 0.5 ? lampMat : steel;
-    signLight.intensity = 20 + 10 * on;
+    signLight.intensity = signLightBase * (0.66 + 0.34 * on);
   });
 
   // ── Trees ──
@@ -447,6 +457,8 @@ export function createRange(scene, river, quality) {
 
   return {
     group,
+    moon,
+    hemi,
     canopy,
     sign,
     bayLight,
@@ -465,10 +477,28 @@ export function createRange(scene, river, quality) {
         o.rim.material.opacity = on && active ? 0.9 : o.baseOpacity;
       }
     },
+    setWind(strength01, fromDeg) {
+      windAmt = strength01;
+      // flags stream downwind (yaw the flag group)
+      const yaw = ((fromDeg + 90) * Math.PI) / 180;
+      for (const f of flags) f.children[1].rotation.y = yaw;
+    },
+    /** 0 = night, 1 = day: floodlights fade out, the moon becomes the sun. */
+    setDay(d) {
+      const n = 1 - d;
+      for (const l of floods) l.intensity = 3200 * n;
+      for (const l of bayLights) l.intensity = (l === bayLight ? 16 : 12) * (0.15 + 0.85 * n);
+      coneMat.uniforms.uStrength.value = 0.05 * n;
+      lampHeadMat.color.setRGB(0.4 + 5.6 * n, 0.38 + 4.6 * n, 0.35 + 3.5 * n);
+      stripMat.color.setRGB(0.5 + 2.7 * n, 0.45 + 1.95 * n, 0.4 + 1.1 * n);
+      signLightBase = 30 * n;
+      pinLight.intensity = 14 * n;
+      for (const f of flags) f.userData.flagMat.emissiveIntensity = f.userData.baseEmissive * (0.25 + 0.75 * n);
+    },
     update(t, dt) {
       for (const f of flags) {
         const sh = f.userData.flagMat.userData.shader;
-        if (sh) sh.uniforms.uTime.value = t;
+        if (sh) { sh.uniforms.uTime.value = t; sh.uniforms.uWind.value = windAmt; }
       }
       for (const u of updaters) u(t, dt);
       beam.material.opacity = 1;

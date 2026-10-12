@@ -184,10 +184,10 @@ export function createTerrain(scene) {
 
   // ── Missouri floodplain across the river ──
   const far = new THREE.Mesh(
-    new THREE.PlaneGeometry(30000, 14000, 1, 1).rotateX(-Math.PI / 2),
-    new THREE.MeshStandardMaterial({ color: 0x0b0f0b, roughness: 1 }),
+    new THREE.PlaneGeometry(120000, 60000, 1, 1).rotateX(-Math.PI / 2),
+    new THREE.MeshLambertMaterial({ color: 0x6f8a52 }),
   );
-  far.position.set(0, LAYOUT.riverY + 1.2, LAYOUT.riverFar - 7000);
+  far.position.set(0, LAYOUT.riverY + 1.2, LAYOUT.riverFar - 30000);
   group.add(far);
 
   scene.add(group);

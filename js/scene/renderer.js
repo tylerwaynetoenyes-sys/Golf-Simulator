@@ -20,7 +20,7 @@ export class Renderer {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.scene = new THREE.Scene();
-    this.camera = new THREE.PerspectiveCamera(52, 1, 0.05, 30000);
+    this.camera = new THREE.PerspectiveCamera(52, 1, 0.05, 90000);
     this.quality = QUALITY[quality] || QUALITY.high;
     this.qualityName = quality;
 

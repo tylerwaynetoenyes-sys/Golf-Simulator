@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Assembles the scene: sky, terrain, river, skyline, range props, ball,
 // tracer, effects, camera rig and (optional) characters.
 import { Renderer } from './renderer.js';
@@ -12,6 +13,7 @@ import { Effects } from './effects.js';
 import { CameraRig } from './cameraRig.js';
 import { Characters, ASSET_MANIFEST, loadSlot } from './assets.js';
 import { CTP_GREEN } from './layout.js';
+import { Environment } from './environment.js';
 
 export class World {
   constructor(canvas, quality = 'high') {
@@ -31,6 +33,8 @@ export class World {
     this.rig = new CameraRig(camera);
     this.characters = new Characters(scene);
     this.time = 0;
+    this._focusV = new THREE.Vector3();
+    this.env = new Environment(this);
     this.loadAuthoredAssets();
   }
 
@@ -77,6 +81,8 @@ export class World {
     this.skyline.update(t, dt, this.camera, this.r.renderer.domElement.height);
     this.range.update(t, dt);
     this.rig.update(dt, ballPos, playT);
+    this.env.focus(this._focusV.lerpVectors(this.camera.position, this.rig.look, 0.3));
+    this.env.update(dt);
     this.ball.update(dt, this.camera);
     this.tracer.update(dt);
     this.effects.update(dt);

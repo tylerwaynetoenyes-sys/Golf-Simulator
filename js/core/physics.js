@@ -41,10 +41,19 @@ export const GROUND = {
   fairway: { restitution: 0.354, friction: 0.546, roll: 4.0, rollDrag: 0.50 },
   rough: { restitution: 0.25, friction: 0.9, roll: 6.5, rollDrag: 1.1 },
   green: { restitution: 0.3, friction: 0.62, roll: 1.1, rollDrag: 0.16 },
+  fringe: { restitution: 0.3, friction: 0.7, roll: 2.4, rollDrag: 0.35 },
   tee: { restitution: 0.3, friction: 0.6, roll: 4.0, rollDrag: 0.5 },
+  sand: { restitution: 0.06, friction: 1.6, roll: 11, rollDrag: 2.5 },
+  path: { restitution: 0.55, friction: 0.3, roll: 1.2, rollDrag: 0.1 },
   water: null,
   oob: null,
 };
+
+// Rolling on an incline: a solid sphere accelerates at (5/7)·g·slope.
+const ROLL_SLOPE = (5 / 7) * 9.80665;
+
+/** Putting green pace: ~10.5 on the Stimpmeter (1.83 m/s release rolls ~3.2 m). */
+export const PUTT = { decel: 0.42, drag: 0.06, cupRadius: 0.054, capture: 1.35 };
 
 function dragCoeff(speed, S) {
   const re = (speed * 2 * BALL.radius) / AERO.kinViscosity;
@@ -68,30 +77,42 @@ function liftCoeff(S) {
  * @property {number} spinAxis  deg (+ = curves right / fade for RH)
  */
 
+function slopeAt(terrain, x, z) {
+  const e = 0.2;
+  const hx = (terrain(x + e, z).height - terrain(x - e, z).height) / (2 * e);
+  const hz = (terrain(x, z + e).height - terrain(x, z - e).height) / (2 * e);
+  return [hx, hz];
+}
+
 /**
- * @param {Launch} launch
+ * Simulate a full shot from any position on the course.
+ * @param {Launch} launch  launchDirection is relative to `heading`
  * @param {object} opts
  * @param {(x:number,z:number)=>{height:number, surface:string}} [opts.terrain]
- * @param {{x:number,z:number}} [opts.wind]  m/s
+ * @param {{x:number,z:number}} [opts.wind]  air velocity, m/s
+ * @param {{x:number,y:number,z:number}} [opts.origin]  ball position (default tee at origin)
+ * @param {number} [opts.heading]  target-line direction in degrees, 0 = down -Z, + = right
  */
 export function simulateShot(launch, opts = {}) {
   const terrain = opts.terrain || (() => ({ height: 0, surface: 'fairway' }));
   const wind = opts.wind || { x: 0, z: 0 };
   const dt = 1 / 240;
+  const o = opts.origin || { x: 0, y: opts.teeHeight ?? 0.03, z: 0 };
+  const hd = ((opts.heading || 0) * Math.PI) / 180;
 
   const v0 = Math.max(0.5, launch.ballSpeed);
   const la = (launch.launchAngle * Math.PI) / 180;
-  const ld = (launch.launchDirection * Math.PI) / 180;
+  const ld = hd + (launch.launchDirection * Math.PI) / 180;
   const sa = (launch.spinAxis * Math.PI) / 180;
 
-  let px = 0, py = opts.teeHeight ?? 0.03, pz = 0;
+  let px = o.x, py = o.y, pz = o.z;
   let vx = v0 * Math.cos(la) * Math.sin(ld);
   let vy = v0 * Math.sin(la);
   let vz = -v0 * Math.cos(la) * Math.cos(ld);
 
   // Spin axis: horizontal "right" of the launch direction, tilted by spin axis.
-  const rx = Math.cos(ld), rz = Math.sin(ld); // right vector of (sin ld, 0, -cos ld)
-  let ax = rx * Math.cos(sa), ay = -Math.sin(sa), az = rz * Math.cos(sa);
+  const rx = Math.cos(ld), rz = Math.sin(ld);
+  const ax = rx * Math.cos(sa), ay = -Math.sin(sa), az = rz * Math.cos(sa);
   let omega = Math.max(0, launch.totalSpin) * RPM; // rad/s
 
   const k = (0.5 * AERO.airDensity * BALL.area) / BALL.mass;
@@ -101,9 +122,9 @@ export function simulateShot(launch, opts = {}) {
   let apex = { y: py, x: px, z: pz, t: 0 };
   let carry = null;
   let landing = null;
-  let levelCross = null; // where a descending ball passes back through tee height
+  let levelCross = null; // where a descending ball passes back through launch height
 
-  const accel = (x, y, z, ux, uy, uz, w) => {
+  const accel = (ux, uy, uz, w) => {
     const rvx = ux - wind.x, rvy = uy, rvz = uz - wind.z;
     const sp = Math.hypot(rvx, rvy, rvz) || 1e-6;
     const S = (BALL.radius * w) / sp;
@@ -122,18 +143,18 @@ export function simulateShot(launch, opts = {}) {
     ];
   };
 
-  // ── flight (RK4) ⇄ roll. A rolling ball can run off the bluff and fly again. ──
+  // ── flight (RK4) ⇄ roll. A rolling ball can run off a ledge and fly again. ──
   let phase = 'flight';
   let bounces = 0;
   let lastSurface = 'fairway';
-  const maxT = 40;
+  const maxT = 45;
   while ((phase === 'flight' || phase === 'roll') && t < maxT) {
     if (phase === 'flight') {
       const w = omega;
-      const a1 = accel(px, py, pz, vx, vy, vz, w);
-      const a2 = accel(px + vx * dt / 2, py + vy * dt / 2, pz + vz * dt / 2, vx + a1[0] * dt / 2, vy + a1[1] * dt / 2, vz + a1[2] * dt / 2, w);
-      const a3 = accel(px + (vx + a1[0] * dt / 2) * dt / 2, py + (vy + a1[1] * dt / 2) * dt / 2, pz + (vz + a1[2] * dt / 2) * dt / 2, vx + a2[0] * dt / 2, vy + a2[1] * dt / 2, vz + a2[2] * dt / 2, w);
-      const a4 = accel(px + (vx + a2[0] * dt / 2) * dt, py + (vy + a2[1] * dt / 2) * dt, pz + (vz + a2[2] * dt / 2) * dt, vx + a3[0] * dt, vy + a3[1] * dt, vz + a3[2] * dt, w);
+      const a1 = accel(vx, vy, vz, w);
+      const a2 = accel(vx + a1[0] * dt / 2, vy + a1[1] * dt / 2, vz + a1[2] * dt / 2, w);
+      const a3 = accel(vx + a2[0] * dt / 2, vy + a2[1] * dt / 2, vz + a2[2] * dt / 2, w);
+      const a4 = accel(vx + a3[0] * dt, vy + a3[1] * dt, vz + a3[2] * dt, w);
       const nvx = vx + (dt / 6) * (a1[0] + 2 * a2[0] + 2 * a3[0] + a4[0]);
       const nvy = vy + (dt / 6) * (a1[1] + 2 * a2[1] + 2 * a3[1] + a4[1]);
       const nvz = vz + (dt / 6) * (a1[2] + 2 * a2[2] + 2 * a3[2] + a4[2]);
@@ -145,7 +166,7 @@ export function simulateShot(launch, opts = {}) {
       t += dt;
 
       if (py > apex.y) apex = { y: py, x: px, z: pz, t };
-      if (!levelCross && vy < 0 && py <= 0) {
+      if (!levelCross && vy < 0 && py <= o.y) {
         const hsl = Math.hypot(vx, vz);
         levelCross = { x: px, z: pz, t, descent: (Math.atan2(-vy, hsl) * 180) / Math.PI, speed: Math.hypot(vx, vy, vz) };
       }
@@ -160,8 +181,9 @@ export function simulateShot(launch, opts = {}) {
       const hs = Math.hypot(vx, vz);
       const descent = (Math.atan2(-vy, hs) * 180) / Math.PI;
       if (!carry) {
-        // Off the bluff: quote carry where it came back through tee height.
-        carry = py < -2 && levelCross ? { ...levelCross } : { x: px, z: pz, t, descent, speed };
+        // Dropping well below the launch height (off a bluff): quote carry where
+        // it came back through launch height.
+        carry = py < o.y - 8 && levelCross ? { ...levelCross } : { x: px, z: pz, t, descent, speed };
         landing = { x: px, y: py, z: pz, t, surface: ground.surface };
       }
       samples.push({ t, x: px, y: py, z: pz, phase: 'impact' });
@@ -169,7 +191,7 @@ export function simulateShot(launch, opts = {}) {
       lastSurface = ground.surface;
 
       const surf = GROUND[ground.surface];
-      if (!surf) { // river / out of bounds: ball is gone
+      if (!surf) { // water / out of bounds: ball is gone
         phase = 'gone';
         events.push({ type: 'splash', t, x: px, y: py, z: pz, surface: ground.surface });
         break;
@@ -177,7 +199,7 @@ export function simulateShot(launch, opts = {}) {
 
       // ── bounce ──
       const vn = -vy;
-      const e = Math.max(0.08, surf.restitution - 0.011 * vn);
+      const e = Math.max(0.05, surf.restitution - 0.011 * vn);
       const hdx = hs > 1e-6 ? vx / hs : 0;
       const hdz = hs > 1e-6 ? vz / hs : -1;
       // Backspin component along travel direction (spin about the horizontal right axis).
@@ -189,18 +211,16 @@ export function simulateShot(launch, opts = {}) {
       let hNew = hs - surf.friction * bite * (hs + rw) * (2 / 7) * 2.2;
       hNew = Math.max(hNew, -0.12 * hs); // a little zip back at most
       if (hs > 1e-6 && hNew < hs * 0.04 && rw < hs) hNew = Math.max(hNew, hs * 0.04);
+      if (ground.surface === 'sand') hNew = Math.min(hNew, hs * 0.08); // plugs / dies in the bunker
       vx = hdx * hNew;
       vz = hdz * hNew;
       vy = vn * e;
       omega *= 0.45;
       bounces++;
-      if (vy < 1.1 || bounces > 6) phase = 'roll';
+      if (vy < 1.1 || bounces > 6) { phase = 'roll'; vy = 0; }
     } else {
-      // ── roll ──
+      // ── roll: 2-D, with slope ──
       const rollDt = 1 / 120;
-      let speed = Math.hypot(vx, vz);
-      if (speed <= 0.04) { phase = 'rest'; break; }
-      const dirx = vx / speed, dirz = vz / speed;
       const ground = terrain(px, pz);
       const surf = GROUND[ground.surface];
       if (!surf) {
@@ -209,15 +229,25 @@ export function simulateShot(launch, opts = {}) {
         break;
       }
       lastSurface = ground.surface;
+      const [gx, gz] = slopeAt(terrain, px, pz);
+      let speed = Math.hypot(vx, vz);
+      const slopeAcc = ROLL_SLOPE * Math.hypot(gx, gz);
+      if (speed < 0.05 && slopeAcc < surf.roll * 0.85) { phase = 'rest'; break; }
       const decel = surf.roll + surf.rollDrag * speed;
-      speed = Math.max(0, speed - decel * rollDt);
-      const nx = px + dirx * speed * rollDt;
-      const nz = pz + dirz * speed * rollDt;
+      // gravity down the slope
+      vx -= ROLL_SLOPE * gx * rollDt;
+      vz -= ROLL_SLOPE * gz * rollDt;
+      speed = Math.hypot(vx, vz);
+      if (speed > 1e-6) {
+        const ns = Math.max(0, speed - decel * rollDt);
+        vx *= ns / speed; vz *= ns / speed;
+      }
+      const nx = px + vx * rollDt;
+      const nz = pz + vz * rollDt;
       const nh = terrain(nx, nz).height;
       px = nx; pz = nz; t += rollDt;
-      vx = dirx * speed; vz = dirz * speed;
       if (nh < py - 0.25) {
-        // ran off an edge (the bluff): airborne again
+        // ran off an edge: airborne again
         vy = 0;
         omega *= 0.2;
         phase = 'flight';
@@ -231,31 +261,112 @@ export function simulateShot(launch, opts = {}) {
   }
   if (phase !== 'gone') phase = 'rest';
 
-  // Thin the flight samples for playback (keep every 2nd at 240 Hz → 120 Hz)
+  return finishResult({ samples, events, t, apex, landing, carry, px, py, pz, o, hd, phase, lastSurface, terrain });
+}
+
+function finishResult({ samples, events, t, apex, landing, carry, px, py, pz, o, hd, phase, lastSurface, terrain }) {
+  // Thin the 240 Hz flight samples to 120 Hz for playback.
   const out = [];
   for (let i = 0; i < samples.length; i++) {
     if (i % 2 === 0 || samples[i].phase !== 'flight' || i === samples.length - 1) out.push(samples[i]);
   }
-
   const rest = { x: px, y: py, z: pz };
-  const carryDist = carry ? Math.hypot(carry.x, carry.z) : Math.hypot(px, pz);
+  const fx = Math.sin(hd), fz = -Math.cos(hd); // target line
+  const rgx = Math.cos(hd), rgz = Math.sin(hd); // right of target line
+  const rel = (p) => ({ dx: p.x - o.x, dz: p.z - o.z });
+  const lateral = (p) => { const r = rel(p); return r.dx * rgx + r.dz * rgz; };
+  const dist = (p) => { const r = rel(p); return Math.hypot(r.dx, r.dz); };
+  void fx; void fz;
   return {
     samples: out,
     events,
     duration: t,
     flightTime: landing ? landing.t : t,
-    apex,
+    apex: { ...apex, y: apex.y - o.y, worldY: apex.y },
     landing,
-    carry: carryDist,
+    carry: carry ? dist(carry) : dist(rest),
     carryPoint: carry,
     descentAngle: carry ? carry.descent : 0,
-    total: Math.hypot(rest.x, rest.z),
-    offline: rest.x,
-    carryOffline: carry ? carry.x : rest.x,
+    total: dist(rest),
+    offline: lateral(rest),
+    carryOffline: carry ? lateral(carry) : lateral(rest),
     rest,
-    restSurface: phase === 'gone' ? lastSurface : (terrain(rest.x, rest.z).surface),
+    origin: o,
+    heading: (hd * 180) / Math.PI,
+    restSurface: phase === 'gone' ? lastSurface : terrain(rest.x, rest.z).surface,
     lost: phase === 'gone',
   };
+}
+
+/**
+ * Putt: a pure roll on the green with slope, Stimp-calibrated pace and cup capture.
+ * @param {{x,y,z}} origin
+ * @param {number} headingDeg  0 = down -Z
+ * @param {number} speed  initial ball speed, m/s
+ * @param {(x,z)=>{height,surface}} terrain
+ * @param {{x:number,z:number}} cup
+ */
+export function simulatePutt(origin, headingDeg, speed, terrain, cup) {
+  const h = (headingDeg * Math.PI) / 180;
+  let vx = Math.sin(h) * speed, vz = -Math.cos(h) * speed;
+  let px = origin.x, pz = origin.z, py = terrain(px, pz).height;
+  const samples = [{ t: 0, x: px, y: py, z: pz, phase: 'roll' }];
+  const events = [];
+  const dt = 1 / 240;
+  let t = 0, holed = false, lipped = false, phase = 'roll', lastSurface = 'green';
+  while (t < 30) {
+    const g = terrain(px, pz);
+    lastSurface = g.surface;
+    const surf = g.surface === 'green' ? null : GROUND[g.surface];
+    if (g.surface === 'water' || g.surface === 'oob') {
+      events.push({ type: 'splash', t, x: px, y: g.height, z: pz, surface: g.surface });
+      phase = 'gone';
+      break;
+    }
+    const roll = surf ? surf.roll : PUTT.decel;
+    const drag = surf ? surf.rollDrag : PUTT.drag;
+    const [gx, gz] = slopeAt(terrain, px, pz);
+    let sp = Math.hypot(vx, vz);
+    const slopeAcc = ROLL_SLOPE * Math.hypot(gx, gz);
+    if (sp < 0.02 && slopeAcc < roll * 0.85) break;
+    vx -= ROLL_SLOPE * gx * dt;
+    vz -= ROLL_SLOPE * gz * dt;
+    sp = Math.hypot(vx, vz);
+    if (sp > 1e-6) {
+      const ns = Math.max(0, sp - (roll + drag * sp) * dt);
+      vx *= ns / sp; vz *= ns / sp;
+    }
+    px += vx * dt; pz += vz * dt; t += dt;
+    py = terrain(px, pz).height;
+    if (cup) {
+      const d = Math.hypot(px - cup.x, pz - cup.z);
+      if (d < PUTT.cupRadius) {
+        const v = Math.hypot(vx, vz);
+        if (v < PUTT.capture) { holed = true; px = cup.x; pz = cup.z; samples.push({ t, x: px, y: py - 0.05, z: pz, phase: 'roll' }); break; }
+        if (!lipped) { lipped = true; events.push({ type: 'lip', t, x: px, y: py, z: pz, speed: v }); }
+        // over the hole: lose some pace and get knocked off line a touch
+        vx *= 0.985; vz *= 0.985;
+      }
+    }
+    if (Math.round(t / dt) % 2 === 0) samples.push({ t, x: px, y: py, z: pz, phase: 'roll' });
+  }
+  samples.push({ t, x: px, y: py, z: pz, phase: 'roll' });
+  const res = finishResult({
+    samples, events, t, apex: { x: origin.x, y: py, z: origin.z, t: 0 }, landing: null, carry: null,
+    px, py, pz, o: { x: origin.x, y: py, z: origin.z }, hd: h, phase, lastSurface, terrain,
+  });
+  res.putt = true;
+  res.holed = holed;
+  if (holed) res.holedAt = { t, x: cup.x, z: cup.z };
+  return res;
+}
+
+/** Initial speed that rolls a putt `distance` metres on a flat green (plus a little extra to die in the hole). */
+export function puttSpeedFor(distance) {
+  // v² = 2·d·a with a ≈ decel + drag·v (solved iteratively)
+  let v = Math.sqrt(2 * distance * PUTT.decel);
+  for (let i = 0; i < 6; i++) v = Math.sqrt(2 * distance * (PUTT.decel + PUTT.drag * v * 0.5));
+  return v;
 }
 
 /** Sample the precomputed path at time t (linear interpolation). */

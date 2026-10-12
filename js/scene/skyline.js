@@ -8,6 +8,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { LAYOUT } from './layout.js';
 import { GlowPoints } from './glowPoints.js';
 import { fbm2 } from './terrain.js';
+import { SUN_DIR } from './sky.js';
 
 const FT = 0.3048;
 const WATER = LAYOUT.riverY;
@@ -93,6 +94,8 @@ function archMaterial() {
       }`,
     fragmentShader: /* glsl */`
       uniform float uGlow;
+      uniform float uDay;
+      uniform vec3 uSunDir;
       varying float vH;
       varying vec3 vN;
       varying vec3 vW;
@@ -105,11 +108,16 @@ function archMaterial() {
         float rim = pow(1.0 - max(dot(vN, V), 0.0), 3.0);
         vec3 steel = vec3(1.0, 0.93, 0.82);
         vec3 col = steel * up * facing * facet * uGlow + vec3(0.9, 0.85, 0.8) * rim * 0.35 * uGlow;
+        // Daylight: brushed stainless reflecting the sky, a bright edge where the sun catches it
+        float sunl = max(dot(vN, normalize(uSunDir)), 0.0);
+        vec3 dayc = mix(vec3(0.62, 0.68, 0.76), vec3(0.85, 0.88, 0.92), facing) * (0.7 + 0.5 * sunl) + vec3(1.0) * pow(sunl, 12.0) * 0.6;
+        dayc = mix(dayc, vec3(0.66, 0.75, 0.84), 0.18); // distance haze
+        col = mix(col, dayc, uDay);
         gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
-    uniforms: { uGlow: { value: 1.35 } },
+    uniforms: { uGlow: { value: 1.35 }, uDay: { value: 0 }, uSunDir: { value: SUN_DIR } },
     fog: false,
   });
 }
@@ -132,6 +140,7 @@ function skylineMaterial() {
       }`,
     fragmentShader: /* glsl */`
       uniform float uTime;
+      uniform float uDay;
       varying vec2 vUv2;
       varying vec3 vInfo;
       varying float vTop;
@@ -151,11 +160,16 @@ function skylineMaterial() {
         // crown accents on taller towers
         float crown = smoothstep(vInfo.z - 4.0, vInfo.z - 1.0, vUv2.y) * step(110.0, vInfo.z);
         col += vec3(0.9, 0.95, 1.0) * crown * 0.6 * (1.0 - vTop);
-        gl_FragColor = vec4(col * 0.72, 1.0);
+        col *= 0.72;
+        // By day: hazy blue-grey towers with glinting glass
+        vec3 dayc = vec3(0.4, 0.47, 0.57) * (0.78 + 0.22 * vN.x) + vec3(0.18) * win * step(0.7, h(cell * 5.3));
+        dayc = mix(dayc, vec3(0.66, 0.75, 0.84), 0.3);
+        col = mix(col, dayc, uDay);
+        gl_FragColor = vec4(col, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,
-    uniforms: { uTime: { value: 0 } },
+    uniforms: { uTime: { value: 0 }, uDay: { value: 0 } },
     fog: false,
   });
 }
@@ -247,7 +261,8 @@ export function createSkyline(scene, river) {
     tp.setXYZ(i, x, topRow ? WATER + hgt : WATER - 1, shoreZ - (topRow ? 25 : 0));
   }
   treeGeo.computeVertexNormals();
-  const treeLine = new THREE.Mesh(treeGeo, new THREE.MeshBasicMaterial({ color: 0x050806, side: THREE.DoubleSide }));
+  const treeLineMat = new THREE.MeshBasicMaterial({ color: 0x050806, side: THREE.DoubleSide });
+  const treeLine = new THREE.Mesh(treeGeo, treeLineMat);
   group.add(treeLine);
   for (let i = 0; i < 160; i++) {
     const x = -7000 + rand() * 14000;
@@ -285,9 +300,10 @@ export function createSkyline(scene, river) {
     }
     steady.add(0, topY + 3, tz, 0xff2a1a, 3.5, 0.6, rand(), 1.4);
   }
+  const cableMat = new THREE.LineBasicMaterial({ color: new THREE.Color(0xd6e4ff).multiplyScalar(1.8), transparent: true, opacity: 0.55 });
   const cables = new THREE.LineSegments(
     new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(cableVerts, 3)),
-    new THREE.LineBasicMaterial({ color: new THREE.Color(0xd6e4ff).multiplyScalar(1.8), transparent: true, opacity: 0.55 }),
+    cableMat,
   );
   bridge.add(cables);
   const bridgeLamps = [];
@@ -478,6 +494,19 @@ export function createSkyline(scene, river) {
     riverboat: rb,
     archTop: arch.top,
     bridgeGroup: bridge,
+    /** 0 = night, 1 = day */
+    setDay(d) {
+      archMesh.material.uniforms.uDay.value = d;
+      skylineMat.uniforms.uDay.value = d;
+      steady.setFade(1 - 0.93 * d);
+      moving.setFade(1 - 0.75 * d);
+      treeLineMat.color.setRGB(0.02 + 0.2 * d, 0.03 + 0.26 * d, 0.025 + 0.25 * d);
+      darkMat.color.setRGB(0.03 + 0.38 * d, 0.03 + 0.43 * d, 0.04 + 0.48 * d);
+      cableMat.color.setRGB(1.6 - 1.0 * d, 1.7 - 1.05 * d, 1.8 - 1.05 * d);
+      cableMat.opacity = 0.55 - 0.15 * d;
+      beamMat.opacity = 0.08 * (1 - d);
+      winMat.color.setRGB(2.2 - 1.6 * d, 1.65 - 1.1 * d, 1.0 - 0.5 * d);
+    },
     update(t, dt, camera, viewportH) {
       skylineMat.uniforms.uTime.value = t;
       for (const f of anim) f(t, dt);

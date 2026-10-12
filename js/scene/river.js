@@ -5,9 +5,12 @@
 // themselves through `addLight()`; moving lights (barges) update per frame.
 import * as THREE from 'three';
 import { LAYOUT } from './layout.js';
-import { MOON_DIR, CITY_DIR } from './sky.js';
+import { MOON_DIR, CITY_DIR, SUN_DIR } from './sky.js';
 
 const MAX_LIGHTS = 64;
+
+/** Every water surface (river + course ponds) so the environment can update them together. */
+export const waterMaterials = new Set();
 
 const vert = /* glsl */`
 varying vec3 vWPos;
@@ -29,6 +32,11 @@ uniform int uCount;
 uniform vec3 uMoonDir;
 uniform vec3 uCityDir;
 uniform float uWaterY;
+uniform float uDay;
+uniform float uCloud;
+uniform vec3 uSunDir;
+uniform vec3 uTint;
+uniform float uFlow;
 varying vec3 vWPos;
 #include <fog_pars_fragment>
 
@@ -44,7 +52,7 @@ void main() {
   // Ripple field flowing west-to-east across the view, stretched along the current.
   vec2 p = vWPos.xz;
   float t = uTime;
-  vec2 q = vec2(p.x * 0.045 - t * 0.35, p.y * 0.11);
+  vec2 q = vec2(p.x * 0.045 - t * 0.35 * uFlow, p.y * 0.11);
   float n1 = vn(q * 1.0) - 0.5;
   float n2 = vn(q * 2.7 + vec2(t * 0.2, 3.1)) - 0.5;
   float n3 = vn(vec2(p.x * 0.4 - t * 1.4, p.y * 0.9)) - 0.5;
@@ -82,18 +90,54 @@ void main() {
     float shimmer = 0.55 + 0.9 * smoothstep(-0.15, 0.35, ripple + n3 * 0.6);
     streaks += uLightCol[i].rgb * uLights[i].w * hz * along * shimmer;
   }
-  col += streaks;
+  col += streaks * (1.0 - uDay);
 
   // Moon glitter path
   vec3 R = reflect(dir, normalize(vec3(ripple * 0.18 * fadeDetail, 1.0, n2 * 0.12 * fadeDetail)));
   float m = max(dot(R, normalize(uMoonDir)), 0.0);
-  col += vec3(0.55, 0.6, 0.7) * pow(m, 260.0) * 0.9 + vec3(0.1, 0.12, 0.16) * pow(m, 24.0) * 0.25;
+  col += (vec3(0.55, 0.6, 0.7) * pow(m, 260.0) * 0.9 + vec3(0.1, 0.12, 0.16) * pow(m, 24.0) * 0.25) * (1.0 - uDay) * (1.0 - uCloud * 0.7);
+
+  // Daylight: muddy-blue river, bright sky reflection, sun glitter
+  vec3 dayBase = uTint * (0.85 + ripple * 0.3);
+  vec3 skyDay = mix(vec3(0.55, 0.68, 0.82), vec3(0.62, 0.65, 0.69), uCloud);
+  vec3 dcol = dayBase + skyDay * fres * 0.62;
+  float sg = max(dot(R, normalize(uSunDir)), 0.0);
+  dcol += vec3(1.0, 0.95, 0.85) * (pow(sg, 400.0) * 6.0 + pow(sg, 40.0) * 0.25) * (1.0 - uCloud * 0.85);
+  col = mix(col, dcol, uDay);
 
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
   #include <fog_fragment>
 }`;
+
+/** A pond / creek surface sharing the river's look (no reflected light streaks). */
+export function createWaterMaterial({ y = 0, tint = 0x1c2a2c, flow = 0.3 } = {}) {
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: vert,
+    fragmentShader: frag,
+    uniforms: THREE.UniformsUtils.merge([
+      THREE.UniformsLib.fog,
+      {
+        uTime: { value: 0 },
+        uLights: { value: Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4()) },
+        uLightCol: { value: Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4()) },
+        uCount: { value: 0 },
+        uMoonDir: { value: MOON_DIR },
+        uCityDir: { value: CITY_DIR },
+        uWaterY: { value: y },
+        uDay: { value: 0 },
+        uCloud: { value: 0.2 },
+        uSunDir: { value: SUN_DIR },
+        uTint: { value: new THREE.Color(tint) },
+        uFlow: { value: flow },
+      },
+    ]),
+    fog: true,
+  });
+  waterMaterials.add(mat);
+  return mat;
+}
 
 export function createRiver(scene, maxLights = MAX_LIGHTS) {
   const lights = [];
@@ -112,10 +156,16 @@ export function createRiver(scene, maxLights = MAX_LIGHTS) {
         uMoonDir: { value: MOON_DIR },
         uCityDir: { value: CITY_DIR },
         uWaterY: { value: LAYOUT.riverY },
+        uDay: { value: 0 },
+        uCloud: { value: 0.2 },
+        uSunDir: { value: SUN_DIR },
+        uTint: { value: new THREE.Color(0.11, 0.13, 0.12) },
+        uFlow: { value: 1 },
       },
     ]),
     fog: true,
   });
+  waterMaterials.add(mat);
   // uniforms merge clones arrays; keep references live
   mat.uniforms.uLights.value = uLights;
   mat.uniforms.uLightCol.value = uLightCol;

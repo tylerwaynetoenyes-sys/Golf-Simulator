@@ -10,6 +10,7 @@ attribute vec2 aBlink; // x = rate (Hz, 0 = steady), y = phase
 uniform float uTime;
 uniform float uScale;
 uniform float uMinPx;
+uniform float uFade;
 varying vec3 vColor;
 varying float vAlpha;
 void main() {
@@ -25,7 +26,7 @@ void main() {
     b = 0.75 + 0.25 * sin(uTime * -aBlink.x * 6.283 + aBlink.y * 40.0);
   }
   // dim tiny points a little so a sea of them doesn't blow out
-  vAlpha = b * clamp(px / uMinPx, 0.35, 1.0);
+  vAlpha = b * clamp(px / uMinPx, 0.35, 1.0) * uFade;
   vColor = aColor;
 }`;
 
@@ -74,7 +75,7 @@ export class GlowPoints {
     this.material = new THREE.ShaderMaterial({
       vertexShader: vert,
       fragmentShader: frag,
-      uniforms: { uTime: { value: 0 }, uScale: { value: 800 }, uMinPx: { value: this.minPx } },
+      uniforms: { uTime: { value: 0 }, uScale: { value: 800 }, uMinPx: { value: this.minPx }, uFade: { value: 1 } },
       transparent: true,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
@@ -85,6 +86,8 @@ export class GlowPoints {
     scene.add(this.mesh);
     return this.mesh;
   }
+
+  setFade(f) { if (this.material) this.material.uniforms.uFade.value = f; }
 
   setPosition(item, x, y, z) {
     const p = this.mesh.geometry.attributes.position;

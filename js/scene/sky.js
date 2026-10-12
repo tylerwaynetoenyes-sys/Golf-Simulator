@@ -5,6 +5,8 @@ import * as THREE from 'three';
 
 export const MOON_DIR = new THREE.Vector3(-0.62, 0.36, -0.7).normalize();
 export const CITY_DIR = new THREE.Vector3(0.17, 0, -0.985).normalize();
+// Afternoon sun behind the golfer's right shoulder: the range is front-lit.
+export const SUN_DIR = new THREE.Vector3(0.42, 0.6, 0.68).normalize();
 
 const vert = /* glsl */`
 varying vec3 vDir;
@@ -19,6 +21,10 @@ const frag = /* glsl */`
 uniform float uTime;
 uniform vec3 uMoonDir;
 uniform vec3 uCityDir;
+uniform vec3 uSunDir;
+uniform float uDay;     // 0 night .. 1 day
+uniform float uCloud;   // 0 clear .. 1 overcast
+uniform vec2 uDrift;    // wind-driven cloud offset
 varying vec3 vDir;
 
 float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -34,21 +40,21 @@ void main() {
   vec3 d = normalize(vDir);
   float el = d.y;
   float h = max(el, 0.0);
-
-  vec3 zenith = vec3(0.006, 0.011, 0.028);
-  vec3 horizon = vec3(0.045, 0.06, 0.09);
-  vec3 col = mix(horizon, zenith, pow(h, 0.45));
-
-  // Light pollution: warm dome concentrated toward St. Louis, faint all round.
   vec2 dxz = normalize(d.xz + 1e-5);
   float toward = max(dot(dxz, normalize(uCityDir.xz)), 0.0);
-  float dome = exp(-h * 9.0) * (0.22 + 1.1 * pow(toward, 5.0)) + exp(-h * 22.0) * 0.5 * pow(toward, 14.0);
-  col += vec3(0.42, 0.21, 0.09) * dome * 0.55;
-  // Cooler glow up the Illinois side (refinery / Alton)
-  float east = max(dot(dxz, normalize(vec2(-0.85, -0.5))), 0.0);
-  col += vec3(0.25, 0.16, 0.1) * exp(-h * 14.0) * pow(east, 6.0) * 0.35;
+  vec2 cp = d.xz / (el + 0.12) * 1.6 + uDrift;
+  float cn = fbm(cp);
+  float lo = mix(0.5, 0.2, uCloud), hi = mix(0.85, 0.62, uCloud);
 
-  // Stars
+  // ── night ──
+  vec3 zenith = vec3(0.006, 0.011, 0.028);
+  vec3 horizon = vec3(0.045, 0.06, 0.09);
+  vec3 night = mix(horizon, zenith, pow(h, 0.45));
+  // Light pollution: warm dome concentrated toward St. Louis, faint all round.
+  float dome = exp(-h * 9.0) * (0.22 + 1.1 * pow(toward, 5.0)) + exp(-h * 22.0) * 0.5 * pow(toward, 14.0);
+  night += vec3(0.42, 0.21, 0.09) * dome * 0.55 * (1.0 + uCloud * 0.6);
+  float east = max(dot(dxz, normalize(vec2(-0.85, -0.5))), 0.0);
+  night += vec3(0.25, 0.16, 0.1) * exp(-h * 14.0) * pow(east, 6.0) * 0.35;
   vec2 sp = vec2(atan(d.z, d.x) * 180.0, asin(clamp(el, -1.0, 1.0)) * 360.0);
   vec2 cell = floor(sp);
   float r = hash(cell);
@@ -59,26 +65,41 @@ void main() {
     float tw = 0.7 + 0.3 * sin(uTime * (1.0 + r * 4.0) + r * 60.0);
     star = smoothstep(0.16, 0.0, dist) * tw * (r - 0.986) * 70.0;
   }
-  float starFade = smoothstep(0.02, 0.35, el) * (1.0 - clamp(dome * 1.4, 0.0, 0.85));
-  col += vec3(0.8, 0.86, 1.0) * star * starFade;
-
-  // Moon + halo
+  float starFade = smoothstep(0.02, 0.35, el) * (1.0 - clamp(dome * 1.4, 0.0, 0.85)) * (1.0 - uCloud * 0.8);
+  night += vec3(0.8, 0.86, 1.0) * star * starFade;
   float md = dot(d, normalize(uMoonDir));
   float disc = smoothstep(0.99955, 0.99975, md);
   float mottle = 0.85 + 0.15 * fbm(d.xy * 900.0);
-  col += vec3(1.0, 0.96, 0.86) * disc * 2.4 * mottle;
-  col += vec3(0.35, 0.4, 0.5) * pow(max(md, 0.0), 900.0) * 0.6;
-  col += vec3(0.12, 0.14, 0.2) * pow(max(md, 0.0), 40.0) * 0.35;
-
-  // High thin cloud, lit by the city from below and the moon from above
+  night += (vec3(1.0, 0.96, 0.86) * disc * 2.4 * mottle + vec3(0.35, 0.4, 0.5) * pow(max(md, 0.0), 900.0) * 0.6) * (1.0 - uCloud * 0.7);
+  night += vec3(0.12, 0.14, 0.2) * pow(max(md, 0.0), 40.0) * 0.35;
   if (el > 0.0) {
-    vec2 cp = d.xz / (el + 0.12) * 1.6 + vec2(uTime * 0.004, uTime * 0.0015);
-    float c = smoothstep(0.48, 0.82, fbm(cp));
+    float c = smoothstep(lo, hi, cn);
     vec3 cloudCol = vec3(0.13, 0.085, 0.06) * (0.4 + 1.6 * pow(toward, 3.0)) + vec3(0.05, 0.06, 0.08) * pow(max(md, 0.0), 6.0);
-    col = mix(col, cloudCol, c * 0.55 * smoothstep(0.0, 0.12, el));
+    night = mix(night, cloudCol, c * (0.55 + 0.35 * uCloud) * smoothstep(0.0, 0.12, el));
   }
+  if (el < 0.0) night = mix(horizon * 0.6, vec3(0.01, 0.012, 0.02), clamp(-el * 6.0, 0.0, 1.0));
 
-  if (el < 0.0) col = mix(horizon * 0.6, vec3(0.01, 0.012, 0.02), clamp(-el * 6.0, 0.0, 1.0));
+  // ── day ──
+  vec3 dz = vec3(0.10, 0.27, 0.62);
+  vec3 dh = vec3(0.58, 0.72, 0.86);
+  vec3 day = mix(dh, dz, pow(h, 0.5));
+  float sd = max(dot(d, normalize(uSunDir)), 0.0);
+  day += vec3(1.0, 0.9, 0.7) * pow(sd, 8.0) * 0.35 + vec3(1.0, 0.95, 0.85) * pow(sd, 300.0) * 1.2;
+  day += vec3(1.0, 0.98, 0.9) * smoothstep(0.9993, 0.9996, sd) * 8.0; // sun disc
+  day += vec3(0.85, 0.75, 0.65) * exp(-h * 18.0) * 0.12 * pow(toward, 3.0); // summer haze over the city
+  // overcast greys the whole sky
+  vec3 grey = vec3(0.62, 0.66, 0.71) * (0.75 + 0.25 * h);
+  day = mix(day, grey, uCloud * 0.75);
+  if (el > 0.0) {
+    float c = smoothstep(lo, hi, cn);
+    float shade = smoothstep(0.3, 0.9, fbm(cp * 1.7 + 4.0));
+    vec3 lit = mix(vec3(1.0, 0.99, 0.97), vec3(0.66, 0.7, 0.76), shade * 0.7 + uCloud * 0.35);
+    lit += vec3(1.0, 0.85, 0.6) * pow(sd, 12.0) * 0.4;
+    day = mix(day, lit, c * smoothstep(0.0, 0.1, el) * 0.92);
+  }
+  if (el < 0.0) day = mix(dh * 0.8, vec3(0.3, 0.36, 0.4), clamp(-el * 4.0, 0.0, 1.0));
+
+  vec3 col = mix(night, day, uDay);
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -91,6 +112,10 @@ export function createSky() {
       uTime: { value: 0 },
       uMoonDir: { value: MOON_DIR },
       uCityDir: { value: CITY_DIR },
+      uSunDir: { value: SUN_DIR },
+      uDay: { value: 0 },
+      uCloud: { value: 0.2 },
+      uDrift: { value: new THREE.Vector2() },
     },
     side: THREE.BackSide,
     depthWrite: false,
@@ -103,6 +128,7 @@ export function createSky() {
   mesh.onBeforeRender = (_r, _s, camera) => { mesh.position.copy(camera.position); mesh.updateMatrixWorld(); };
   return {
     mesh,
+    uniforms: mat.uniforms,
     update(t) { mat.uniforms.uTime.value = t; },
   };
 }

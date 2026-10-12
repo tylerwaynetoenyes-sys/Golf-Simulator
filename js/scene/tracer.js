@@ -36,6 +36,7 @@ uniform vec3 uColor;
 uniform float uOpacity;
 uniform float uHead;
 uniform float uTail;
+uniform float uDay;
 varying float vSide;
 varying float vIdx;
 void main() {
@@ -47,7 +48,11 @@ void main() {
   float headBoost = 1.0 + 1.5 * exp(-(uHead - vIdx) * 0.08);
   vec3 col = (vec3(1.0, 0.97, 0.9) * core * 2.4 + uColor * halo * 1.5) * headBoost;
   float a = (core + halo * 0.6) * fade * uOpacity * smoothstep(0.0, 14.0, vIdx);
-  gl_FragColor = vec4(col * a, a);
+  // Daylight: additive glow vanishes against a bright sky, so draw a solid
+  // broadcast-style red-orange ribbon with a hot core instead.
+  vec3 dayCol = mix(vec3(0.95, 0.18, 0.06), vec3(1.0, 0.85, 0.7), core * 0.8);
+  float dayA = clamp((core * 1.2 + halo * 0.5) * fade * uOpacity * smoothstep(0.0, 14.0, vIdx), 0.0, 1.0);
+  gl_FragColor = mix(vec4(col * a, a), vec4(dayCol, dayA), uDay);
 }`;
 
 export class Tracer {
@@ -84,6 +89,7 @@ export class Tracer {
         uHead: { value: 0 },
         uTail: { value: 400 },
         uPixelAngle: { value: 0.0016 },
+        uDay: { value: 0 },
         uMinWidth: { value: 0.012 },
       },
       transparent: true,
@@ -102,6 +108,20 @@ export class Tracer {
   }
 
   setColor(c) { this.material.uniforms.uColor.value.set(c); }
+
+  setDay(d) {
+    this.material.uniforms.uDay.value = d > 0.5 ? 1 : 0;
+    const blending = d > 0.5 ? THREE.NormalBlending : THREE.AdditiveBlending;
+    if (this.material.blending !== blending) {
+      this.material.blending = blending;
+      this.material.needsUpdate = true;
+      for (const g of this.ghosts) { g.material.blending = blending; g.material.needsUpdate = true; }
+    }
+    this.day = d;
+  }
+
+  /** Visual scale for big screens (wider ribbon). */
+  setScale(s) { this.material.uniforms.uPixelAngle.value = 0.0016 * s; this.material.uniforms.uMinWidth.value = 0.012 * s; }
 
   reset() {
     this.count = 0;
@@ -143,8 +163,8 @@ export class Tracer {
       const pts = this.points.filter((_, i) => i % 2 === 0).map((p) => new THREE.Vector3(...p));
       const g = new THREE.BufferGeometry().setFromPoints(pts);
       const m = new THREE.Line(g, new THREE.LineBasicMaterial({
-        color: this.material.uniforms.uColor.value.clone().multiplyScalar(0.9),
-        transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false,
+        color: this.day > 0.5 ? new THREE.Color(0.9, 0.25, 0.1) : this.material.uniforms.uColor.value.clone().multiplyScalar(0.9),
+        transparent: true, opacity: 0.32, blending: this.day > 0.5 ? THREE.NormalBlending : THREE.AdditiveBlending, depthWrite: false,
       }));
       m.renderOrder = 25;
       m.frustumCulled = false;
