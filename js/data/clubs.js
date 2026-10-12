@@ -16,6 +16,7 @@ export const CLUBS = [
 export const clubById = (id) => CLUBS.find((c) => c.id === id) || CLUBS[3];
 
 function gauss(rng = Math.random) {
+  if (rng === null) return 0; // deterministic (nominal) launch
   let u = 0, v = 0;
   while (u === 0) u = rng();
   while (v === 0) v = rng();
@@ -30,13 +31,14 @@ function gauss(rng = Math.random) {
  * @param {number} aimDeg  intended start line, + right
  */
 export function demoLaunch(club, power = 1, contact = 0.9, aimDeg = 0, rng = Math.random) {
+  // rng === null gives the nominal (noise-free) launch for a pure strike
   const p = Math.max(0.15, Math.min(1.1, power));
   const over = Math.max(0, p - 1); // overswing adds speed and chaos
   const miss = 1 - Math.max(0, Math.min(1, contact));
   // speed scales a little less than linearly with power (a 50% swing isn't half distance)
   const speedFactor = Math.pow(p, 0.78) * (1 - 0.22 * miss * miss - 0.05 * miss) * (1 + 0.6 * over);
   const ballMph = club.ballMph * speedFactor * (1 + gauss(rng) * 0.012);
-  const thin = miss > 0.55 && rng() < 0.5; // occasional thin/topped strike
+  const thin = rng !== null && miss > 0.55 && rng() < 0.5; // occasional thin/topped strike
   const launch = club.launch * (thin ? 0.45 + 0.2 * rng() : 1 + gauss(rng) * 0.06) * (0.9 + 0.1 * p);
   const spin = club.spin * (thin ? 0.6 : 1) * (0.85 + 0.15 * p) * (1 + gauss(rng) * 0.07);
 
@@ -47,7 +49,7 @@ export function demoLaunch(club, power = 1, contact = 0.9, aimDeg = 0, rng = Mat
   const spinAxis = Math.max(-35, Math.min(35, 3.4 * (face - path) * (club.id === 'DR' || club.id === '3W' ? 1.25 : 1)));
 
   return {
-    ballSpeed: ballMph * MPH,
+    ballSpeed: Math.max(1, ballMph) * MPH,
     launchAngle: launch,
     launchDirection,
     totalSpin: spin,

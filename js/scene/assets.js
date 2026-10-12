@@ -7,8 +7,8 @@
 // below, and swapped in for the procedural mesh — no other code changes.
 //
 // Characters: the `golfer` slot expects a rigged glTF with an animation clip
-// named "swing" (and optionally "idle"). The game calls `characters.swing()`
-// on every shot, timed so impact lands on the ball launch.
+// named "swing" (and optionally "idle"). Shot data arrives just after impact,
+// so `characters.swing()` starts the clip at its impact point.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
@@ -22,6 +22,9 @@ export const ASSET_MANIFEST = {
 };
 
 const loader = new GLTFLoader();
+
+/** Where impact sits in the "swing" clip, as a fraction of its duration. */
+export const IMPACT_FRACTION = 0.55;
 
 export async function loadSlot(name) {
   const slot = ASSET_MANIFEST[name];
@@ -64,14 +67,14 @@ export class Characters {
     return true;
   }
 
-  /** Play the swing so its impact frame lines up with `impactInSeconds`. */
-  swing(impactInSeconds = 0) {
+  /** Play the swing from `secondsBeforeImpact` ahead of its impact frame. */
+  swing(secondsBeforeImpact = 0) {
     const a = this.actions.swing;
     if (!a) return;
     a.reset();
     a.setLoop(THREE.LoopOnce, 1);
     a.clampWhenFinished = true;
-    a.time = Math.max(0, a.getClip().duration * 0.55 - impactInSeconds);
+    a.time = Math.max(0, a.getClip().duration * IMPACT_FRACTION - secondsBeforeImpact);
     a.play();
   }
 

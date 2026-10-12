@@ -10,7 +10,7 @@ import { Ball } from './ball.js';
 import { Tracer } from './tracer.js';
 import { Effects } from './effects.js';
 import { CameraRig } from './cameraRig.js';
-import { Characters } from './assets.js';
+import { Characters, ASSET_MANIFEST, loadSlot } from './assets.js';
 import { CTP_GREEN } from './layout.js';
 
 export class World {
@@ -31,6 +31,31 @@ export class World {
     this.rig = new CameraRig(camera);
     this.characters = new Characters(scene);
     this.time = 0;
+    this.loadAuthoredAssets();
+  }
+
+  /** Swap procedural groups for authored glTF models where the manifest has a url. */
+  async loadAuthoredAssets() {
+    const targets = {
+      arch: this.skyline.archMesh,
+      bridge: this.skyline.bridgeGroup,
+      riverboat: this.skyline.riverboat,
+      canopy: this.range.canopy,
+      altonSign: this.range.sign,
+    };
+    for (const [name, slot] of Object.entries(ASSET_MANIFEST)) {
+      if (!slot.url || !slot.replaces) continue;
+      const loaded = await loadSlot(name);
+      const old = targets[slot.replaces];
+      if (!loaded || !old) continue;
+      // Without an explicit position, take over the procedural object's transform.
+      if (!slot.position) {
+        loaded.root.position.copy(old.position);
+        loaded.root.rotation.copy(old.rotation);
+      }
+      old.parent.add(loaded.root);
+      old.visible = false;
+    }
   }
 
   setQuality(name) {

@@ -45,7 +45,11 @@ async function boot() {
   audio.volume = store.settings.volume;
   audio.ambienceLevel = store.settings.ambience;
 
-  const client = new BridgeClient(store.settings.bridgeUrl);
+  // When the bridge itself served this page, its WebSocket is on the same port.
+  const sameOrigin = location.protocol.startsWith('http') && location.host ? `ws://${location.host}` : null;
+  const fallbacks = store.settings.bridgeUrl === 'ws://localhost:8765' && sameOrigin ? [sameOrigin] : [];
+  const client = new BridgeClient(sameOrigin && fallbacks.length ? sameOrigin : store.settings.bridgeUrl,
+    fallbacks.length ? [store.settings.bridgeUrl] : []);
   let game;
   const pairing = new PairingUI(client, { onEnterGame: (how) => game.start(how) });
   const hud = new HUD({ onClub: (id) => game.selectClub(id) });

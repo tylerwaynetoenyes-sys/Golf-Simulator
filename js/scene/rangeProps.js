@@ -151,20 +151,22 @@ export function createRange(scene, river, quality) {
   tee.position.set(0, 0.07, 0);
   group.add(tee);
 
+  const canopy = new THREE.Group();
+  group.add(canopy);
   const roof = new THREE.Mesh(new THREE.BoxGeometry(40, 0.35, 7.2), roofUnder);
   roof.position.set(0, 3.9, 4.6);
   roof.castShadow = true;
   roof.receiveShadow = true;
-  group.add(roof);
+  canopy.add(roof);
   const fascia = new THREE.Mesh(new THREE.BoxGeometry(40, 0.6, 0.12), steel);
   fascia.position.set(0, 3.75, 1.0);
-  group.add(fascia);
+  canopy.add(fascia);
   for (let i = -5; i <= 5; i++) {
     for (const z of [1.15, 7.9]) {
       const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 3.9, 0.16), steel);
-      post.position.set(i * 4.2 - 2.1 + (i === -5 ? 0 : 0), 1.95, z);
+      post.position.set(i * 4.2 - 2.1, 1.95, z);
       post.castShadow = true;
-      group.add(post);
+      canopy.add(post);
     }
   }
   // Under-canopy amber lights, one per bay (glow strips) + three real lights
@@ -429,7 +431,7 @@ export function createRange(scene, river, quality) {
     new THREE.ShaderMaterial({
       uniforms: { uColor: { value: new THREE.Color(0xffd27a) } },
       vertexShader: 'varying float vY; void main(){ vY = uv.y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader: 'uniform vec3 uColor; varying float vY; void main(){ float a = pow(1.0 - vY, 3.0) * 0.22; gl_FragColor = vec4(uColor * a, a);} ',
+      fragmentShader: 'uniform vec3 uColor; varying float vY; void main(){ float a = pow(1.0 - vY, 2.5) * 0.4; gl_FragColor = vec4(uColor * a, a);} ',
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     }),
   );
@@ -445,6 +447,8 @@ export function createRange(scene, river, quality) {
 
   return {
     group,
+    canopy,
+    sign,
     bayLight,
     flags,
     ctp,

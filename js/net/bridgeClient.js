@@ -35,8 +35,13 @@ export function normalizeShot(msg) {
 }
 
 export class BridgeClient {
-  constructor(url) {
+  /**
+   * @param {string} url  preferred bridge URL
+   * @param {string[]} [fallbacks]  also tried, in order, if the first is silent
+   */
+  constructor(url, fallbacks = []) {
     this.url = url;
+    this.candidates = [...new Set([url, ...fallbacks])];
     this.ws = null;
     this.mode = null; // 'ble' | 'mock'
     this.state = 'offline';
@@ -55,41 +60,55 @@ export class BridgeClient {
     bus.emit('r10:status', { state, ...extra, device: extra.device || this.device });
   }
 
-  /** Open the socket. Resolves true when the bridge says hello, false on failure. */
+  /** Open the socket, trying each candidate URL. Resolves true on the bridge's hello. */
   open(timeoutMs = 2500) {
     if (this.connected) return Promise.resolve(true);
     if (this._openPromise) return this._openPromise;
-    this._openPromise = new Promise((resolve) => {
+    this._openPromise = (async () => {
+      for (const url of this.candidates) {
+        if (await this._openOne(url, timeoutMs)) {
+          this.url = url;
+          return true;
+        }
+      }
+      return false;
+    })().finally(() => { this._openPromise = null; });
+    return this._openPromise;
+  }
+
+  _openOne(url, timeoutMs) {
+    return new Promise((resolve) => {
       let settled = false;
+      let timer = null;
       const done = (ok) => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        this._openPromise = null;
         resolve(ok);
       };
       let ws;
       try {
-        ws = new WebSocket(this.url);
+        ws = new WebSocket(url);
       } catch (e) {
         done(false);
         return;
       }
       this.ws = ws;
-      const timer = setTimeout(() => { try { ws.close(); } catch { /* ignore */ } done(false); }, timeoutMs);
+      timer = setTimeout(() => { try { ws.close(); } catch { /* ignore */ } done(false); }, timeoutMs);
       ws.onmessage = (ev) => {
         let msg;
         try { msg = JSON.parse(ev.data); } catch { return; }
-        if (msg.type === 'hello') done(true);
+        if (msg.type === 'hello') { ws.helloed = true; done(true); }
         this._onMessage(msg);
       };
       ws.onerror = () => done(false);
       ws.onclose = () => {
         done(false);
-        if (this.ws === ws) this._onClose();
+        if (this.ws !== ws) return;
+        if (ws.helloed) this._onClose(); // a live bridge went away
+        else this.ws = null; // never connected: just a failed attempt
       };
     });
-    return this._openPromise;
   }
 
   _onMessage(msg) {
@@ -190,6 +209,7 @@ export class BridgeClient {
   setUrl(url) {
     if (url === this.url) return;
     this.url = url;
+    this.candidates = [url];
     if (this.ws) { try { this.ws.close(); } catch { /* ignore */ } }
   }
 }

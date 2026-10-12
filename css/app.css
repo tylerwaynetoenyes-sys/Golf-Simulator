@@ -187,10 +187,17 @@ button { font: inherit; color: inherit; }
 .meter-sweet { position: absolute; left: calc(84 / 110 * 100%); width: calc(14 / 110 * 100%); top: 0; bottom: 0; background: rgba(95, 227, 154, 0.22); border-left: 1px solid rgba(95, 227, 154, 0.5); border-right: 1px solid rgba(95, 227, 154, 0.5); }
 .meter-fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; border-radius: 999px; background: linear-gradient(90deg, #ffcf96, #ffab5a 70%, #ff7a4a); box-shadow: 0 0 18px rgba(255, 170, 90, 0.6); }
 .meter-marker { position: absolute; top: -3px; bottom: -3px; width: 2px; background: #fff; left: calc(100 / 110 * 100%); opacity: 0.5; }
+.meter-target { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--gold); box-shadow: 0 0 10px rgba(255, 211, 106, 0.9); }
 .meter-labels { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-3); margin-top: 6px; }
 .action-row { display: flex; gap: 10px; align-items: center; }
 .btn-swing { background: rgba(255, 180, 107, 0.16); color: var(--amber-hi); border: 1px solid rgba(255, 180, 107, 0.3); padding: 12px 26px; touch-action: none; }
 .btn-swing.holding { background: rgba(255, 180, 107, 0.3); }
+
+/* floating pin marker */
+.hud .pin-label { pointer-events: none; }
+.pin-label { position: absolute; left: 0; top: 0; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center; will-change: transform; }
+.pin-dist { padding: 4px 10px; border-radius: 999px; background: rgba(14, 18, 27, 0.78); border: 1px solid rgba(255, 211, 106, 0.45); color: var(--gold); font-size: 12.5px; font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; box-shadow: 0 6px 20px -6px rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.pin-stem { width: 1px; height: 22px; background: linear-gradient(rgba(255, 211, 106, 0.7), rgba(255, 211, 106, 0)); }
 
 /* minimap */
 .minimap { position: absolute; right: var(--gutter); bottom: var(--gutter); border-radius: 20px; padding: 8px; }

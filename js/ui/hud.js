@@ -136,6 +136,13 @@ export class HUD {
     $('#meterFill').style.width = `${(Math.min(1.1, power) / 1.1) * 100}%`;
   }
 
+  setMeterTarget(power) {
+    const m = $('#meterTarget');
+    if (power == null) { m.hidden = true; return; }
+    m.hidden = false;
+    m.style.left = `${(power / 1.1) * 100}%`;
+  }
+
   setSkip(visible) { $('#skipButton').hidden = !visible; }
 
   // ── mini map ──

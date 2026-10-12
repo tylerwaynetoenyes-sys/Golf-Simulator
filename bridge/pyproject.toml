@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "r10bridge"
+version = "1.0.0"
+description = "Garmin Approach R10 (Bluetooth LE) to WebSocket bridge for the Alton Range golf simulator"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = ["bleak>=1.0", "websockets>=13.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=8"]
+
+[project.scripts]
+r10bridge = "r10bridge.__main__:main"
+
+[tool.setuptools]
+packages = ["r10bridge"]

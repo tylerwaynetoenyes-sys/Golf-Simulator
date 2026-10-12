@@ -474,6 +474,8 @@ export function createSkyline(scene, river) {
   return {
     group,
     archPosition: ARCH_POS,
+    archMesh,
+    riverboat: rb,
     archTop: arch.top,
     bridgeGroup: bridge,
     update(t, dt, camera, viewportH) {

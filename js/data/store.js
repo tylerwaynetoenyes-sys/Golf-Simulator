@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS = {
   ghostTracers: true,
   commentary: true,
   bridgeUrl: 'ws://localhost:8765',
+  r10Distance: 7, // feet from the R10 to the ball
   handedness: 'right',
 };
 

@@ -3,9 +3,10 @@
 // camera, audio and commentary.
 import * as THREE from 'three';
 import { simulateShot, samplePath, MPH } from '../core/physics.js';
-import { terrain } from '../scene/layout.js';
+import { terrain, groundHeight } from '../scene/layout.js';
 import { bus } from '../core/events.js';
 import { units } from '../core/units.js';
+import * as U from '../core/units.js';
 import { CLUBS, clubById, demoLaunch } from '../data/clubs.js';
 import { store } from '../data/store.js';
 import { audio } from '../audio/audio.js';
@@ -35,11 +36,17 @@ export class Game {
     this.r10 = false;
     this.swing = { holding: false, power: 0, t: 0, lastTick: 0 };
     this.ballPos = new THREE.Vector3(0, 0.1, 0);
+    this.helper = null; // {power, yards} swing needed to reach the current target
     this._buildAimLine();
 
     bus.on('r10:shot', (launch) => this.onR10Shot(launch));
     bus.on('r10:misread', () => toast("R10 couldn't read that one", { kind: 'warn', sub: 'Swing again' }));
-    bus.on('r10:connected', () => { this.r10 = true; this.updatePrompt(); if (this.state !== 'idle') this.hud.comment(line('r10')); });
+    bus.on('r10:connected', () => {
+      this.r10 = true;
+      this.updatePrompt();
+      this.sendR10Config();
+      if (this.state !== 'idle') this.hud.comment(line('r10'));
+    });
     bus.on('r10:disconnected', () => { this.r10 = false; this.updatePrompt(); });
     this._bindInput();
     this.applySetting('camera', store.settings.camera, false);
@@ -75,20 +82,75 @@ export class Game {
     this.hud.setMode(this.mode.status());
     const sug = this.mode.suggestedClub?.();
     if (sug) this.selectClub(sug, true);
+    else this._updateHelper();
   }
 
   selectClub(id, quiet = false) {
     this.club = clubById(id);
     this.hud.setClub(this.club.id);
     if (!quiet) audio.tick();
+    this._updateHelper();
+  }
+
+  /** Where the current mode wants the ball to finish (metres), if anywhere. */
+  _targetPoint() {
+    if (this.mode.roundOver) return null;
+    if (this.mode.pin) return this.mode.pin;
+    if (this.mode.target) return this.mode.target;
+    return null;
+  }
+
+  /** Demo helper: swing power that sends the selected club to the target. */
+  _updateHelper() {
+    const tp = this._targetPoint();
+    this.helper = null;
+    if (tp) {
+      const want = Math.hypot(tp.x, tp.z);
+      const wind = this.mode.wind();
+      const useTotal = this.mode.id === 'ctp';
+      const reach = (p) => {
+        const r = simulateShot(demoLaunch(this.club, p, 1, 0, null), { terrain: () => ({ height: 0, surface: 'fairway' }), wind });
+        return useTotal ? r.total : r.carry;
+      };
+      if (reach(1.0) >= want * 0.97) {
+        let lo = 0.15, hi = 1.0;
+        for (let i = 0; i < 14; i++) {
+          const mid = (lo + hi) / 2;
+          if (reach(mid) < want) lo = mid; else hi = mid;
+        }
+        this.helper = { power: (lo + hi) / 2, yards: want };
+      } else {
+        this.helper = { power: null, yards: want };
+      }
+    }
+    this.hud.setMeterTarget(this.helper?.power ?? null);
+    this.updatePrompt();
   }
 
   updatePrompt() {
+    const h = this.helper;
+    const helperText = h
+      ? h.power != null
+        ? ` · <b>${this.club.short}</b> needs about <b>${Math.round(h.power * 100)}%</b>`
+        : ` · <b>${this.club.short}</b> won't get there — club up`
+      : '';
     if (this.r10) {
-      this.hud.setPrompt('<b>R10 armed</b> — take your swing · <span class="prompt-key">← →</span> aim · <span class="prompt-key">Space</span> demo swing', true);
+      this.hud.setPrompt(`<b>R10 armed</b> — take your swing${this._targetPoint() ? ` · ${U.dist(Math.hypot(this._targetPoint().x, this._targetPoint().z))} ${U.distUnit()} to the target` : ''} · <span class="prompt-key">← →</span> aim`, true);
     } else {
-      this.hud.setPrompt('<span class="prompt-key">Space</span> hold, release in the green for a pure strike · <span class="prompt-key">← →</span> aim · <span class="prompt-key">1–7</span> club');
+      this.hud.setPrompt(h
+        ? `<span class="prompt-key">Space</span> hold &amp; release${helperText} · <span class="prompt-key">← →</span> aim`
+        : '<span class="prompt-key">Space</span> hold, release in the green for a pure strike · <span class="prompt-key">← →</span> aim · <span class="prompt-key">1–7</span> club');
     }
+  }
+
+  /** Tell the R10 where the ball is and the conditions on the bluff. */
+  sendR10Config() {
+    this.client.shotConfig({
+      teeRangeYards: store.settings.r10Distance / 3,
+      temperatureC: 18,
+      humidity: 0.65,
+      altitudeM: 190,
+    });
   }
 
   applySetting(key, value, save = true) {
@@ -117,6 +179,13 @@ export class Game {
       case 'bridgeUrl':
         this.client.setUrl(value);
         break;
+      case 'r10Distance': {
+        const el = document.getElementById('r10DistVal');
+        if (el) el.textContent = `${value} ft`;
+        clearTimeout(this._cfgTimer);
+        this._cfgTimer = setTimeout(() => this.sendR10Config(), 400);
+        break;
+      }
       default:
         break;
     }
@@ -149,6 +218,7 @@ export class Game {
     const result = simulateShot(launch, { terrain, wind, teeHeight: this.world.ball.mesh.position.y });
     const club = this.club;
     const outcome = this.mode.evaluate(result, launch, club) || {};
+    this._globalBests(result, launch, club, outcome);
 
     store.addShot({
       at: Date.now(), mode: this.mode.id, club: club.id, source,
@@ -181,6 +251,25 @@ export class Game {
     this.hud.setSkip(true);
     this.hud.meter(false, 0);
     bus.emit('shot:start', { launch, result, source });
+  }
+
+  /** Personal bests that count in every mode. */
+  _globalBests(result, launch, club, outcome) {
+    const bests = outcome.bests || (outcome.bests = []);
+    const add = (label, value) => { if (!bests.some((b) => b.label === label)) bests.push({ label, value }); };
+    if (launch.ballSpeed > 40) {
+      const r = store.submitBest('range.ballSpeed', launch.ballSpeed, 'max');
+      if (r.isBest && !r.first) add('Ball speed', `${(launch.ballSpeed / MPH).toFixed(1)} mph`);
+    }
+    if (!result.lost && club.id === 'DR') {
+      const r = store.submitBest('range.longestDrive', result.total, 'max');
+      if (r.isBest && !r.first) add('Longest drive', `${U.dist(result.total)} ${U.distUnit()}`);
+    }
+    if (!result.lost) {
+      const r = store.submitBest(`range.carry.${club.id}`, result.carry, 'max', { club: club.id });
+      if (r.isBest && !r.first) add(`${club.short} carry`, `${U.dist(result.carry)} ${U.distUnit()}`);
+    }
+    if (bests.length) outcome.isBest = true;
   }
 
   skip() {
@@ -230,6 +319,7 @@ export class Game {
 
   _toTee() {
     this.world.ball.placeOnTee();
+    this.hud.hideCard();
     this.world.rig.toAddress();
     this.aimLine.visible = true;
     this.hud.setSkip(false);
@@ -330,6 +420,7 @@ export class Game {
     }
 
     this.aimLine.rotation.y = (-this.aimDeg * Math.PI) / 180;
+    this._updatePinLabel();
     this.hud.drawMap(this.state === 'flight' ? this.ballPos : null, this.aimDeg, this.mode.id);
     return this.ballPos;
   }
@@ -359,6 +450,22 @@ export class Game {
     const launch = demoLaunch(this.club, p, contact, this.aimDeg);
     setTimeout(() => this.hud.meter(false, 0), 400);
     this.handleLaunch(launch, 'demo');
+  }
+
+  _updatePinLabel() {
+    const el = this._pinEl || (this._pinEl = document.getElementById('pinLabel'));
+    const tp = this._targetPoint();
+    if (!tp || this.state !== 'ready' || panelOpen()) { el.hidden = true; return; }
+    const cam = this.world.camera;
+    const v = this._pinV || (this._pinV = new THREE.Vector3());
+    v.set(tp.x, groundHeight(tp.x, tp.z) + 3.2, tp.z).project(cam);
+    if (v.z > 1 || Math.abs(v.x) > 1.1) { el.hidden = true; return; }
+    el.hidden = false;
+    const x = (v.x * 0.5 + 0.5) * window.innerWidth;
+    const y = (-v.y * 0.5 + 0.5) * window.innerHeight;
+    el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px) translate(-50%, -100%)`;
+    const label = `${U.dist(Math.hypot(tp.x, tp.z))} ${U.distUnit()}`;
+    if (this._pinText !== label) { this._pinText = label; document.getElementById('pinDist').textContent = label; }
   }
 
   _buildAimLine() {

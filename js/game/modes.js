@@ -55,21 +55,9 @@ export class RangeMode extends BaseMode {
     return { title: 'Driving Range', detail: this.count ? `${this.count} shot${this.count === 1 ? '' : 's'} this session` : 'Free practice', chips: [] };
   }
 
-  evaluate(result, launch, club) {
+  evaluate() {
     this.count++;
-    const bests = [];
-    if (!result.lost) {
-      const k = `range.carry.${club.id}`;
-      const r = store.submitBest(k, result.carry, 'max', { club: club.id });
-      if (r.isBest && !r.first) bests.push({ label: `${club.short} carry`, value: `${dist(result.carry)} ${distUnit()}` });
-      if (club.id === 'DR') {
-        const r2 = store.submitBest('range.longestDrive', result.total, 'max');
-        if (r2.isBest && !r2.first) bests.push({ label: 'Longest drive', value: `${dist(result.total)} ${distUnit()}` });
-      }
-    }
-    const rs = store.submitBest('range.ballSpeed', launch.ballSpeed, 'max');
-    if (rs.isBest && !rs.first && launch.ballSpeed > 40) bests.push({ label: 'Ball speed', value: `${(launch.ballSpeed / MPH).toFixed(1)} mph` });
-    return { bests, isBest: bests.length > 0 };
+    return { bests: [] };
   }
 }
 

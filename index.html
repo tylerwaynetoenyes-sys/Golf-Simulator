@@ -113,6 +113,7 @@
           <div class="meter-sweet"></div>
           <div class="meter-fill" id="meterFill"></div>
           <div class="meter-marker" id="meterMarker"></div>
+          <div class="meter-target" id="meterTarget" hidden title="Swing needed for this distance"></div>
         </div>
         <div class="meter-labels"><span>Soft</span><span>Full</span><span>Over</span></div>
       </div>
@@ -122,6 +123,9 @@
         <button class="btn btn-quiet" id="skipButton" hidden>Skip ›</button>
       </div>
     </div>
+
+    <!-- floating target marker (projected from 3D) -->
+    <div class="pin-label" id="pinLabel" hidden><span class="pin-dist" id="pinDist"></span><span class="pin-stem"></span></div>
 
     <!-- mini map -->
     <div class="minimap glass" id="minimapWrap" aria-hidden="true">

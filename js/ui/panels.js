@@ -162,6 +162,7 @@ export function openSettings(game) {
     <div class="setting"><label>Master volume</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-range="volume" /></div>
     <div class="setting"><label>Night ambience</label><input type="range" min="0" max="1" step="0.05" value="${s.ambience}" data-range="ambience" /></div>
     <h3>R10 bridge</h3>
+    <div class="setting"><div><label>R10 to ball</label><div class="hint">How far behind the ball the R10 sits (Garmin: 6–8 ft). Sent to the R10 on connect.</div></div><input type="range" min="6" max="8" step="0.5" value="${s.r10Distance}" data-range="r10Distance" /><span class="hint" id="r10DistVal">${s.r10Distance} ft</span></div>
     <div class="setting"><div><label>Bridge address</label><div class="hint">Where <code>python -m r10bridge</code> is listening.</div></div><input type="text" value="${esc(s.bridgeUrl)}" data-text="bridgeUrl" spellcheck="false" /></div>
     <div class="panel-actions"><button class="btn btn-primary" data-close>Done</button></div>`);
   el.querySelectorAll('.seg[data-key]').forEach((g) => g.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
@@ -231,7 +232,7 @@ export function openHelp(url = 'ws://localhost:8765') {
     <h3>2 · Put the R10 in pairing mode</h3>
     <p>Turn it on, then hold the button until the LED is <b>solid blue</b>. Close the Garmin Golf app (the R10 only talks to one device at a time).</p>
     <h3>3 · Pair</h3>
-    <p>Press <b>Pair Garmin R10</b>. Set the R10 about 2–2.5 m (7–8 ft) behind the ball, level, pointed down your target line.</p>
+    <p>Press <b>Pair Garmin R10</b>. Garmin's guidance: put the R10 on the ground <b>1.8–2.4 m (6–8 ft) behind the ball</b>, level, with its red alignment line pointing at your target. Indoors, leave at least 2.4 m (8 ft) between the ball and the net.</p>
     <h3>No R10?</h3>
     <p><code>python -m r10bridge --mock</code> simulates one through the full protocol, and demo mode needs no bridge at all.</p>
     <h3>Controls</h3>

@@ -108,10 +108,15 @@ export class PairingUI {
     this.onEnterGame?.(how);
   }
 
-  startPairing() {
+  async startPairing() {
     this.openSheet();
     this.setVisual('bridge');
-    this.client.pair();
+    const ok = await this.client.pair();
+    // The bridge may already hold a live R10 (e.g. started with --auto-pair).
+    if (ok && this.client.state === 'ready') {
+      this.state = 'connecting';
+      this.onStatus({ state: 'ready', device: this.client.device });
+    }
   }
 
   openSheet() {
@@ -218,7 +223,7 @@ export class PairingUI {
         this.setVisual('error', {
           title: e.title,
           msg: e.msg,
-          help: e.help(this.client.url),
+          help: e.help(this.client.candidates[this.client.candidates.length - 1] || this.client.url),
           actions: [
             { label: 'Try again', primary: true, run: () => this.startPairing() },
             { label: this.inGame ? 'Keep playing in demo mode' : 'Play in Demo Mode', run: () => { this.closeSheet(); this.enterGame('demo'); } },
