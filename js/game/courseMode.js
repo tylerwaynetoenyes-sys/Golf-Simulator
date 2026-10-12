@@ -426,7 +426,7 @@ export class CourseMode {
       rows: lb.rows.map((r, i) => ({ label: `${i + 1}. ${r.name}`, value: r.display, extra: `${this.toPar(r.id).strokes} strokes`, color: r.color })),
       teams: lb.teams,
       verdict: solo
-        ? me.toPar <= 0 ? 'Under par on the Confluence. The rivers approve.' : me.toPar <= 9 ? 'A proper round. The landmarks held up their end.' : 'Every landmark got a good look. Some of them twice.'
+        ? me.toPar < 0 ? 'Under par on the Confluence. The rivers approve.' : me.toPar === 0 ? 'Level par. The Arch has no notes.' : me.toPar <= 9 ? 'A proper round. The landmarks held up their end.' : 'Every landmark got a good look. Some of them twice.'
         : lb.teams?.length > 1 ? `${lb.teams[0].name} takes it.` : `${lb.rows[0].name} wins.`,
       scorecard: true,
     };
