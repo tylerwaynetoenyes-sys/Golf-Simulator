@@ -210,3 +210,21 @@ def test_origin_filter():
     assert _origin_ok(None) and _origin_ok("null")
     assert _origin_ok("http://localhost:8080") and _origin_ok("http://127.0.0.1:5500")
     assert not _origin_ok("https://evil.example.com")
+
+
+def test_static_serving_and_traversal(tmp_path):
+    pytest.importorskip("websockets")
+    from r10bridge.server import static_response
+
+    (tmp_path / "index.html").write_text("<h1>range</h1>")
+    (tmp_path / "js").mkdir()
+    (tmp_path / "js" / "a.js").write_text("export {}")
+    (tmp_path / ".git").mkdir()
+    (tmp_path / ".git" / "config").write_text("secret")
+    assert static_response(tmp_path, "/").status_code == 200
+    r = static_response(tmp_path, "/js/a.js?v=1")
+    assert r.status_code == 200 and r.headers["Content-Type"].startswith("text/javascript")
+    assert static_response(tmp_path, "/../../etc/passwd").status_code in (403, 404)
+    assert static_response(tmp_path, "/%2e%2e/%2e%2e/etc/passwd").status_code in (403, 404)
+    assert static_response(tmp_path, "/.git/config").status_code == 404
+    assert static_response(tmp_path, "/missing.js").status_code == 404

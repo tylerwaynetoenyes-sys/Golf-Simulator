@@ -27,7 +27,9 @@ import asyncio
 import json
 import logging
 import time
+from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 from . import __version__
 from . import messages as M
@@ -240,12 +242,47 @@ def _origin_ok(origin: str | None) -> bool:
     return hostname in ALLOWED_ORIGIN_HOSTS
 
 
-async def serve(host: str, port: int, bridge: Bridge, auto_pair: bool = False) -> None:
-    from websockets.asyncio.server import serve as ws_serve
-    from websockets.http11 import Response
+CONTENT_TYPES = {
+    ".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".mjs": "text/javascript; charset=utf-8",
+    ".css": "text/css; charset=utf-8", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png",
+    ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webp": "image/webp", ".glb": "model/gltf-binary",
+    ".gltf": "model/gltf+json", ".bin": "application/octet-stream", ".ktx2": "image/ktx2", ".hdr": "application/octet-stream",
+    ".wav": "audio/wav", ".mp3": "audio/mpeg", ".ogg": "audio/ogg", ".woff2": "font/woff2", ".ico": "image/x-icon",
+    ".txt": "text/plain; charset=utf-8", ".md": "text/plain; charset=utf-8",
+}
+
+
+def static_response(web_root: Path, raw_path: str):
+    """Serve a file from the game directory (GET only, no directory listing)."""
     from websockets.datastructures import Headers
+    from websockets.http11 import Response
+
+    path = unquote(raw_path.split("?", 1)[0].split("#", 1)[0])
+    if path.endswith("/"):
+        path += "index.html"
+    root = web_root.resolve()
+    target = (root / path.lstrip("/")).resolve()
+    if root not in target.parents and target != root:
+        return Response(403, "Forbidden", Headers([("Content-Type", "text/plain")]), b"forbidden\n")
+    if not target.is_file() or any(part.startswith(".") for part in target.relative_to(root).parts):
+        return Response(404, "Not Found", Headers([("Content-Type", "text/plain")]), b"not found\n")
+    body = target.read_bytes()
+    ctype = CONTENT_TYPES.get(target.suffix.lower(), "application/octet-stream")
+    headers = Headers([("Content-Type", ctype), ("Content-Length", str(len(body))), ("Cache-Control", "no-cache")])
+    return Response(200, "OK", headers, body)
+
+
+async def serve(host: str, port: int, bridge: Bridge, auto_pair: bool = False, web_root: Path | None = None) -> None:
+    from websockets.asyncio.server import serve as ws_serve
+    from websockets.datastructures import Headers
+    from websockets.http11 import Response
 
     def process_request(connection, request):
+        is_ws = "websocket" in request.headers.get("Upgrade", "").lower()
+        if not is_ws:
+            if web_root is not None:
+                return static_response(web_root, request.path)
+            return Response(426, "Upgrade Required", Headers([("Content-Type", "text/plain")]), b"WebSocket only\n")
         if not _origin_ok(request.headers.get("Origin")):
             return Response(403, "Forbidden", Headers([("Content-Type", "text/plain")]), b"origin not allowed\n")
         return None
@@ -253,6 +290,8 @@ async def serve(host: str, port: int, bridge: Bridge, auto_pair: bool = False) -
     server = await ws_serve(bridge.handler, host, port, process_request=process_request,
                             ping_interval=20, ping_timeout=20)
     log.info("R10 bridge listening on ws://%s:%d  (%s mode)", host, port, "MOCK" if bridge.mock else "BLE")
+    if web_root is not None:
+        log.info("Game available at  http://%s:%d/", "localhost" if host in ("127.0.0.1", "0.0.0.0") else host, port)
     try:
         if auto_pair:
             await bridge.pair()

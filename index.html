@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Alton Range</title>
+  <meta name="description" content="A night driving range on the Mississippi bluffs above Alton, with live Garmin Approach R10 support." />
+  <meta name="theme-color" content="#06090f" />
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2306090f'/%3E%3Cpath d='M14 50 Q32 2 50 50' fill='none' stroke='%23ffb46b' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='50' r='4' fill='%23fff'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="css/app.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "./vendor/three/three.module.js",
+        "three/addons/": "./vendor/three/addons/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <canvas id="scene" aria-label="3D driving range"></canvas>
+  <div id="vignette" aria-hidden="true"></div>
+
+  <!-- ───────────── HUD ───────────── -->
+  <div id="hud" class="hud" data-visible="false">
+    <header class="topbar">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 48 32" aria-hidden="true"><path d="M6 30 Q24 -10 42 30" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg>
+        <div class="brand-text">
+          <span class="brand-name">Alton Range</span>
+          <span class="brand-sub">Mississippi bluffs · night</span>
+        </div>
+      </div>
+
+      <button class="mode-pill glass" id="modeButton" aria-haspopup="dialog">
+        <span class="mode-title" id="modeTitle">Driving Range</span>
+        <span class="mode-detail" id="modeDetail">Free practice</span>
+        <span class="mode-chips" id="modeChips"></span>
+        <svg class="chev" viewBox="0 0 12 12" aria-hidden="true"><path d="M3 4.5 6 7.5 9 4.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+
+      <div class="top-actions">
+        <button class="r10-pill glass" id="r10Pill" data-state="demo" aria-haspopup="dialog">
+          <span class="r10-dot"></span>
+          <span class="r10-label" id="r10Label">Demo Mode</span>
+          <span class="r10-sub" id="r10Sub">Pair R10</span>
+        </button>
+        <button class="icon-btn glass" id="sessionButton" title="Session & personal bests (Tab)" aria-label="Session">
+          <svg viewBox="0 0 24 24"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="icon-btn glass" id="settingsButton" title="Settings" aria-label="Settings">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.5v2.6M12 18.9v2.6M4.6 4.6l1.9 1.9M17.5 17.5l1.9 1.9M2.5 12h2.6M18.9 12h2.6M4.6 19.4l1.9-1.9M17.5 6.5l1.9-1.9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- device popover -->
+    <div class="popover glass" id="r10Popover" hidden>
+      <div class="pop-head">
+        <div class="pop-device-icon"><svg viewBox="0 0 40 40"><rect x="9" y="6" width="22" height="28" rx="5" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="15" r="4" fill="none" stroke="currentColor" stroke-width="2"/><path d="M14 26h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
+        <div>
+          <div class="pop-title" id="popTitle">Approach R10</div>
+          <div class="pop-sub" id="popSub">Connected</div>
+        </div>
+      </div>
+      <dl class="pop-meta" id="popMeta"></dl>
+      <div class="pop-actions">
+        <button class="btn btn-quiet" id="popSimulate" hidden>Simulate swing</button>
+        <button class="btn btn-quiet" id="popPair">Pair R10</button>
+        <button class="btn btn-danger-quiet" id="popDisconnect">Disconnect</button>
+      </div>
+    </div>
+
+    <!-- club rail -->
+    <nav class="club-rail glass" id="clubRail" aria-label="Club"></nav>
+
+    <!-- shot card -->
+    <section class="shot-card glass" id="shotCard" data-visible="false" aria-live="polite">
+      <div class="shot-head">
+        <span class="shot-club" id="shotClub">7 Iron</span>
+        <span class="shot-source" id="shotSource">Demo</span>
+      </div>
+      <div class="shot-outcome" id="shotOutcome" hidden>
+        <div class="outcome-main" id="outcomeMain"></div>
+        <div class="outcome-sub" id="outcomeSub"></div>
+      </div>
+      <div class="shot-hero">
+        <div class="hero-item">
+          <div class="hero-value"><span id="carryValue">0</span><span class="hero-unit" id="carryUnit">yd</span></div>
+          <div class="hero-label">Carry</div>
+        </div>
+        <div class="hero-item secondary">
+          <div class="hero-value"><span id="totalValue">0</span><span class="hero-unit" id="totalUnit">yd</span></div>
+          <div class="hero-label">Total</div>
+        </div>
+      </div>
+      <div class="shot-grid" id="shotGrid"></div>
+    </section>
+
+    <!-- commentary -->
+    <div class="commentary" id="commentary" aria-live="polite"></div>
+
+    <!-- toasts -->
+    <div class="toasts" id="toasts"></div>
+
+    <!-- bottom: prompt + swing meter -->
+    <div class="bottom-center">
+      <div class="prompt" id="prompt">
+        <span class="prompt-key">Space</span> hold to swing, release to hit · <span class="prompt-key">← →</span> aim
+      </div>
+      <div class="swing-meter glass" id="swingMeter" aria-hidden="true">
+        <div class="meter-track">
+          <div class="meter-sweet"></div>
+          <div class="meter-fill" id="meterFill"></div>
+          <div class="meter-marker" id="meterMarker"></div>
+        </div>
+        <div class="meter-labels"><span>Soft</span><span>Full</span><span>Over</span></div>
+      </div>
+      <div class="action-row">
+        <button class="btn btn-swing" id="swingButton" aria-label="Hold to swing">Hold to swing</button>
+        <button class="btn btn-quiet" id="manualButton" title="Enter launch numbers">Custom shot</button>
+        <button class="btn btn-quiet" id="skipButton" hidden>Skip ›</button>
+      </div>
+    </div>
+
+    <!-- mini map -->
+    <div class="minimap glass" id="minimapWrap" aria-hidden="true">
+      <canvas id="minimap" width="220" height="300"></canvas>
+    </div>
+  </div>
+
+  <!-- ───────────── Launch / pairing ───────────── -->
+  <div id="launch" class="launch" data-visible="true">
+    <div class="launch-inner">
+      <div class="launch-mark" aria-hidden="true">
+        <svg viewBox="0 0 120 70"><path d="M10 66 Q60 -26 110 66" fill="none" stroke="url(#archGrad)" stroke-width="5" stroke-linecap="round"/><defs><linearGradient id="archGrad" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffd7a1"/><stop offset="1" stop-color="#fff6e6"/></linearGradient></defs></svg>
+      </div>
+      <h1 class="launch-title">Alton Range</h1>
+      <p class="launch-tag">A night range on the bluffs above the Mississippi.<br />The Arch is on the horizon. The lights are on.</p>
+
+      <div class="launch-actions">
+        <button class="btn btn-primary btn-xl" id="pairButton">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7 7 10 10-5 5V2l5 5L7 17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Pair Garmin R10
+        </button>
+        <button class="btn btn-ghost btn-xl" id="demoButton">Play in Demo Mode</button>
+      </div>
+      <button class="link-btn" id="bridgeHelpButton">How to run the R10 bridge</button>
+    </div>
+  </div>
+
+  <!-- pairing sheet -->
+  <div class="sheet-backdrop" id="pairSheet" data-visible="false" role="dialog" aria-modal="true" aria-labelledby="pairTitle">
+    <div class="sheet glass-strong">
+      <button class="sheet-close" id="pairClose" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+      <div class="pair-visual" id="pairVisual" data-state="bridge">
+        <div class="pulse p1"></div><div class="pulse p2"></div><div class="pulse p3"></div>
+        <svg class="pair-ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track" cx="60" cy="60" r="52" />
+          <circle class="ring-progress" id="ringProgress" cx="60" cy="60" r="52" />
+        </svg>
+        <div class="pair-device" aria-hidden="true">
+          <svg viewBox="0 0 40 40"><rect x="9" y="5" width="22" height="30" rx="6" fill="none" stroke="currentColor" stroke-width="2"/><circle cx="20" cy="15" r="4.5" fill="none" stroke="currentColor" stroke-width="2"/><circle class="led" cx="20" cy="27" r="1.8"/></svg>
+        </div>
+        <svg class="pair-check" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="check-disc" cx="60" cy="60" r="52" />
+          <path class="check-mark" d="M38 62 l15 15 l30 -32" />
+        </svg>
+        <svg class="pair-error" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="err-disc" cx="60" cy="60" r="52" />
+          <path class="err-mark" d="M60 36 v30 M60 80 v2" />
+        </svg>
+      </div>
+      <h2 class="pair-title" id="pairTitle">Connecting to bridge</h2>
+      <p class="pair-msg" id="pairMsg">Looking for the R10 bridge on this computer.</p>
+      <ol class="pair-steps" id="pairSteps">
+        <li data-step="bridge"><span class="step-dot"></span>Bridge</li>
+        <li data-step="scanning"><span class="step-dot"></span>Find R10</li>
+        <li data-step="connecting"><span class="step-dot"></span>Pair</li>
+        <li data-step="ready"><span class="step-dot"></span>Ready</li>
+      </ol>
+      <div class="pair-help" id="pairHelp" hidden></div>
+      <div class="pair-actions" id="pairActions"></div>
+    </div>
+  </div>
+
+  <!-- generic panel (session / settings / help / manual / mode picker / summary) -->
+  <div class="sheet-backdrop" id="panel" data-visible="false" role="dialog" aria-modal="true">
+    <div class="panel glass-strong" id="panelBody"></div>
+  </div>
+
+  <div id="loading" class="loading">
+    <div class="loading-arc"></div>
+    <div class="loading-text">Lighting the range…</div>
+  </div>
+
+  <noscript><div class="noscript">Alton Range needs JavaScript and WebGL.</div></noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
