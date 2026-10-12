@@ -239,6 +239,9 @@ export class Game {
     w.ball.spinRate = launch.totalSpin * RPM * 0.12;
     w.rig.startShot(result);
     w.characters.swing(0);
+    // impact: a spark off the face, and turf for anything that isn't teed up high
+    w.effects.burst(0, 0.08, -0.05, { n: 16, color: 0xfff0d0, speed: 1.4, up: 1.2, life: 0.32, gravity: 2 });
+    if (club.id !== 'DR') w.effects.burst(0, 0.03, -0.15, { n: 22, color: 0x58702c, speed: 1.8, up: 2.6, life: 0.9 });
 
     const expected = club.ballMph * MPH;
     const smash = launch.clubSpeed ? launch.ballSpeed / launch.clubSpeed : null;

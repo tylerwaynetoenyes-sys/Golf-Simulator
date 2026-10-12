@@ -180,7 +180,10 @@ def test_bridge_websocket_end_to_end():
         bridge = Bridge(mock=True)
         server = asyncio.create_task(serve("127.0.0.1", 8799, bridge))
         await asyncio.sleep(0.3)
-        async with connect("ws://127.0.0.1:8799", proxy=None) as ws:
+        # websockets >= 15 honours proxy env vars; keep localhost direct
+        major = int(websockets.__version__.split(".")[0])
+        kwargs = {"proxy": None} if major >= 15 else {}
+        async with connect("ws://127.0.0.1:8799", **kwargs) as ws:
             hello = json.loads(await ws.recv())
             assert hello["type"] == "hello" and hello["mode"] == "mock"
             await ws.send(json.dumps({"type": "pair"}))

@@ -9,7 +9,7 @@ description = "Garmin Approach R10 (Bluetooth LE) to WebSocket bridge for the Al
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
-dependencies = ["bleak>=1.0", "websockets>=13.0"]
+dependencies = ["bleak>=1.0", "websockets>=14.0"]
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
