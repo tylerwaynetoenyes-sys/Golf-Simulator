@@ -21,7 +21,7 @@ void main() {
   float b = 1.0;
   if (aBlink.x > 0.0) {
     float s = fract(uTime * aBlink.x + aBlink.y);
-    b = smoothstep(0.0, 0.05, s) * smoothstep(0.35, 0.2, s);
+    b = smoothstep(0.0, 0.05, s) * (1.0 - smoothstep(0.2, 0.35, s));
   } else if (aBlink.x < 0.0) {
     b = 0.75 + 0.25 * sin(uTime * -aBlink.x * 6.283 + aBlink.y * 40.0);
   }
@@ -36,7 +36,7 @@ varying float vAlpha;
 void main() {
   vec2 c = gl_PointCoord - 0.5;
   float d = length(c) * 2.0;
-  float core = smoothstep(1.0, 0.0, d);
+  float core = 1.0 - smoothstep(0.0, 1.0, d);
   float a = core * core * vAlpha;
   if (a < 0.01) discard;
   gl_FragColor = vec4(vColor * a, a);

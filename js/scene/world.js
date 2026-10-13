@@ -85,6 +85,7 @@ export class World {
       this.groundFn = rangeGround;
       this.ball.setGround(rangeGround);
       this.rig.setGround(rangeGround);
+      this.rig.obstacle = null;
       this.rig.setAddress(new THREE.Vector3(0, 0.1, 0), 0);
       this.markers.set([]);
     }
@@ -102,6 +103,7 @@ export class World {
     this.groundFn = T.groundHeight;
     this.ball.setGround(T.groundHeight);
     this.rig.setGround(T.groundHeight);
+    this.rig.obstacle = this.course.cameraClear;
     this.env.apply();
     return T;
   }

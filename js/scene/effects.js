@@ -10,7 +10,7 @@ function ringMaterial(color) {
       uniform vec3 uColor; uniform float uT; varying vec2 vUv;
       void main(){
         float r = length(vUv - 0.5) * 2.0;
-        float ring = smoothstep(uT - 0.12, uT, r) * smoothstep(uT + 0.04, uT, r);
+        float ring = smoothstep(uT - 0.12, uT, r) * (1.0 - smoothstep(uT, uT + 0.04, r));
         float a = ring * (1.0 - uT);
         gl_FragColor = vec4(uColor * a * 1.6, a);
       }`,

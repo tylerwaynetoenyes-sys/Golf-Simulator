@@ -51,7 +51,7 @@ export function lightConeMaterial(color, strength) {
       void main() {
         vec3 V = normalize(cameraPosition - vW);
         float edge = pow(abs(dot(vN, V)), 1.6);
-        float a = edge * pow(vAlong, 1.8) * uStrength;
+        float a = edge * pow(clamp(vAlong, 0.0, 1.0), 1.8) * uStrength;
         gl_FragColor = vec4(uColor * a, a);
       }`,
     transparent: true,
@@ -439,7 +439,7 @@ export function createRange(scene, river, quality) {
     new THREE.ShaderMaterial({
       uniforms: { uColor: { value: new THREE.Color(0xffd27a) } },
       vertexShader: 'varying float vY; void main(){ vY = uv.y; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);}',
-      fragmentShader: 'uniform vec3 uColor; varying float vY; void main(){ float a = pow(1.0 - vY, 2.5) * 0.4; gl_FragColor = vec4(uColor * a, a);} ',
+      fragmentShader: 'uniform vec3 uColor; varying float vY; void main(){ float a = pow(clamp(1.0 - vY, 0.0, 1.0), 2.5) * 0.4; gl_FragColor = vec4(uColor * a, a);} ',
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
     }),
   );

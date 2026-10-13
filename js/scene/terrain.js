@@ -88,7 +88,7 @@ float cross = step(0.5, fract((z + vWPos.x * 0.6) / 30.0));
 vec3 fair = mix(fair1, fair2, stripe * 0.85 + cross * 0.15);
 vec3 rough = vec3(0.11, 0.17, 0.065) * (0.85 + 0.3 * vn(vWPos.xz * 0.05));
 vec3 woods = vec3(0.045, 0.06, 0.03);
-float fw = smoothstep(uFairway + 2.5, uFairway - 1.5, ax);
+float fw = (1.0 - smoothstep(uFairway - 1.5, uFairway + 2.5, ax));
 float wd = smoothstep(uBounds - 8.0, uBounds + 30.0, ax);
 vec3 g = mix(rough, fair, fw);
 g = mix(g, woods, wd);
@@ -98,14 +98,14 @@ g = mix(g, fair1 * 0.9, smoothstep(-4.0, 6.0, z) * (1.0 - wd));
 for (int i = 0; i < ${GREENS.length}; i++) {
   float d = length(vWPos.xz - uGreens[i].xy);
   float r = uGreens[i].z;
-  g = mix(g, vec3(0.14, 0.33, 0.12), smoothstep(r + 2.2, r + 1.2, d));
-  g = mix(g, vec3(0.19, 0.42, 0.14) * (0.95 + 0.1 * vn(vWPos.xz * 0.9)), smoothstep(r + 0.3, r - 0.4, d));
+  g = mix(g, vec3(0.14, 0.33, 0.12), (1.0 - smoothstep(r + 1.2, r + 2.2, d)));
+  g = mix(g, vec3(0.19, 0.42, 0.14) * (0.95 + 0.1 * vn(vWPos.xz * 0.9)), (1.0 - smoothstep(r - 0.4, r + 0.3, d)));
 }
 if (uCtp.w > 0.5) {
   float d = length(vWPos.xz - uCtp.xy);
   float r = uCtp.z;
-  g = mix(g, vec3(0.14, 0.33, 0.12), smoothstep(r + 2.6, r + 1.4, d));
-  g = mix(g, vec3(0.2, 0.44, 0.15) * (0.96 + 0.08 * vn(vWPos.xz * 1.1)), smoothstep(r + 0.3, r - 0.4, d));
+  g = mix(g, vec3(0.14, 0.33, 0.12), (1.0 - smoothstep(r + 1.4, r + 2.6, d)));
+  g = mix(g, vec3(0.2, 0.44, 0.15) * (0.96 + 0.08 * vn(vWPos.xz * 1.1)), (1.0 - smoothstep(r - 0.4, r + 0.3, d)));
 }
 // patchy wear
 g *= 0.9 + 0.2 * vn(vWPos.xz * 0.12);

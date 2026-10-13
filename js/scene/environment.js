@@ -108,8 +108,21 @@ export class Environment {
     // keep the key light's shadow frustum on the action
     const key = this.w.range.moon;
     const dir = this.day > 0.5 ? SUN_DIR : MOON_DIR;
-    key.target.position.copy(this._focus);
-    key.position.copy(this._focus).addScaledVector(dir, 150);
+    // Snap the shadow camera to whole shadow-map texels in light space, so a
+    // moving camera doesn't make every shadow edge crawl and flicker.
+    const sc = key.shadow.camera;
+    const texel = (sc.right - sc.left) / (key.shadow.mapSize.x || 1024);
+    const f = this._snapV || (this._snapV = new THREE.Vector3());
+    const right = this._lr || (this._lr = new THREE.Vector3());
+    const upL = this._lu || (this._lu = new THREE.Vector3());
+    right.set(0, 1, 0).cross(dir).normalize();
+    upL.copy(dir).cross(right).normalize();
+    const fx = Math.round(this._focus.dot(right) / texel) * texel;
+    const fy = Math.round(this._focus.dot(upL) / texel) * texel;
+    const fz = this._focus.dot(dir);
+    f.copy(right).multiplyScalar(fx).addScaledVector(upL, fy).addScaledVector(dir, fz);
+    key.target.position.copy(f);
+    key.position.copy(f).addScaledVector(dir, 150);
     key.target.updateMatrixWorld();
   }
 

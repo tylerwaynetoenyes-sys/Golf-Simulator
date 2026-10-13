@@ -333,8 +333,14 @@ export class CameraRig {
     }
 
     if (this.mode !== 'flyover') {
+      // never park the camera inside a tree canopy
+      if (this.obstacle) this.desiredPos.y = Math.max(this.desiredPos.y, this.obstacle(this.desiredPos.x, this.desiredPos.z));
       damp(this.pos, this.desiredPos, this.rate, dt);
       damp(this.look, this.desiredLook, this.lookRate, dt);
+      if (this.obstacle) {
+        const clear = this.obstacle(this.pos.x, this.pos.z);
+        if (this.pos.y < clear) this.pos.y += (clear - this.pos.y) * (1 - Math.exp(-12 * dt));
+      }
     }
     const want = this.baseFov * this.fovScale;
     this.fov += (want - this.fov) * (1 - Math.exp(-3 * dt));
@@ -351,8 +357,15 @@ export class CameraRig {
       this.camera.position.x += Math.sin(performance.now() * 0.00045) * 0.01;
     }
     this.camera.lookAt(this.look);
-    if (Math.abs(this.camera.fov - this.fov) > 0.01) {
+    // Near plane: tiny only for the cup close-up (the camera sits centimetres
+    // from the turf); everywhere else a 25 cm near plane gives the depth
+    // buffer ~5x the precision, which keeps distant surfaces from z-fighting.
+    const close = (this.mode === 'shot' && this.cupShot && playT >= this.cupShot.at - this.cupShot.lead)
+      || (this.mode === 'rest' && this.result?.holed && this.cupShot);
+    const near = close ? 0.03 : 0.25;
+    if (Math.abs(this.camera.fov - this.fov) > 0.01 || this.camera.near !== near) {
       this.camera.fov = this.fov;
+      this.camera.near = near;
       this.camera.updateProjectionMatrix();
     }
   }

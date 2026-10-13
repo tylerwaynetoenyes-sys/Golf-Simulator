@@ -21,8 +21,15 @@ void main() {
   vec3 tang = np.xyz - pp.xyz;
   if (length(tang) < 1e-5) tang = vec3(1.0, 0.0, 0.0);
   tang = normalize(tang);
-  vec3 toCam = normalize(-vp.xyz);
-  vec3 nrm = normalize(cross(tang, toCam));
+  vec3 toCam = -vp.xyz;
+  toCam = length(toCam) > 1e-5 ? normalize(toCam) : vec3(0.0, 0.0, 1.0);
+  // A shot flying straight away from (or at) the camera makes the tangent and
+  // view direction parallel: their cross product is zero and normalize(0) is
+  // NaN, which some GPUs rasterise as stray triangles. Fall back to screen-up.
+  vec3 cr = cross(tang, toCam);
+  if (length(cr) < 1e-4) cr = cross(tang, vec3(0.0, 1.0, 0.0));
+  if (length(cr) < 1e-4) cr = vec3(1.0, 0.0, 0.0);
+  vec3 nrm = normalize(cr);
   float dist = length(vp.xyz);
   float w = max(uMinWidth, dist * uPixelAngle);
   vp.xyz += nrm * aSide * w;

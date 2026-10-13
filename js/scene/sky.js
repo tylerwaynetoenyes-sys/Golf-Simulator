@@ -42,7 +42,7 @@ void main() {
   float h = max(el, 0.0);
   vec2 dxz = normalize(d.xz + 1e-5);
   float toward = max(dot(dxz, normalize(uCityDir.xz)), 0.0);
-  vec2 cp = d.xz / (el + 0.12) * 1.6 + uDrift;
+  vec2 cp = d.xz / max(el + 0.12, 0.02) * 1.6 + uDrift;
   float cn = fbm(cp);
   float lo = mix(0.5, 0.2, uCloud), hi = mix(0.85, 0.62, uCloud);
 
@@ -63,7 +63,7 @@ void main() {
   if (r > 0.986) {
     float dist = length(fract(sp) - 0.5 - off * 0.6);
     float tw = 0.7 + 0.3 * sin(uTime * (1.0 + r * 4.0) + r * 60.0);
-    star = smoothstep(0.16, 0.0, dist) * tw * (r - 0.986) * 70.0;
+    star = (1.0 - smoothstep(0.0, 0.16, dist)) * tw * (r - 0.986) * 70.0;
   }
   float starFade = smoothstep(0.02, 0.35, el) * (1.0 - clamp(dome * 1.4, 0.0, 0.85)) * (1.0 - uCloud * 0.8);
   night += vec3(0.8, 0.86, 1.0) * star * starFade;

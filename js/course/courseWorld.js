@@ -104,7 +104,9 @@ export class CourseWorld {
         let h = T.meshHeight(x, z);
         const edge = Math.min(x - b.minx, b.maxx - x, z - b.minz, b.maxz - z);
         const ek = Math.min(1, Math.max(0, 1 - edge / 50));
-        h += (baseY - 0.5 - h) * ek * ek;
+        // dive well below the base plane so the two cross steeply instead of
+        // running almost coplanar (a wide z-fighting band at distance)
+        h += (baseY - 6 - h) * ek * ek;
         pos.set([x, h, z], k * 3);
         uv.set([x * 0.15, z * 0.15], k * 2);
         this._colorAt(T, x, z, c);
@@ -199,6 +201,13 @@ export class CourseWorld {
     const dec = new THREE.InstancedMesh(this.decGeo, this.treeMatB, N);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p3 = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     let nc = 0, nd = 0;
+    // canopy index for camera collision: 20 m buckets of {x, z, r, top}
+    this.treeGrid = new Map();
+    const addTree = (x, z, r, top) => {
+      const k = `${Math.floor(x / 20)},${Math.floor(z / 20)}`;
+      if (!this.treeGrid.has(k)) this.treeGrid.set(k, []);
+      this.treeGrid.get(k).push({ x, z, r, top });
+    };
     for (let i = 0; i < N * 4 && (nc < N || nd < N); i++) {
       const x = b.minx + rand() * (b.maxx - b.minx);
       const z = b.minz + rand() * (b.maxz - b.minz);
@@ -215,11 +224,13 @@ export class CourseWorld {
         const h = 10 + rand() * 12;
         sc.set(2.6 + rand() * 2, h, 2.6 + rand() * 2);
         con.setMatrixAt(nc++, m4.compose(p3.set(x, y - 0.3, z), q, sc));
+        addTree(x, z, sc.x, y - 0.3 + h);
       } else {
         if (nd >= N) continue;
         const r = 4 + rand() * 4;
         sc.set(r, r * (0.9 + rand() * 0.4), r);
         dec.setMatrixAt(nd++, m4.compose(p3.set(x, y + r * 0.4, z), q, sc));
+        addTree(x, z, r, y + r * 0.4 + sc.y * 1.9);
       }
     }
     con.count = nc; dec.count = nd;
@@ -486,6 +497,23 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
     if (!this.flag) return;
     this.flag.userData.outTarget = out ? 1 : 0;
   }
+
+  /** Lowest camera height that stays out of any tree canopy at (x, z). */
+  cameraClear = (x, z) => {
+    if (!this.treeGrid) return -Infinity;
+    const gx = Math.floor(x / 20), gz = Math.floor(z / 20);
+    let y = -Infinity;
+    for (let i = -1; i <= 1; i++) {
+      for (let j = -1; j <= 1; j++) {
+        const list = this.treeGrid.get(`${gx + i},${gz + j}`);
+        if (!list) continue;
+        for (const t of list) {
+          if (Math.hypot(x - t.x, z - t.z) < t.r + 1.5) y = Math.max(y, t.top + 1.5);
+        }
+      }
+    }
+    return y;
+  };
 
   _water(opts) { const m = createWaterMaterial(opts); this.waterMats.push(m); return m; }
 
