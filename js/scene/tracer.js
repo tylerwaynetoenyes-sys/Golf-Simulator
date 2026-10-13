@@ -31,6 +31,8 @@ void main() {
   if (length(cr) < 1e-4) cr = vec3(1.0, 0.0, 0.0);
   vec3 nrm = normalize(cr);
   float dist = length(vp.xyz);
+  // world-width ribbon (5 cm) that thins with distance, floored at ~1.5 px:
+  // the tracer reads as going away from you instead of staying a fat band
   float w = max(uMinWidth, dist * uPixelAngle);
   vp.xyz += nrm * aSide * w;
   vSide = aSide;
@@ -95,9 +97,9 @@ export class Tracer {
         uOpacity: { value: 1 },
         uHead: { value: 0 },
         uTail: { value: 400 },
-        uPixelAngle: { value: 0.0016 },
+        uPixelAngle: { value: 0.00085 },
         uDay: { value: 0 },
-        uMinWidth: { value: 0.012 },
+        uMinWidth: { value: 0.018 },
       },
       transparent: true,
       depthWrite: false,
@@ -128,7 +130,7 @@ export class Tracer {
   }
 
   /** Visual scale for big screens (wider ribbon). */
-  setScale(s) { this.material.uniforms.uPixelAngle.value = 0.0016 * s; this.material.uniforms.uMinWidth.value = 0.012 * s; }
+  setScale(s) { this.material.uniforms.uPixelAngle.value = 0.00085 * s; this.material.uniforms.uMinWidth.value = 0.018 * s; }
 
   reset() {
     this.count = 0;

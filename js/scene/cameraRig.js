@@ -26,8 +26,8 @@ export class CameraRig {
     this.mode = 'address'; // address | showcase | shot | rest | flyover
     this.style = 'cinematic';
     this.shake = 0;
-    this.fov = 52;
-    this.baseFov = 52;
+    this.fov = 44;
+    this.baseFov = 44;
     this.fovScale = 1;
     this.t = 0;
     this._v = new THREE.Vector3();
@@ -57,8 +57,8 @@ export class CameraRig {
     const a = ((this.heading + this.aimDeg) * Math.PI) / 180;
     const fx = Math.sin(a), fz = -Math.cos(a);
     const o = this.origin;
-    const back = this.putting ? 2.4 : 3.4;
-    const up = this.putting ? 1.05 : 1.5;
+    const back = this.putting ? 2.4 : 4.2;
+    const up = this.putting ? 1.05 : 1.75;
     const x = o.x - fx * back, z = o.z - fz * back;
     const gy = this.ground(x, z);
     this.desiredPos.set(x, Math.max(o.y + up, gy + 1.2), z);
@@ -76,7 +76,7 @@ export class CameraRig {
     this._addressTargets();
     this.rate = 2.4;
     this.lookRate = 3;
-    this.baseFov = 52;
+    this.baseFov = 44;
     if (immediate) {
       this.pos.copy(this.desiredPos);
       this.look.copy(this.desiredLook);
@@ -111,6 +111,8 @@ export class CameraRig {
     this.result = result;
     this.cupShot = null;
     this.holeRest = null;
+    this.shortShot = false;
+    this.restPoint = null;
     if (result.holedAt && cupCam) this._planCupCam(result);
     this.shake = result.putt ? 0 : 0.06 + Math.min(0.08, result.carry / 3000);
     this.cut = false;
@@ -140,22 +142,67 @@ export class CameraRig {
       this.landPoint = new THREE.Vector3(sp.x, sp.y, sp.z);
       this.overlook = this.landCam;
       this.cutAt = Math.max(1.2, (result.landing ? result.landing.t : result.duration) - 2.6);
-    } else if (lp && result.flightTime > 2.6 && this.style === 'cinematic') {
-      const dirx = lp.x - o.x, dirz = lp.z - o.z;
-      const len = Math.hypot(dirx, dirz) || 1;
-      const fx = dirx / len, fz = dirz / len; // forward (ball -> landing)
-      const rx = -fz, rz = fx; // right
-      const side = result.offline > 4 ? -1 : result.offline < -4 ? 1 : (Math.random() < 0.5 ? -1 : 1);
-      // Broadcast "green-side" camera: off to one side, short of the landing
-      // spot, framed so the ball drops in from the top of the shot.
-      const back = 30 + Math.min(18, result.carry * 0.05);
-      const x = lp.x - fx * back + rx * 17 * side;
-      const z = lp.z - fz * back + rz * 17 * side;
-      const y = Math.max(g(x, z), lp.y - 3, -40) + 4.2;
-      this.landCam = new THREE.Vector3(x, y, z);
-      this.landPoint = new THREE.Vector3(lp.x, g(lp.x, lp.z), lp.z);
-      this.cutAt = Math.max(1.2, result.flightTime - 1.7);
+    } else if (lp && result.total < 45 && this.style !== 'tee') {
+      // chips and pitches: stay put behind the ball and pan with it, the way
+      // you'd watch a short shot yourself; the lens tightens as it runs out
+      this.shortShot = true;
+    } else if (lp && result.flightTime > 2.2 && this.style === 'cinematic') {
+      this._planLandingCam(result, lp);
     }
+  }
+
+  /**
+   * Broadcast landing camera: off to one side of the landing area, far enough
+   * back to frame both where the ball comes down and where it stops, and
+   * raised until nothing (ground or trees) blocks either.
+   */
+  _planLandingCam(result, lp) {
+    const g = this.ground;
+    const o = result.origin || { x: 0, z: 0 };
+    const rest = result.rest;
+    let fx = lp.x - o.x, fz = lp.z - o.z;
+    const len = Math.hypot(fx, fz) || 1;
+    fx /= len; fz /= len;
+    const rx = -fz, rz = fx;
+    const mx = (lp.x + rest.x) / 2, mz = (lp.z + rest.z) / 2;
+    const span = Math.hypot(rest.x - lp.x, rest.z - lp.z);
+    const back = Math.max(26, 18 + span * 0.9 + result.carry * 0.04);
+    const lateral = 14 + span * 0.25;
+    const lpY = g(lp.x, lp.z), rY = g(rest.x, rest.z);
+    // Try both sides (and a closer, straighter option); keep the one that
+    // needs the least lifting to see both spots and isn't next to a mast.
+    const candidates = [];
+    for (const side of [-1, 1]) for (const [bk, lt] of [[back, lateral], [back * 0.8, lateral * 0.5]]) {
+      const cam = new THREE.Vector3(mx - fx * bk + rx * lt * side, 0, mz - fz * bk + rz * lt * side);
+      cam.y = Math.max(g(cam.x, cam.z), Math.min(lpY, rY) - 2) + 4 + bk * 0.07;
+      const base = cam.y;
+      const blocked = (tx, ty, tz) => {
+        for (let i = 1; i < 14; i++) {
+          const u = i / 14;
+          const px = cam.x + (tx - cam.x) * u, pz = cam.z + (tz - cam.z) * u;
+          const py = cam.y + (ty - cam.y) * u;
+          const top = Math.max(g(px, pz) + 0.6, this.obstacle ? this.obstacle(px, pz) - 1.5 : -Infinity);
+          if (top > py) return true;
+        }
+        return false;
+      };
+      let k = 0;
+      for (; k < 12 && (blocked(lp.x, lpY + 0.3, lp.z) || blocked(rest.x, rY + 0.3, rest.z)); k++) cam.y += 2.5;
+      if (this.obstacle) cam.y = Math.max(cam.y, this.obstacle(cam.x, cam.z));
+      const mast = this.nearPole ? this.nearPole(cam.x, cam.z, 5) : false;
+      // prefer the side the ball didn't curve toward (usually the open fairway)
+      const preferred = (result.offline > 6 && side < 0) || (result.offline < -6 && side > 0) ? 0 : 0.5;
+      candidates.push({ cam, cost: (cam.y - base) + (mast ? 40 : 0) + preferred + (bk < back ? 1 : 0) });
+    }
+    candidates.sort((a, b) => a.cost - b.cost);
+    const cam = candidates[0].cam;
+    this.landCam = cam;
+    this.landPoint = new THREE.Vector3(lp.x, lpY, lp.z);
+    this.restPoint = new THREE.Vector3(rest.x, rY, rest.z);
+    const dist = cam.distanceTo(this.landPoint);
+    this.landFov = THREE.MathUtils.clamp(40 - dist * 0.08, 26, 38);
+    // cut ~1.8 s before it lands: enough time to see it drop in
+    this.cutAt = Math.max(1.0, (result.landing ? result.landing.t : result.flightTime) - 1.8);
   }
 
   /**
@@ -262,22 +309,50 @@ export class CameraRig {
         this.desiredLook.copy(b);
         this.lookRate = 8;
         const d = Math.hypot(b.x - o.x, b.z - o.z);
-        this.baseFov = THREE.MathUtils.clamp(52 - d * 0.06, 30, 52);
+        this.baseFov = THREE.MathUtils.clamp(44 - d * 0.06, 26, 44);
+      } else if (this.shortShot) {
+        // hold position, pan with the ball, tighten the lens as it runs out
+        const d = Math.hypot(b.x - o.x, b.z - o.z);
+        this.desiredPos.copy(this.pos);
+        this.desiredPos.y += (Math.max(this.pos.y, o.y + 2.2) - this.pos.y) * 0.02;
+        this.desiredLook.set(b.x, b.y + 0.1, b.z);
+        this.baseFov = THREE.MathUtils.clamp(42 - d * 0.35, 26, 42);
+        this.rate = 1.5;
+        this.lookRate = 7;
       } else if (this.landCam && playT >= this.cutAt) {
-        // Keep the landing area in frame while the ball is still high, then
-        // settle onto the ball as it comes down.
+        // Landing camera: frame the drop zone while the ball is high, follow
+        // it down, then lead toward where it will stop.
+        // aim at the landing zone, pulled up toward the ball while it's high:
+        // the ball drops into a frame that already shows where it will land
         const air = Math.max(0, b.y - g(b.x, b.z));
-        const k = THREE.MathUtils.clamp(air / 40, 0, 0.5);
-        const target = this._v.copy(b).lerp(this.landPoint, k);
+        const landed = this.result.landing && playT >= this.result.landing.t;
+        const target = this._v.copy(this.landPoint);
+        if (!landed) {
+          // hold on the landing spot (lifted a little so the ball drops into frame)
+          target.lerp(b, 0.08);
+          target.y = this.landPoint.y + Math.min(6, air * 0.22);
+        } else {
+          // on the ground: follow the ball, leading toward where it will stop
+          target.copy(b);
+          if (this.restPoint) target.lerp(this.restPoint, THREE.MathUtils.clamp((playT - this.result.landing.t) / 1.5, 0, 0.35));
+        }
         if (!this.cut) {
           this.cut = true;
           this.pos.copy(this.landCam);
           this.look.copy(target);
-          this.fov = this.baseFov = 42;
+          this.fov = this.baseFov = this.landFov || 34;
+          this.shake = 0;
         }
         this.desiredPos.copy(this.landCam);
         this.desiredLook.copy(target);
+        this.rate = 2;
         this.lookRate = 6;
+      } else if (playT < 0.55 && this.style === 'cinematic') {
+        // launch: hold behind the player for the strike, let the ball leave
+        this.desiredPos.copy(this.pos);
+        this.desiredLook.lerpVectors(this.look, b, 0.25);
+        this.lookRate = 10;
+        this.baseFov = 42;
       } else {
         // chase: behind and above the ball, looking a little ahead of it
         const hx = b.x - o.x, hz = b.z - o.z;
@@ -286,8 +361,8 @@ export class CameraRig {
         let fx = Math.sin(a), fz = -Math.cos(a);
         if (len > 2) { fx = hx / len; fz = hz / len; }
         const height = Math.max(0, b.y - g(b.x, b.z));
-        const back = 9 + Math.min(14, playT * 3.2);
-        const ramp = Math.min(1, playT / 0.9);
+        const back = 9 + Math.min(14, Math.max(0, playT - 0.4) * 3.2);
+        const ramp = Math.min(1, Math.max(0, playT - 0.45) / 0.9);
         const tgt = this._v.set(b.x - fx * back, b.y + 2.6 + height * 0.08, b.z - fz * back);
         tgt.lerpVectors(this.desiredPos.clone(), tgt, ramp * ramp);
         const gy = g(tgt.x, tgt.z) + 1.2;
@@ -296,7 +371,7 @@ export class CameraRig {
         this.desiredLook.set(b.x + fx * 6, b.y + 0.4, b.z + fz * 6);
         this.rate = playT < 0.5 ? 2 : 5;
         this.lookRate = 12;
-        this.baseFov = 52 - Math.min(8, playT * 2);
+        this.baseFov = 44 - Math.min(8, playT * 2);
       }
     } else if (this.mode === 'rest') {
       const p = this.restPos;

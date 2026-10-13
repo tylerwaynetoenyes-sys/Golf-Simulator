@@ -13,7 +13,8 @@ glowing tracer, a cinematic camera and the full set of numbers.
 | ![Hole intro](docs/screenshots/10-course-intro.jpg) | ![Afternoon on the course](docs/screenshots/11-course-day.jpg) |
 | ![Landing camera](docs/screenshots/03-landing-cam.jpg) | ![Four players, two teams](docs/screenshots/12-multiplayer.jpg) |
 | ![Cup camera](docs/screenshots/15-cup-cam.jpg) | ![Holed out](docs/screenshots/14-holed-out.jpg) |
-| ![Reading the green](docs/screenshots/16-green-read.jpg) | ![R10 help](docs/screenshots/13-r10-help.jpg) |
+| ![Approach into the putting rings](docs/screenshots/18-approach-rings.jpg) | ![Finished inside the outer ring](docs/screenshots/19-ring-finish.jpg) |
+| ![Landing camera](docs/screenshots/20-landing-cam.jpg) | ![R10 help](docs/screenshots/13-r10-help.jpg) |
 
 ## Quick start
 
@@ -120,13 +121,12 @@ bridge. Use it on your home Wi-Fi, not on a network you don't trust.
 | **Hold Space / hold the Swing button** | Demo swing: release in the green zone (84–98%) for a pure strike; soft swings stay clean, over-swings get wild |
 | **← →** | Aim (also rotates R10 shots, like any simulator's target line); finer on the green; **R** resets |
 | **1–7** or **↑ ↓** | Club (the course picks one for you each shot) |
-| **Enter** | On the green: auto putt. Otherwise: skip to the result |
+| **Enter** | Skip to the result |
 | **M** / **P** / **S** | Choose a game / players & teams / scorecard |
 | **N** | Day ↔ night |
 | **C** | Camera: Cinematic → Follow → Tee |
 | **Tab** | Session stats and personal bests |
 | **H** or **?** | R10 help |
-| **G** | Green slope arrows on/off |
 | **Custom shot** | Type in launch numbers from any monitor |
 
 ### Games
@@ -141,11 +141,9 @@ bridge. Use it on your home Wi-Fi, not on a network you don't trust.
   have elevation, doglegs, sloped greens, bunkers, creeks, ponds and an island
   green. Each hole opens with a fly-over and a hole card. Rules: rough and sand
   cost distance and spin, water is a one-stroke drop, out of bounds is stroke
-  and distance, gimmes (off / 2 ft / 4 ft), and a pick-up at par + 4 keeps a
-  six-ball moving. **Putting:** press Enter for an auto putt (Tour make
-  percentages by distance, rolled for real on the slope), or hold Space to
-  putt yourself with the read shown on screen. The round saves after every
-  hole and resumes after a reload.
+  and distance, and a pick-up at par + 4 keeps a six-ball moving. The green
+  is settled by putting rings (below). The round saves after every hole and
+  resumes after a reload.
 - **Driving Range.** Free practice with ghost tracers, a dispersion mini-map
   and five lit target greens.
 - **Closest to Pin.** Five holes at varied distances (wedges, mixed or long),
@@ -155,36 +153,52 @@ bridge. Use it on your home Wi-Fi, not on a network you don't trust.
 - **Longest Drive.** Balls into a 50-yard grid, best ball counts. The bluff
   edge sits at about 330 yards, so a big enough drive finds the Mississippi.
 
-### The hole
+### The green: putting rings
 
-The cup is a real hole: 4¼ in across and 4 in deep, cut through the turf with
-a white-topped liner you can see into. The ball physically rolls in. It drops
-when it stays over the hole long enough to fall one ball radius before
-reaching the far edge. That works out to about 1.6 m/s dead centre (the
-measured figure for real cups) and less off-centre. Anything firmer or wider
-catches the lip and spins out. Chips can roll in or dunk, and they rattle off
-the flagstick when it's in. Putts are struck with the flagstick out.
+There's no putting mode, the way most sims handle a round with friends. Every
+hole has two rings around the cup, visible from the fairway (plus a soft
+light beam over the pin on the approach):
 
-When a ball is going in, the camera cuts to cup level on the far side of the
-hole, play drops into slow motion, and the camera pushes in as the ball tips
-over the edge. You hear the rattle off the liner and the hollow knock on the
-bottom. Then a banner (Birdie, Par, Hole in one…), gold sparks out of the cup
-and the gallery, scaled to how good it was. The camera then rises over the
-cup so you see the ball sitting in the bottom.
+- finish inside the **gold ring** (10 ft) → **1-putt**
+- inside the **white ring** (30 ft) → **2-putt**
+- anywhere else on the green → **3-putt**
+- off the green and outside the rings → play your next shot (a chip or pitch)
+- roll it **into the cup** → holed, no putts
 
-Greens are built at high detail around the hole, with tilt plus swells and
-swales. Pins sit on calmer ground, and peak slopes are 3–4%. Mowing stripes
-and slope shading show the contours from the fairway. On the green:
+When the ball settles inside a ring, the shot card shows the result, then
+the ball rolls into the cup on a real line (slope included). The cup camera
+picks it up for the drop, and the banner shows the score. Ring sizes are
+Tight (6/20 ft), Standard (10/30 ft) or Generous (15/45 ft) in the course
+setup.
 
-- Animated arrows flow downhill over the last ~15 ft to the cup, coloured
-  blue (gentle), gold (medium) or red (steep), and fade out toward the edge.
-  Press **G** to hide them.
-- A dotted aim line runs to the hole, and the read shows length, uphill or
-  downhill, break, and "plays like" distance.
-- The gold mark on the putting meter is the pace for this putt, slope included.
-- A gimme is tapped in for you, so every hole still finishes in the cup.
+The cup itself is a real hole: 4¼ in across and 4 in deep, cut through the
+turf with a white-topped liner. A chip or approach that reaches it drops when
+it stays over the hole long enough to fall a ball radius (about 1.6 m/s dead
+centre, the measured figure for real cups). Anything firmer or wider lips out,
+and full shots can dunk or rattle off the flagstick. Holing out triggers the
+cup-level camera, slow motion, the knock on the bottom, sparks and the gallery.
 
-The ball itself has ~330 modelled dimples and a clear-coat finish for close-ups.
+### Distance, scale and camera
+
+- **The ball** is drawn on the ground exactly as rendered, so it never sinks
+  into the turf. It has ~330 modelled dimples and a clear-coat finish up
+  close. Its glow shrinks with distance like a real object, with a floor of a
+  few pixels, so a 300-yard drive actually looks 300 yards away.
+- **The tracer** is a few centimetres wide in world terms and thins out with
+  distance, instead of a fixed-width band.
+- **Yardage stakes** on every hole (100 red, 150 white, 200 blue, 250 yellow,
+  to the green) and haze at distance give the eye real references.
+- **Bounces** use the actual slope of the ground, so a ball landing on a bank
+  kicks the way it should. Each surface reacts differently: fairway releases,
+  rough grabs, sand plugs, greens hold and check. Each has its own landing
+  sound and spray.
+- **Camera:**
+  - *Long shots:* the launch is held behind you, then a chase follows the
+    climb. About 1.8 s before landing it cuts to a broadcast camera beside
+    the landing zone, placed so both the landing spot and the finish are in
+    view (it lifts over trees and avoids light masts).
+  - *Chips and pitches:* the camera stays behind the ball and pans with it.
+  - *After the shot:* a tag over the ball shows what's left to the pin.
 
 ### Players and teams
 

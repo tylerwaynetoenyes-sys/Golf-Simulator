@@ -22,11 +22,45 @@ const NIGHT = {
   key: new THREE.Color(0x9fb4e6), keyIntensity: 0.42,
 };
 const DAY = {
-  fog: new THREE.Color(0xb7cce0), fogDensity: 0.00017, exposure: 0.92, bloom: 0.32, bloomThreshold: 0.93,
-  hemiSky: new THREE.Color(0xbcd6f0), hemiGround: new THREE.Color(0x4a5a34), hemi: 1.05,
+  fog: new THREE.Color(0xb7cce0), fogDensity: 0.00024, exposure: 0.92, bloom: 0.32, bloomThreshold: 0.93,
+  hemiSky: new THREE.Color(0xbcd6f0), hemiGround: new THREE.Color(0x4a5a34), hemi: 0.8,
   key: new THREE.Color(0xfff0d8), keyIntensity: 2.7,
 };
 const OVERCAST_FOG = new THREE.Color(0xa7b0ba);
+
+/**
+ * Image-based lighting: a small generated sky (zenith → horizon glow →
+ * ground bounce) prefiltered for PBR, so every material picks up soft sky
+ * reflections and coloured ambient instead of looking flat-lit.
+ */
+function skyEnvironment(renderer, { zenith, horizon, glow, glowDir, ground }) {
+  const scene = new THREE.Scene();
+  const mat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false,
+    uniforms: {
+      uZ: { value: new THREE.Color(zenith) }, uH: { value: new THREE.Color(horizon) },
+      uG: { value: new THREE.Color(ground) }, uGlow: { value: new THREE.Color(glow) }, uDir: { value: glowDir.clone().normalize() },
+    },
+    vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `
+      uniform vec3 uZ; uniform vec3 uH; uniform vec3 uG; uniform vec3 uGlow; uniform vec3 uDir; varying vec3 vD;
+      void main() {
+        vec3 d = normalize(vD);
+        float up = clamp(d.y, 0.0, 1.0);
+        vec3 sky = mix(uH, uZ, pow(up, 0.5));
+        float s = max(dot(d, uDir), 0.0);
+        sky += uGlow * (pow(s, 6.0) * 0.6 + pow(s, 64.0) * 2.5);
+        vec3 col = d.y >= 0.0 ? sky : mix(uH * 0.6, uG, clamp(-d.y * 3.0, 0.0, 1.0));
+        gl_FragColor = vec4(col, 1.0);
+      }`,
+  });
+  scene.add(new THREE.Mesh(new THREE.SphereGeometry(10, 48, 24), mat));
+  const pm = new THREE.PMREMGenerator(renderer);
+  const rt = pm.fromScene(scene, 0.02);
+  pm.dispose();
+  mat.dispose();
+  return rt.texture;
+}
 
 export class Environment {
   constructor(world) {
@@ -43,6 +77,11 @@ export class Environment {
     this._tmpC = new THREE.Color();
     this._tmpC2 = new THREE.Color();
     this.listeners = new Set();
+    try {
+      const r = world.r.renderer;
+      this.envDay = skyEnvironment(r, { zenith: 0x3d74c4, horizon: 0xc9dcec, glow: 0xfff0d0, glowDir: SUN_DIR, ground: 0x4c5a35 });
+      this.envNight = skyEnvironment(r, { zenith: 0x05080f, horizon: 0x1c2232, glow: 0x4a2c18, glowDir: new THREE.Vector3(0.2, 0.05, -1), ground: 0x0b0d09 });
+    } catch (e) { console.warn('environment map unavailable', e); }
     this.apply();
   }
 
@@ -143,7 +182,7 @@ export class Environment {
     // the course has no range floodlights over the fairways: a brighter moon there
     const nightBoost = w.sceneMode === 'course' ? 1.9 : 1;
     key.intensity = THREE.MathUtils.lerp(NIGHT.keyIntensity * nightBoost * (1 - c * 0.6), DAY.keyIntensity * this.sunAmt, d);
-    const shadowSize = d > 0.5 ? 60 : 30;
+    const shadowSize = d > 0.5 ? 85 : 30;
     const cam = key.shadow.camera;
     if (cam.right !== shadowSize) {
       Object.assign(cam, { left: -shadowSize, right: shadowSize, top: shadowSize, bottom: -shadowSize });
@@ -153,6 +192,13 @@ export class Environment {
     hemi.color.copy(lerpC(NIGHT.hemiSky, DAY.hemiSky, d));
     hemi.groundColor.copy(lerpC(NIGHT.hemiGround, DAY.hemiGround, d));
     hemi.intensity = THREE.MathUtils.lerp(NIGHT.hemi * nightBoost, DAY.hemi * (1 + c * 0.35), d);
+
+    // image-based light: the sky's colour in every material's reflections
+    const scn = w.scene;
+    if (this.envDay) {
+      scn.environment = d > 0.5 ? this.envDay : this.envNight;
+      scn.environmentIntensity = d > 0.5 ? THREE.MathUtils.lerp(0.25, 0.55, (d - 0.5) * 2) * (1 - c * 0.3) : THREE.MathUtils.lerp(0.12, 0.25, d * 2);
+    }
 
     // fog + post
     const fog = w.scene.fog;

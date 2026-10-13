@@ -37,7 +37,8 @@ export const HOLES = [
     green: { r: 14, slope: [0.01, 0.006] }, pin: [-3, -3],
     bunkers: [{ t: 0.55, off: -21, rx: 11, rz: 6 }, { t: 1.0, off: -16, rx: 7, rz: 6 }],
     water: [{ creek: 0.72, width: 22 }],
-    lm: { type: 'eads', at: [0.72, 0], scale: 1, rot: 0, onCreek: true },
+    // the bridge carries the creek crossing well left of the fairway, framing it
+    lm: { type: 'eads', at: [-190, 0], scale: 1, rot: 0, onCreek: true },
   },
   {
     n: 4, name: 'Alton Riverfront', par: 4, landmark: 'riverfront',
@@ -177,7 +178,7 @@ export const HOLES = [
     green: { r: 13, slope: [-0.012, 0.004] }, pin: [-3, -2],
     bunkers: [{ t: 0.9, off: -15, rx: 7, rz: 6 }, { t: 1.08, off: 10, rx: 8, rz: 5 }],
     water: [],
-    lm: { type: 'wadlow', at: [16, -6], scale: 1, rot: -0.6 },
+    lm: { type: 'wadlow', at: [24, -8], scale: 1, rot: -0.6 },
   },
   {
     n: 18, name: 'Homecoming', par: 5, landmark: 'arch',

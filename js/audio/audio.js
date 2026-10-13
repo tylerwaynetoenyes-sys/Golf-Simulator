@@ -88,13 +88,16 @@ class AudioEngine {
 
   _noise(t, dur, { type = 'bandpass', freq = 1000, q = 1, gain = 1, attack = 0.001, out = this.sfx, freqEnd = null, pan = 0 }) {
     const ctx = this.ctx;
+    // exponential ramps can't target 0 (the Web Audio API throws): a soft
+    // chip computes gain 0 for its impact, which used to abort the shot
+    gain = Math.max(1e-4, Number.isFinite(gain) ? gain : 1e-4);
     const src = ctx.createBufferSource();
     src.buffer = this.noise;
     src.loop = true;
     const f = ctx.createBiquadFilter();
     f.type = type;
     f.frequency.setValueAtTime(freq, t);
-    if (freqEnd) f.frequency.exponentialRampToValueAtTime(freqEnd, t + dur);
+    if (freqEnd) f.frequency.exponentialRampToValueAtTime(Math.max(1, freqEnd), t + dur);
     f.Q.value = q;
     const g = ctx.createGain();
     g.gain.setValueAtTime(0.0001, t);
@@ -114,6 +117,8 @@ class AudioEngine {
 
   _tone(t, freq, dur, { type = 'sine', gain = 0.3, attack = 0.002, out = this.sfx, freqEnd = null, detune = 0 }) {
     const ctx = this.ctx;
+    gain = Math.max(1e-4, Number.isFinite(gain) ? gain : 1e-4);
+    if (freqEnd != null) freqEnd = Math.max(1, freqEnd);
     const o = ctx.createOscillator();
     o.type = type;
     o.frequency.setValueAtTime(freq, t);
@@ -183,6 +188,14 @@ class AudioEngine {
     if (surface === 'green') {
       this._noise(t, 0.09, { type: 'bandpass', freq: 520, q: 1.2, gain: 0.5 * v });
       this._tone(t, 110, 0.08, { gain: 0.25 * v, freqEnd: 70 });
+    } else if (surface === 'sand') {
+      // a dull thump and a hiss of sand
+      this._tone(t, 70, 0.1, { gain: 0.32 * v, freqEnd: 45 });
+      this._noise(t, 0.35, { type: 'bandpass', freq: 2600, q: 0.7, gain: 0.32 * v });
+    } else if (surface === 'rough') {
+      // muffled: long grass soaks it up
+      this._noise(t, 0.2, { type: 'lowpass', freq: 240, q: 0.6, gain: 0.55 * v });
+      this._noise(t + 0.02, 0.25, { type: 'bandpass', freq: 1800, q: 0.8, gain: 0.08 * v });
     } else {
       this._noise(t, 0.16, { type: 'lowpass', freq: 380, q: 0.8, gain: 0.7 * v });
       this._tone(t, 85, 0.12, { gain: 0.3 * v, freqEnd: 50 });
@@ -494,6 +507,19 @@ class AudioEngine {
 
     this.amb.gain.setTargetAtTime(this.ambienceLevel * 0.9, ctx.currentTime, 1.5);
   }
+}
+
+// Sound must never break gameplay: wrap every method so an audio error is
+// logged once and ignored.
+for (const name of Object.getOwnPropertyNames(AudioEngine.prototype)) {
+  const fn = AudioEngine.prototype[name];
+  if (name === 'constructor' || name.startsWith('_') || typeof fn !== 'function') continue;
+  AudioEngine.prototype[name] = function safe(...args) {
+    try { return fn.apply(this, args); } catch (e) {
+      if (!this._warned) { this._warned = true; console.warn('audio error (ignored)', e); }
+      return undefined;
+    }
+  };
 }
 
 export const audio = new AudioEngine();

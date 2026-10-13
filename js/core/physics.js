@@ -319,27 +319,36 @@ export function simulateShot(launch, opts = {}) {
         break;
       }
 
-      // ── bounce ──
-      const vn = -vy;
+      // ── bounce, against the real surface normal (a ball landing on a slope
+      // kicks down it; on flat ground this is exactly the calibrated bounce) ──
+      const [sgx, sgz] = slopeAt(terrain, px, pz);
+      const nl = Math.hypot(sgx, 1, sgz);
+      const nx = -sgx / nl, ny = 1 / nl, nz = -sgz / nl;
+      const vdotn = vx * nx + vy * ny + vz * nz;
+      const vn = Math.max(0, -vdotn);
+      let tx = vx - vdotn * nx, ty = vy - vdotn * ny, tz = vz - vdotn * nz;
+      const ts = Math.hypot(tx, ty, tz);
       const e = Math.max(0.05, surf.restitution - 0.011 * vn);
-      const hdx = hs > 1e-6 ? vx / hs : 0;
-      const hdz = hs > 1e-6 ? vz / hs : -1;
+      if (ts > 1e-6) { tx /= ts; ty /= ts; tz /= ts; } else { tx = 0; ty = 0; tz = -1; }
       // Backspin component along travel direction (spin about the horizontal right axis).
-      const rightDot = -ax * hdz + az * hdx;
+      const thl = Math.hypot(tx, tz) || 1;
+      const rightDot = -ax * (tz / thl) + az * (tx / thl);
       const backOmega = omega * Math.max(-1, Math.min(1, rightDot));
       const rw = BALL.radius * backOmega;
-      // Steeper landings bite harder.
-      const bite = Math.min(1, Math.max(0.25, Math.sin((descent * Math.PI) / 180) * 1.25));
-      let hNew = hs - surf.friction * bite * (hs + rw) * (2 / 7) * 2.2;
-      hNew = Math.max(hNew, -0.12 * hs); // a little zip back at most
-      if (hs > 1e-6 && hNew < hs * 0.04 && rw < hs) hNew = Math.max(hNew, hs * 0.04);
-      if (ground.surface === 'sand') hNew = Math.min(hNew, hs * 0.08); // plugs / dies in the bunker
-      vx = hdx * hNew;
-      vz = hdz * hNew;
-      vy = vn * e;
+      // Steeper landings (relative to the surface) bite harder.
+      const impact = (Math.atan2(vn, ts) * 180) / Math.PI;
+      const bite = Math.min(1, Math.max(0.25, Math.sin((impact * Math.PI) / 180) * 1.25));
+      let hNew = ts - surf.friction * bite * (ts + rw) * (2 / 7) * 2.2;
+      hNew = Math.max(hNew, -0.12 * ts); // a little zip back at most
+      if (ts > 1e-6 && hNew < ts * 0.04 && rw < ts) hNew = Math.max(hNew, ts * 0.04);
+      if (ground.surface === 'sand') hNew = Math.min(hNew, ts * 0.08); // plugs / dies in the bunker
+      const up = vn * e;
+      vx = tx * hNew + nx * up;
+      vy = ty * hNew + ny * up;
+      vz = tz * hNew + nz * up;
       omega *= 0.45;
       bounces++;
-      if (vy < 1.1 || bounces > 6) { phase = 'roll'; vy = 0; }
+      if (up < 1.1 || bounces > 6) { phase = 'roll'; vy = 0; }
     } else {
       // ── roll: 2-D, with slope ──
       const rollDt = 1 / 120;

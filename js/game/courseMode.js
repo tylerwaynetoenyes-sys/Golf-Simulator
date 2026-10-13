@@ -4,8 +4,11 @@
 // Turn order follows golf: everyone tees off in honour order (lowest score on
 // the previous hole first), then the player farthest from the hole plays.
 // Rules handled: lies (rough/sand slow the ball), water (one-stroke penalty,
-// drop where it crossed in), out of bounds (stroke and distance), gimmes,
-// a pick-up at par + 4 to keep the round moving, and putting (auto or manual).
+// drop where it crossed in), out of bounds (stroke and distance), a pick-up
+// at par + 4 to keep the round moving, and the green finish: there is no
+// putting mode. Two rings around every hole score the putts: finish inside
+// the inner ring and it's a 1-putt, inside the outer ring a 2-putt, anywhere
+// else on the green a 3-putt. A ball that rolls into the cup is simply holed.
 import { simulatePutt, puttSpeedFor, YD } from '../core/physics.js';
 import { HOLES, coursePar } from '../course/holes.js';
 import { HoleTerrain } from '../course/holeTerrain.js';
@@ -37,6 +40,13 @@ export const fmtToPar = (n) => (n === 0 ? 'E' : n > 0 ? `+${n}` : `${n}`);
 
 const SAVE_KEY = 'alton-range.round.v1';
 
+/** Putting rings (feet): inner = 1-putt, outer = 2-putt. */
+export const PUTT_RINGS = {
+  tight: { label: 'Tight', one: 6, two: 20 },
+  standard: { label: 'Standard', one: 10, two: 30 },
+  generous: { label: 'Generous', one: 15, two: 45 },
+};
+
 export class CourseMode {
   constructor(game) {
     this.game = game;
@@ -46,7 +56,7 @@ export class CourseMode {
     this.course = true;
     this.roundOver = false;
     this.length = 9;
-    this.gimme = 2; // feet
+    this.rings = 'standard';
   }
 
   get roster() { return this.game.roster; }
@@ -56,7 +66,7 @@ export class CourseMode {
 
   start(opts = {}) {
     if (opts.length) this.length = opts.length;
-    if (opts.gimme != null) this.gimme = opts.gimme;
+    if (opts.rings && PUTT_RINGS[opts.rings]) this.rings = opts.rings;
     const first = opts.startHole || 1;
     this.holes = HOLES.slice(first - 1, first - 1 + this.length);
     if (this.holes.length < this.length) this.holes = HOLES.slice(0, this.length);
@@ -74,6 +84,12 @@ export class CourseMode {
   }
 
   get hole() { return this.holes[this.holeIdx]; }
+
+  /** Ring radii in metres. */
+  get ringRadii() {
+    const r = PUTT_RINGS[this.rings] || PUTT_RINGS.standard;
+    return { one: r.one * FT, two: r.two * FT };
+  }
   get T() { return this.game.world.course.T; }
 
   _startHole() {
@@ -113,7 +129,7 @@ export class CourseMode {
       origin: { x: b.x, y: b.teed ? b.y + 0.04 : T.groundHeight(b.x, b.z) + 0.021, z: b.z },
       heading,
       teed: b.teed,
-      putting: b.surface === 'green' || (b.surface === 'fringe' && toPin < 18),
+      putting: false, // the rings settle the green; every shot is a full swing or chip
       lie: b.teed ? 'tee' : b.surface,
       toPin,
       strokes: b.strokes,
@@ -203,13 +219,17 @@ export class CourseMode {
     b.y = T.groundHeight(b.x, b.z);
     b.prev = before;
 
-    // gimme
-    let gimme = false;
+    // the green finish: rings around the hole score the putts
+    let finish = null;
     const toPin = T.toPin(b.x, b.z);
-    if (!b.holed && b.surface === 'green' && this.gimme > 0 && toPin <= this.gimme * FT) {
-      b.strokes += 1;
-      b.holed = true;
-      gimme = true;
+    if (!b.holed && !penalty) {
+      const R = this.ringRadii;
+      const putts = toPin <= R.one ? 1 : toPin <= R.two ? 2 : b.surface === 'green' ? 3 : 0;
+      if (putts) {
+        finish = { putts, from: toPin };
+        b.strokes += putts;
+        b.holed = true;
+      }
     }
     // pick up to keep things moving
     let pickedUp = false;
@@ -222,11 +242,12 @@ export class CourseMode {
     let headline, sub, category = null;
     if (b.holed) {
       const name = scoreName(b.strokes, par);
-      headline = gimme ? `${name} · gimme` : name;
-      sub = `${b.strokes} stroke${b.strokes === 1 ? '' : 's'} · ${player.name}`;
+      headline = name;
+      sub = finish
+        ? `${finish.putts}-putt from ${proximity(finish.from)} · ${b.strokes} strokes`
+        : `Holed out · ${b.strokes} stroke${b.strokes === 1 ? '' : 's'}`;
       const d = b.strokes - par;
       category = b.strokes === 1 ? 'ctpAce' : d <= -2 ? 'eagle' : d === -1 ? 'birdie' : d === 0 ? 'par' : d === 1 ? 'bogey' : 'double';
-      if (result.putt && !gimme && result.total > 6) category = 'longPutt';
     } else if (pickedUp) {
       headline = 'Picked up';
       sub = `Scores ${par + MAX_OVER} · on to the next`;
@@ -245,7 +266,9 @@ export class CourseMode {
       else if (result.putt) category = toPin < 0.6 ? null : 'lagMiss';
     }
 
-    const out = { headline, sub, category, bests: [], holed: b.holed, penalty, ace: b.holed && b.strokes === 1, gimme };
+    const out = { headline, sub, category, bests: [], holed: b.holed, penalty, ace: b.holed && b.strokes === 1, finish };
+    // the shot card shouldn't give away the drop: it shows the ring first
+    if (finish) out.preview = { headline: `${proximity(finish.from)} · ${finish.putts}-putt`, sub: finish.putts === 3 ? 'On the green · three to get down' : `Inside the ${finish.putts === 1 ? 'inner' : 'outer'} ring` };
     if (b.holed && b.strokes === 1) out.bests.push({ label: 'Hole in one', value: this.hole.name });
 
     // hole finished for everyone?
@@ -458,7 +481,7 @@ export class CourseMode {
     return this.players.filter((p) => p.id !== cur.id).map((p) => {
       const b = this.ball.get(p.id);
       if (b.holed || b.pickedUp || b.strokes === 0) return null;
-      return { x: b.x, y: T.groundHeight(b.x, b.z), z: b.z, color: p.color, name: p.name };
+      return { x: b.x, y: this.game.world.visualGround(b.x, b.z), z: b.z, color: p.color, name: p.name };
     }).filter(Boolean);
   }
 
@@ -467,7 +490,7 @@ export class CourseMode {
   _save() {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
-        at: Date.now(), length: this.length, first: this.holes[0].n, holeIdx: this.holeIdx, gimme: this.gimme,
+        at: Date.now(), length: this.length, first: this.holes[0].n, holeIdx: this.holeIdx, rings: this.rings,
         names: this.players.map((p) => p.name),
         cards: this.players.map((p) => this.cards.get(p.id)),
         honor: this.honor.map((id) => this.players.findIndex((p) => p.id === id)),

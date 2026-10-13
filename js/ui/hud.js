@@ -242,6 +242,7 @@ export class HUD {
       <div class="hc-top"><span class="hc-num">${h.n}</span><div><div class="hc-kicker">Hole ${h.idx} of ${h.of}</div><div class="hc-name">${escape(h.name)}</div></div></div>
       <div class="hc-stats"><div><b>Par ${h.par}</b></div><div><b>${U.isMetric() ? Math.round(h.yards * YD) : h.yards}</b> ${U.distUnit()}</div>${h.wind ? `<div>${h.wind}</div>` : ''}</div>
       ${h.note ? `<p class="hc-note">${escape(h.note)}</p>` : ''}
+      ${h.rings ? `<div class="hc-rings"><span class="ring-gold"></span><span class="ring-white"></span>${escape(h.rings)}</div>` : ''}
       <div class="hc-skip">Tap or press Enter to skip</div>`;
     el.dataset.visible = 'true';
   }
@@ -274,6 +275,7 @@ export class HUD {
       if (!t || !t.pt) { el.hidden = true; return; }
       el.hidden = false;
       if (el.dataset.name !== t.name) { el.dataset.name = t.name; el.textContent = t.name; el.style.setProperty('--pc', t.color); }
+      el.classList.toggle('self', !!t.self);
       el.style.transform = `translate(${t.pt.x.toFixed(1)}px, ${t.pt.y.toFixed(1)}px) translate(-50%, -100%)`;
     });
   }

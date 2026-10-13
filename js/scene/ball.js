@@ -135,7 +135,8 @@ export class Ball {
   /** Rest the ball at (x, z): on a tee peg, or sitting on the ground. */
   placeAt(x, y, z, teed = false) {
     const gy = this.ground(x, z);
-    this.setPosition(x, (teed ? Math.max(gy, y) + 0.07 : gy) + BALL.radius, z);
+    // teed: ball bottom ~3.5 cm above the turf, a normal driver tee height
+    this.setPosition(x, (teed ? Math.max(gy, y - 0.04) + 0.035 : gy) + BALL.radius, z);
     this.spinRate = 0;
     this.mesh.rotation.set(0, 0, 0);
     this.setVisible(true);
@@ -166,10 +167,15 @@ export class Ball {
   update(dt, camera) {
     if (this.spinRate) this.mesh.rotateOnWorldAxis(this.spinAxis, this.spinRate * dt);
     const d = camera.position.distanceTo(this.mesh.position);
-    // fade the screen-space glow in once the ball is small on screen
+    // Halo: a fixed 30 cm of light around the ball in world terms, so it
+    // shrinks with distance like a real object (a constant-size blob makes a
+    // 300-yard ball look like it's 30 yards away), with a floor of a few
+    // pixels so it never vanishes against the sky.
     const a = THREE.MathUtils.smoothstep(d, 4, 18);
     this.glow.material.opacity = a;
-    const px = THREE.MathUtils.clamp(0.012 + d * 0.00004, 0.012, 0.022) * (this.glowScale || 1);
+    const view = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    const k = this.glowScale || 1;
+    const px = Math.max(0.0042 * k, (0.3 * k) / Math.max(1e-3, d * view));
     this.glow.scale.set(px, px, 1);
   }
 }

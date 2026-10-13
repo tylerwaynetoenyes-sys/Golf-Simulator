@@ -3,7 +3,7 @@
 import { $, esc, copyButtons, toast } from './dom.js';
 import { bus } from '../core/events.js';
 import { HOLES } from '../course/holes.js';
-import { CourseMode, fmtToPar } from '../game/courseMode.js';
+import { CourseMode, fmtToPar, PUTT_RINGS } from '../game/courseMode.js';
 import { PLAYER_COLORS, TEAMS, MAX_PLAYERS } from '../game/roster.js';
 import { store } from '../data/store.js';
 import { CLUBS, clubById } from '../data/clubs.js';
@@ -335,9 +335,9 @@ function helpTv() {
 
 function helpControls() {
   const rows = [
-    ['Hold / release Space', 'Demo swing, or putt when on the green'],
-    ['Enter', 'Auto putt (on the green) · skip the replay'],
-    ['← →', 'Aim (finer on the green) · R resets aim'],
+    ['Hold / release Space', 'Demo swing'],
+    ['Enter', 'Skip the replay'],
+    ['← →', 'Aim · R resets aim'],
     ['1–7 or ↑ ↓', 'Select club'],
     ['M', 'Choose game'],
     ['P', 'Players & teams'],
@@ -533,7 +533,7 @@ export function openCourseSetup(game) {
   const saved = CourseMode.savedRound(game.roster);
   let length = s.courseLength || 9;
   let start = s.courseStart || 1;
-  let gimme = s.gimme ?? 2;
+  let rings = PUTT_RINGS[s.rings] ? s.rings : 'standard';
   const pick = () => (length === 18 ? HOLES : HOLES.slice(start - 1, start + 8));
   const holeList = () => {
     const hs = pick();
@@ -552,9 +552,9 @@ export function openCourseSetup(game) {
       <button data-v="18" aria-pressed="${length === 18}">Full 18</button>
     </div>
     <div id="csHoles" style="margin-top:12px">${holeList()}</div>
-    <h3>Gimmes</h3>
-    <div class="setting" style="border:0;padding-top:0"><div><div class="hint">Putts this close count as holed, one stroke. Keeps a six-ball moving.</div></div>
-      <div class="seg" id="csGimme">${[[0, 'Off'], [2, '2 ft'], [4, '4 ft']].map(([v, l]) => `<button data-v="${v}" aria-pressed="${gimme === v}">${l}</button>`).join('')}</div></div>
+    <h3>On the green</h3>
+    <div class="setting" style="border:0;padding-top:0"><div><div class="hint">No putting: two rings around every hole settle it. Finish inside the gold ring for a 1-putt, inside the white ring for a 2-putt, anywhere else on the green for a 3-putt. Roll it in the cup and it's holed.</div></div>
+      <div class="seg" id="csRings">${Object.entries(PUTT_RINGS).map(([k, r]) => `<button data-v="${k}" aria-pressed="${rings === k}">${r.label} <small style="opacity:.7">${r.one}/${r.two} ft</small></button>`).join('')}</div></div>
     <h3>Players</h3>
     <div class="setting" style="border:0;padding-top:0"><div>${players.map((p) => `<span class="tb-team" style="--pc:${p.color};margin-right:6px;display:inline-block;margin-bottom:4px">${esc(p.name)}</span>`).join('')}
       ${game.roster.teamMode ? `<div class="hint">Teams: ${game.roster.teams().map((t) => `${esc(t.name)} (${t.members.length})`).join(' vs ')}</div>` : ''}</div>
@@ -567,25 +567,25 @@ export function openCourseSetup(game) {
     el.querySelector('#csHoles').innerHTML = holeList();
     audio.tick();
   }));
-  el.querySelectorAll('#csGimme button').forEach((b) => b.addEventListener('click', () => {
-    el.querySelectorAll('#csGimme button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
-    gimme = Number(b.dataset.v);
+  el.querySelectorAll('#csRings button').forEach((b) => b.addEventListener('click', () => {
+    el.querySelectorAll('#csRings button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    rings = b.dataset.v;
     audio.tick();
   }));
   el.querySelector('#csPlayers').addEventListener('click', () => openPlayers(game, { then: () => openCourseSetup(game) }));
   el.querySelector('#csStart').addEventListener('click', () => {
     store.setSetting('courseLength', length);
     store.setSetting('courseStart', start);
-    store.setSetting('gimme', gimme);
+    store.setSetting('rings', rings);
     onClose = null;
     closePanel();
     audio.click();
-    game.setMode('course', { length, gimme, startHole: start });
+    game.setMode('course', { length, rings, startHole: start });
   });
   el.querySelector('#csResume')?.addEventListener('click', () => {
     onClose = null;
     closePanel();
-    game.setMode('course', { length: saved.length, gimme: saved.gimme, startHole: saved.first, resume: saved });
+    game.setMode('course', { length: saved.length, rings: saved.rings, startHole: saved.first, resume: saved });
   });
 }
 

@@ -98,15 +98,32 @@ export class Effects {
     }
   }
 
+  /** What the turf does when the ball comes down, by surface. */
   land(ev) {
-    if (ev.surface === 'green') {
-      this.ring(ev.x, ev.y, ev.z, 0xfff0c8, 5, 1.0);
-      this.burst(ev.x, ev.y, ev.z, { n: 10, color: 0x6a9a4a, speed: 1.2, up: 1.2, life: 0.6 });
-    } else if (ev.surface === 'water') {
-      this.splash(ev.x, ev.y, ev.z);
-    } else {
-      this.ring(ev.x, ev.y, ev.z, 0xffd9a0, Math.min(10, 3 + ev.speed * 0.15), 1.0);
-      this.burst(ev.x, ev.y, ev.z, { n: 24, color: 0x6f8a3a, speed: 2.2, up: 2.4, life: 0.8 });
+    const sp = Math.min(1.5, (ev.speed || 15) / 25);
+    switch (ev.surface) {
+      case 'green':
+        // a soft pitch mark: small ring, a puff of fine grass
+        this.ring(ev.x, ev.y, ev.z, 0xfff0c8, 2.5 + sp * 2, 0.9);
+        this.burst(ev.x, ev.y, ev.z, { n: 8, color: 0x7fb257, speed: 0.8, up: 0.9, life: 0.5, fine: true });
+        break;
+      case 'sand':
+        // bunker: a spray of sand, low and heavy
+        this.burst(ev.x, ev.y, ev.z, { n: Math.round(40 + sp * 50), color: 0xe9dcb6, speed: 2.2 * sp + 0.6, up: 2.4 * sp + 0.8, life: 0.9, gravity: 12 });
+        this.burst(ev.x, ev.y, ev.z, { n: 18, color: 0xf4ead0, speed: 1.2, up: 1.4, life: 1.4, gravity: 3, fine: true });
+        break;
+      case 'rough':
+        // rough: grass flies up, the ball nestles down
+        this.burst(ev.x, ev.y, ev.z, { n: 26, color: 0x4e6b2a, speed: 1.6 * sp + 0.5, up: 2.2 * sp + 0.6, life: 0.8 });
+        this.ring(ev.x, ev.y, ev.z, 0xcfe0a8, 2.5 + sp * 3, 0.8);
+        break;
+      case 'water':
+        this.splash(ev.x, ev.y, ev.z);
+        break;
+      default:
+        // fairway / fringe / tee: a crisp ring and a little turf
+        this.ring(ev.x, ev.y, ev.z, 0xffd9a0, Math.min(10, 3 + (ev.speed || 15) * 0.15), 1.0);
+        this.burst(ev.x, ev.y, ev.z, { n: 20, color: 0x6f8a3a, speed: 1.8 * sp + 0.4, up: 2 * sp + 0.4, life: 0.75 });
     }
   }
 

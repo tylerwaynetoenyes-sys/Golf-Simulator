@@ -25,7 +25,7 @@ const DEFAULT_SETTINGS = {
   display: 'standard', // standard | tv
   timeOfDay: 'night', // night | day
   weather: 'clear', // clear | cloudy | breezy | windy
-  gimme: 2, // feet
+  rings: 'standard', // putting rings: tight | standard | generous
   courseLength: 9,
   courseStart: 1,
 };

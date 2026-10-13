@@ -135,7 +135,7 @@ export class Game {
     this._keepAwake();
   }
 
-  /** Switch game. Course needs options (holes, gimme) from its setup panel. */
+  /** Switch game. Course needs options (holes, putting rings) from its setup panel. */
   setMode(id, opts = {}) {
     if (!this.modes[id]) return;
     if (id === 'course' && !opts.length) { openCourseSetup(this); return; }
@@ -157,7 +157,7 @@ export class Game {
   }
 
   restartMode() {
-    const opts = this.mode.course ? { length: this.mode.length, gimme: this.mode.gimme, startHole: this.mode.holes[0].n } : {};
+    const opts = this.mode.course ? { length: this.mode.length, rings: this.mode.rings, startHole: this.mode.holes[0].n } : {};
     this.setMode(this.mode.id, opts);
   }
 
@@ -184,7 +184,7 @@ export class Game {
     w.rig.toAddress(immediate);
     this.aimLine.position.set(s.origin.x, w.ball.mesh.position.y - 0.02, s.origin.z);
     this.aimLine.visible = !s.putting;
-    if (m.course) w.course.setPutting(!!s.putting);
+    if (m.course) { w.course.setPutting(false); w.course.setRings(true, m.ringRadii); }
     this._buildPuttLine();
     w.markers.set(m.markers());
     const sug = m.suggestedClub?.();
@@ -498,11 +498,16 @@ export class Game {
     this.hud.setSkip(false);
     this._reveal();
     const o = s.outcome;
-    s.restTimer = r.holed && !s.tapping ? 3.2 : o.summary ? 2.6 : o.holeComplete ? 2.2 : r.putt ? 1.5 : 3.2 + (this.hud.commentEl.classList.contains('show') ? 0.8 : 0);
-    if (o.gimme && !s.tapped) s.tapDelay = 0.75;
+    s.restTimer = r.holed && (!s.tapping || s.ring) ? 3.0 : o.summary ? 2.6 : o.holeComplete ? 2.2 : r.putt ? 1.5 : 3.2 + (this.hud.commentEl.classList.contains('show') ? 0.8 : 0);
+    // finished inside a putting ring: roll it in
+    if (o.finish && !s.tapped) s.tapDelay = 0.9;
   }
 
-  /** Conceded putt: knock it in so the ball still finishes in the cup. */
+  /**
+   * The green finish: the ball settled inside a ring, so the putts are
+   * already counted. Roll it into the cup on a real line (slope included)
+   * with the cup camera, then the hole-out moment.
+   */
   _tapIn(s) {
     const m = this.mode;
     if (!m.course || !m.T) return;
@@ -510,26 +515,30 @@ export class Game {
     const b = s.result.rest;
     const d = T.toPin(b.x, b.z);
     const base = (Math.atan2(T.pin.x - b.x, -(T.pin.z - b.z)) * 180) / Math.PI;
+    const terrain = (x, z) => { const t = T.terrain(x, z); return t.surface === 'green' ? t : { height: t.height, surface: 'fringe' }; };
     let res = null;
-    for (const sf of [1.12, 1.2, 1.05, 1.3]) {
-      for (let k = 0; k <= 24 && !res; k++) {
-        const aim = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.6;
-        const r = simulatePutt({ x: b.x, y: b.y, z: b.z }, base + aim, puttSpeedFor(d) * sf + 0.15, T.terrain, T.pin);
+    for (const sf of [1.1, 1.16, 1.04, 1.24, 1.32]) {
+      for (let k = 0; k <= 40 && !res; k++) {
+        const aim = (k % 2 ? 1 : -1) * Math.ceil(k / 2) * 0.45;
+        const r = simulatePutt({ x: b.x, y: b.y, z: b.z }, base + aim, puttSpeedFor(d) * sf + 0.12, terrain, T.pin);
         if (r.holed) res = r;
       }
       if (res) break;
     }
-    if (!res) { this.world.ball.setVisible(false); return; }
+    if (!res) { this.world.ball.setVisible(false); audio.cupBottom(1); this._holeOutMoment(s); return; }
     s.tapped = true;
     s.tapping = true;
+    s.ring = true;
     s.result = res;
     s.t = 0;
     s.ev = 0;
-    s.restRevealed = true;
+    // long rolls play a little faster until the cup camera takes over
+    s.rate = d > 6 ? 1.8 : d > 3 ? 1.4 : 1;
     this.state = 'flight';
     audio.putt();
     this.hud.comment(null);
-    this.world.rig.startShot(res, { cupCam: false });
+    this.world.course.setRings(false);
+    this.world.rig.startShot(res, { cupCam: true });
   }
 
   /** Ball at the bottom of the cup: banner, sparks, gallery, Piasa. */
@@ -537,18 +546,19 @@ export class Game {
     const r = s.result;
     const o = s.outcome || {};
     const w = this.world;
-    const cy = w.groundFn(r.holedAt.x, r.holedAt.z);
-    const d = r.putt ? Math.hypot(r.holedAt.x - r.origin.x, r.holedAt.z - r.origin.z) : 0;
+    const cy = w.groundFn(r.holedAt?.x ?? this.mode.T?.pin.x ?? 0, r.holedAt?.z ?? this.mode.T?.pin.z ?? 0);
+    const hx = r.holedAt?.x ?? this.mode.T?.pin.x, hz = r.holedAt?.z ?? this.mode.T?.pin.z;
+    const d = r.putt && r.holedAt ? Math.hypot(r.holedAt.x - r.origin.x, r.holedAt.z - r.origin.z) : 0;
     const cat = o.category;
-    const level = o.ace ? 1 : cat === 'eagle' ? 0.95 : cat === 'birdie' || cat === 'longPutt' ? 0.7 : !r.putt ? 0.85 : cat === 'par' ? 0.35 : 0.22;
-    w.effects.holeOut(r.holedAt.x, cy, r.holedAt.z, level);
+    const fin = o.finish;
+    const level = o.ace ? 1 : cat === 'eagle' ? 0.95 : !fin ? 0.85 : cat === 'birdie' ? 0.7 : cat === 'par' ? (fin.putts === 1 ? 0.45 : 0.32) : 0.2;
+    w.effects.holeOut(hx, cy, hz, level);
     audio.cheer(level);
     if (level >= 0.85) setTimeout(() => audio.personalBest(), 350);
     const big = level >= 0.6;
     let title = o.headline || 'In the hole';
-    let kicker = !r.putt ? (r.holedAt.dunk ? 'Straight in' : 'Holed out') : d > 6 ? `From ${U.proximity(d)}` : 'In the hole';
+    let kicker = fin ? `${fin.putts === 1 ? 'One' : fin.putts === 2 ? 'Two' : 'Three'}-putt` : !r.putt ? (r.holedAt?.dunk ? 'Straight in' : 'Holed out') : d > 6 ? `From ${U.proximity(d)}` : 'In the hole';
     if (o.ace) { title = 'Hole in one'; kicker = this.mode.course ? this.mode.hole.name : 'Closest to Pin'; }
-    title = title.replace(/ · gimme$/, '');
     const sub = this.roster.multi || this.mode.course ? `${s.player.name}${o.sub ? ` · ${o.sub.replace(` · ${s.player.name}`, '')}` : ''}` : o.sub || '';
     this.hud.holeOut({ kicker, title, sub, big });
     this.piasa?.react(big ? 'big' : 'cheer');
@@ -559,11 +569,12 @@ export class Game {
     if (!s || s.revealed) return;
     s.revealed = true;
     const { launch, result, outcome, club, source, player } = s;
-    if (result.putt) this.hud.showPutt({ result, outcome, player, left: this.mode.T ? this.mode.T.toPin(result.rest.x, result.rest.z) : null });
-    else this.hud.showShot({ launch, result, club, source, outcome, player: this.roster.multi ? player : null });
+    const shown = outcome.preview && !s.tapped ? { ...outcome, headline: outcome.preview.headline, sub: outcome.preview.sub } : outcome;
+    if (result.putt) this.hud.showPutt({ result, outcome: shown, player, left: this.mode.T ? this.mode.T.toPin(result.rest.x, result.rest.z) : null });
+    else this.hud.showShot({ launch, result, club, source, outcome: shown, player: this.roster.multi ? player : null });
     if (!result.putt) this.hud.addDot(result, player.color);
     this.refreshMode();
-    if (store.settings.commentary && !(result.holed && !s.tapping)) {
+    if (store.settings.commentary && !(result.holed && !s.tapping) && !outcome.finish) {
       const c = commentFor({ result, launch, club, mode: this.mode.id, outcome, hole: this.mode.course ? this.mode.hole : null });
       if (c) this.hud.comment(c);
     }
@@ -625,7 +636,8 @@ export class Game {
       { pos: V(mid.x - mid.dx * 40 + mid.rx * 25, gy(mid.x, mid.z) + 42, mid.z - mid.dz * 40 + mid.rz * 25), look: V(g.x, gy(g.x, g.z) + 2, g.z) },
       { pos: V(g.x - f.x * 55 - T.finalRight.x * 20, gy(g.x, g.z) + 16, g.z - f.z * 55 - T.finalRight.z * 20), look: V(g.x + f.x * 40, gy(g.x, g.z) + 14, g.z + f.z * 40) },
     ];
-    this.hud.showHoleCard({ n: h.n, name: h.name, par: h.par, yards: Math.round(T.length / YD), note: h.note, idx: m.holeIdx + 1, of: m.holes.length });
+    const rr = m.ringRadii;
+    this.hud.showHoleCard({ n: h.n, name: h.name, par: h.par, yards: Math.round(T.length / YD), note: h.note, idx: m.holeIdx + 1, of: m.holes.length, rings: `Gold ring ${Math.round(rr.one / 0.3048)} ft = 1-putt · white ${Math.round(rr.two / 0.3048)} ft = 2-putt` });
     this.world.rig.flyover(keys, 6.5, () => this._endIntro());
   }
 
@@ -656,8 +668,11 @@ export class Game {
       const prevT = s.t;
       const r = s.result;
       // slow motion through the drop (not for tap-ins)
-      let scale = 1;
-      if (r.holedAt && !s.tapping) {
+      let scale = s.rate || 1;
+      if (s.ring && r.holedAt) {
+        // ring finish: brisk roll, then real time at the cup
+        if (s.t > r.holedAt.t - 1.4) scale = 1;
+      } else if (r.holedAt && !s.tapping) {
         const rel = s.t - r.holedAt.t;
         if (rel > -0.42 && rel < 0.45) scale = 0.34;
         else if (rel > -0.8 && rel <= -0.42) scale = 1 - 0.66 * ((rel + 0.8) / 0.38);
@@ -666,12 +681,19 @@ export class Game {
       this.timeScale = scale;
       const p = samplePath(r, s.t);
       this.ballPos.set(p.x, p.y, p.z);
-      w.ball.setPosition(p.x, p.y + BALL.radius, p.z);
+      // draw the ball on the ground as rendered (the physics surface can sit
+      // a few cm off the visible mesh); in the air, never below it
+      let by = p.y + BALL.radius;
+      if (p.phase === 'roll') by = w.visualGround(p.x, p.z) + BALL.radius;
+      else if (p.phase !== 'cup') by = Math.max(by, w.visualGround(p.x, p.z) + BALL.radius);
+      w.ball.setPosition(p.x, by, p.z);
       if (!s.landed && !r.putt) w.tracer.push(p.x, p.y, p.z);
       const o = r.origin || { x: 0, z: 0 };
+      const cam = w.camera.position;
       while (s.ev < r.events.length && r.events[s.ev].t <= s.t) {
         const e = r.events[s.ev++];
-        const d = Math.hypot(e.x - o.x, e.z - o.z);
+        // sounds are heard from the camera (the landing camera is close)
+        const d = Math.hypot(e.x - cam.x, e.z - cam.z);
         if (e.type === 'land') {
           s.landed = true;
           if (e.surface !== 'water' && e.surface !== 'oob') {
@@ -696,7 +718,7 @@ export class Game {
         } else if (e.type === 'cupBottom') {
           s.holed = true;
           audio.cupBottom(e.speed);
-          if (!s.tapping) this._holeOutMoment(s);
+          if (!s.tapping || s.ring) this._holeOutMoment(s);
           else audio.cheer(0.12);
         } else if (e.type === 'splash') {
           if (e.surface === 'water') { w.effects.splash(e.x, e.y, e.z); audio.splash(Math.max(0.2, 1 - d / 600)); }
@@ -783,6 +805,20 @@ export class Game {
     }
     // other players' balls
     const tags = this.world.markers.items.map((m) => ({ ...m, pt: this.state === 'ready' || this.state === 'rest' ? this._project(m.x, m.y + 0.9, m.z) : null }));
+    // where this ball finished: distance left (course) or total (range)
+    const s = this.shot;
+    if (this.state === 'rest' && s && !s.result.lost && !s.result.holed && !s.tapping && !panelOpen()) {
+      const r = s.result.rest;
+      const bp = this.world.ball.mesh.position;
+      let label;
+      if (this.mode.course && this.mode.T) {
+        const left = this.mode.T.toPin(r.x, r.z);
+        label = s.outcome?.finish ? `${U.proximity(left)} · ${s.outcome.finish.putts}-putt` : `${U.dist(left)} ${U.distUnit()} to pin`;
+      } else {
+        label = `${U.dist(s.result.total)} ${U.distUnit()}`;
+      }
+      tags.push({ name: label, color: s.player.color, pt: this._project(bp.x, bp.y + 0.6, bp.z), self: true });
+    }
     this.hud.setBallTags(tags);
   }
 

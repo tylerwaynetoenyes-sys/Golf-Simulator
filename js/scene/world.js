@@ -39,6 +39,7 @@ export class World {
     this.sceneMode = 'range';
     this.terrainFn = rangeTerrain;
     this.groundFn = rangeGround;
+    this.visualGround = rangeGround;
     this.time = 0;
     this._focusV = new THREE.Vector3();
     this.env = new Environment(this);
@@ -84,8 +85,10 @@ export class World {
       this.terrainFn = rangeTerrain;
       this.groundFn = rangeGround;
       this.ball.setGround(rangeGround);
+      this.visualGround = rangeGround;
       this.rig.setGround(rangeGround);
       this.rig.obstacle = null;
+      this.rig.nearPole = null;
       this.rig.setAddress(new THREE.Vector3(0, 0.1, 0), 0);
       this.markers.set([]);
     }
@@ -101,9 +104,11 @@ export class World {
     const T = this.course.load(hole);
     this.terrainFn = T.terrain;
     this.groundFn = T.groundHeight;
-    this.ball.setGround(T.groundHeight);
+    this.ball.setGround(this.course.visualHeight);
+    this.visualGround = this.course.visualHeight;
     this.rig.setGround(T.groundHeight);
     this.rig.obstacle = this.course.cameraClear;
+    this.rig.nearPole = this.course.nearPole;
     this.env.apply();
     return T;
   }
