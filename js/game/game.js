@@ -9,6 +9,7 @@ import * as U from '../core/units.js';
 import { CLUBS, clubById, demoLaunch } from '../data/clubs.js';
 import { store } from '../data/store.js';
 import { audio } from '../audio/audio.js';
+import { radio, STATIONS } from '../audio/radio.js';
 import { createModes } from './modes.js';
 import { CourseMode, LIES, MULLIGANS } from './courseMode.js';
 import { Roster } from './roster.js';
@@ -61,6 +62,7 @@ export class Game {
     bus.on('ui:help', (tab) => openHelp(this, tab));
     this._bindInput();
     this._bindEnv();
+    this._bindRadio();
     this.applySetting('camera', store.settings.camera, false);
     units.system = store.settings.units;
     const day = store.settings.timeOfDay === 'day';
@@ -97,6 +99,55 @@ export class Game {
   }
 
   // ── conditions popover ──
+
+  /** Radio button and panel (js/audio/radio.js). */
+  _bindRadio() {
+    const pop = document.getElementById('radioPopover');
+    const btn = document.getElementById('radioButton');
+    if (!pop || !btn) return;
+    const list = document.getElementById('radioList');
+    const vol = document.getElementById('radioVolume');
+    const tog = document.getElementById('radioToggle');
+    const now = document.getElementById('radioNow');
+    const esc = (t) => String(t).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const groups = [...new Set(STATIONS.map((s) => s.group))];
+    list.innerHTML = groups.map((g) => `<div class="radio-group">${esc(g)}</div>${STATIONS.filter((s) => s.group === g).map((s) => `
+      <button class="radio-st" data-st="${s.id}"><span class="rs-name">${esc(s.name)}</span><span class="rs-by">${esc(s.by)}</span><span class="rs-blurb">${esc(s.blurb)}</span></button>`).join('')}`).join('');
+    const render = () => {
+      btn.dataset.on = String(radio.on);
+      btn.dataset.state = radio.state;
+      tog.setAttribute('aria-checked', String(radio.on));
+      vol.value = String(radio.volume);
+      list.querySelectorAll('[data-st]').forEach((b) => b.setAttribute('aria-current', String(radio.on && b.dataset.st === radio.station.id)));
+      const st = esc(radio.station.name);
+      if (radio.state === 'off') now.textContent = 'Off';
+      else if (radio.state === 'loading') now.innerHTML = `Tuning in to <b>${st}</b>…`;
+      else if (radio.state === 'error') now.innerHTML = `<b>${st}</b> is not responding. Try another station.`;
+      else now.innerHTML = radio.nowPlaying ? `<b>${esc(radio.nowPlaying.artist)}</b> · ${esc(radio.nowPlaying.title)}` : `<b>${st}</b>`;
+    };
+    radio.onChange(render);
+    render();
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      audio.click();
+      document.getElementById('r10Popover').hidden = true;
+      document.getElementById('envPopover').hidden = true;
+      pop.hidden = !pop.hidden;
+    });
+    document.addEventListener('click', (e) => { if (!pop.hidden && !pop.contains(e.target) && e.target !== btn) pop.hidden = true; });
+    tog.addEventListener('click', () => { audio.tick(); radio.toggle(); });
+    vol.addEventListener('input', () => radio.setVolume(Number(vol.value)));
+    list.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-st]');
+      if (!b) return;
+      audio.tick();
+      if (radio.on && radio.station.id === b.dataset.st) radio.stop(); else radio.play(b.dataset.st);
+    });
+    // browsers only allow sound after a gesture: pick the radio back up then
+    const resume = () => { radio.resumeIfWanted(); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
+    window.addEventListener('pointerdown', resume);
+    window.addEventListener('keydown', resume);
+  }
 
   _bindEnv() {
     const pop = document.getElementById('envPopover');
@@ -638,6 +689,7 @@ export class Game {
 
   /** Ball at the bottom of the cup: banner, sparks, gallery, Piasa. */
   _holeOutMoment(s) {
+    radio.duck(0.3, 4500); // let the moment (and the crowd) be heard
     const r = s.result;
     const o = s.outcome || {};
     const w = this.world;
@@ -1020,6 +1072,7 @@ export class Game {
         if (closePanel()) return;
         document.getElementById('r10Popover').hidden = true;
         document.getElementById('envPopover').hidden = true;
+        document.getElementById('radioPopover').hidden = true;
         return;
       }
       if (this.state === 'idle') return;
@@ -1054,6 +1107,7 @@ export class Game {
         case 'm': case 'M': openModePicker(this); break;
         case 's': case 'S': if (this.mode.course) openScorecard(this); break;
         case 'p': case 'P': openPlayers(this); break;
+        case 'b': case 'B': radio.toggle(); break;
         case 'n': case 'N': this.setTimeOfDay(this.world.env.isDay ? 'night' : 'day'); break;
         case 'h': case 'H': case '?': openHelp(this, 'pairing'); break;
         case 'r': case 'R': if (this.state === 'ready') this.setAim(0); break;
