@@ -114,7 +114,7 @@ export class World {
     this.course.treeDensity = this.r.quality.trees ?? 1;
     // dry high-plains and Mediterranean air carries much farther than
     // Mississippi valley haze
-    this.fogScale = { western: 0.5, coastal: 0.7 }[hole.theme] ?? 1;
+    this.fogScale = { western: 0.5, coastal: 0.6, harbor: 0.8, urban: 0.85, paris: 0.8, industrial: 0.9 }[hole.theme] ?? 1;
     this.theme = hole.theme || 'parkland';
     // the St. Louis skyline belongs to the Confluence Course only
     this.skyline.group.visible = !hole.course || hole.course === 'confluence';

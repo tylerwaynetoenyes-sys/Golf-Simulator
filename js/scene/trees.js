@@ -230,6 +230,72 @@ function juniper(seed, { height = 6 } = {}) {
   return { wood: w, leaves: mergeGeometries(leaves), height: H, radius: crownR * 1.1, crownY: H * 0.1, kind: 'cedar' };
 }
 
+/**
+ * Stone (umbrella) pine, Pinus pinea: a bare, often leaning trunk that forks
+ * high into a broad, flat-topped canopy, the silhouette of the Provençal coast.
+ */
+function stonepine(seed, { height = 14 } = {}) {
+  const rnd = seeded(seed);
+  const wood = [], leaves = [];
+  const lean = new THREE.Vector3((rnd() - 0.5) * 2.4, height * 0.62, (rnd() - 0.5) * 2.4);
+  wood.push(limb(new THREE.Vector3(0, -0.3, 0), lean, 0.34, 0.24, 1.2, rnd));
+  const crown = new THREE.Vector3(lean.x, height * 0.82, lean.z);
+  const crownR = height * 0.42;
+  for (let i = 0; i < 5; i++) {
+    const a = (i / 5) * Math.PI * 2 + rnd();
+    const tip = new THREE.Vector3(crown.x + Math.cos(a) * crownR * 0.6, height * 0.8, crown.z + Math.sin(a) * crownR * 0.6);
+    wood.push(limb(lean.clone(), tip, 0.18, 0.06, 0.8, rnd));
+  }
+  for (let i = 0; i < 11; i++) {
+    const a = rnd() * Math.PI * 2, r = Math.sqrt(rnd()) * crownR * 0.8;
+    const c = new THREE.Vector3(crown.x + Math.cos(a) * r, height * (0.84 + rnd() * 0.06), crown.z + Math.sin(a) * r);
+    const g = cluster(c, crownR * (0.36 + rnd() * 0.12), crown, crownR * 1.2, 0x3f5a2a, rnd);
+    g.translate(-c.x, -c.y, -c.z).scale(1, 0.55, 1).translate(c.x, c.y, c.z); // flatten each tuft
+    leaves.push(g);
+  }
+  const w = mergeGeometries(wood);
+  return { wood: w, leaves: mergeGeometries(leaves), height, radius: crownR, crownY: height * 0.7, kind: 'broad' };
+}
+
+/** Olive: a short, gnarled grey trunk and a loose silver-green crown. */
+function olive(seed, { height = 6 } = {}) {
+  const rnd = seeded(seed);
+  const wood = [], leaves = [];
+  const top = new THREE.Vector3((rnd() - 0.5) * 0.8, height * 0.35, (rnd() - 0.5) * 0.8);
+  wood.push(limb(new THREE.Vector3(0, -0.2, 0), top, 0.3, 0.2, 0.9, rnd));
+  const crown = new THREE.Vector3(top.x, height * 0.62, top.z);
+  const crownR = height * 0.4;
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + rnd();
+    const tip = new THREE.Vector3(crown.x + Math.cos(a) * crownR * 0.7, height * (0.55 + rnd() * 0.2), crown.z + Math.sin(a) * crownR * 0.7);
+    wood.push(limb(top.clone(), tip, 0.12, 0.04, 0.8, rnd));
+    leaves.push(cluster(tip, crownR * (0.45 + rnd() * 0.15), crown, crownR * 1.3, 0x7d8a5e, rnd));
+  }
+  return { wood: mergeGeometries(wood), leaves: mergeGeometries(leaves), height, radius: crownR * 1.1, crownY: height * 0.35, kind: 'broad' };
+}
+
+/** Italian cypress: a dark, narrow flame. */
+function cypressTree(seed, { height = 13 } = {}) {
+  const rnd = seeded(seed);
+  const trunk = new THREE.CylinderGeometry(0.1, 0.18, 1.6, 6).translate(0, 0.5, 0);
+  trunk.deleteAttribute('uv');
+  const g = new THREE.CylinderGeometry(0.15, 1.1, height, 10, 6);
+  g.deleteAttribute('uv');
+  const p = g.attributes.position;
+  const col = new Float32Array(p.count * 3);
+  const tint = new THREE.Color(0x26402a);
+  for (let i = 0; i < p.count; i++) {
+    const u = (p.getY(i) + height / 2) / height;
+    const k = (Math.sin(Math.min(1, u * 1.35) * Math.PI) * (1 - u * 0.45) + 0.12) * (0.92 + rnd() * 0.16);
+    p.setXYZ(i, p.getX(i) * k, p.getY(i) + height / 2 + 0.6, p.getZ(i) * k);
+    const ao = 0.6 + 0.5 * u;
+    col.set([tint.r * ao, tint.g * ao, tint.b * ao], i * 3);
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  g.computeVertexNormals();
+  return { wood: trunk, leaves: g, height, radius: 1.0, crownY: 1.2, kind: 'cedar' };
+}
+
 const VARIANTS = [
   (s) => broadleaf(s, { height: 13, spread: 1.05, tint: 0x4a7330 }), // white oak
   (s) => broadleaf(s + 1, { height: 12, spread: 0.95, tint: 0x557d2c }), // oak, younger
@@ -242,14 +308,25 @@ const VARIANTS = [
   (s) => broadleaf(s + 6, { height: 21, spread: 1.25, tint: 0x7c9a38, bark: 0x6f675b, barkHi: 0x9c9586 }),
   (s) => juniper(s + 7, { height: 6 }),
   (s) => ponderosa(s + 8, { height: 22 }),
+  // Provence: stone pine, olive, Italian cypress
+  (s) => stonepine(s + 9, { height: 14 }),
+  (s) => olive(s + 10, { height: 6 }),
+  (s) => cypressTree(s + 11, { height: 13 }),
 ];
 
 /** Tree species index sets per course theme. */
 export const THEME_TREES = {
   parkland: { broad: [0, 1, 2, 3], conifer: [4, 5], density: 1 },
-  western: { broad: [6], conifer: [7, 7, 8], density: 0.45, conifersFirst: true },
-  coastal: { broad: [2], conifer: [8, 7], density: 0.6, conifersFirst: true },
-  urban: { broad: [0, 2, 3], conifer: [4], density: 0.85 },
+  western: { broad: [6], conifer: [7, 7, 8], density: 0.45, conifersFirst: true, scatter: 1 },
+  // Provence: umbrella pines and Aleppo pines on the slopes, olives and
+  // cypresses lower down
+  coastal: { broad: [9, 10, 10], conifer: [9, 8, 11], density: 0.6, conifersFirst: true, scatter: 0.8 },
+  // East St. Louis bottomland: cottonwood, silver maple, sycamore
+  industrial: { broad: [6, 2, 3], conifer: [4], density: 0.55, scatter: 0.5 },
+  // the Bois de Boulogne: oaks, chestnuts, planes and the odd conifer
+  paris: { broad: [0, 1, 2, 3], conifer: [4, 5], density: 0.95, scatter: 0.7 },
+  urban: { broad: [0, 2, 3], conifer: [4], density: 0.85, scatter: 0.6 },
+  harbor: { broad: [0, 2], conifer: [4], density: 0.4, scatter: 0 }, // open to the water
 };
 
 let cache = null;

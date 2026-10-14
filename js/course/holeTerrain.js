@@ -44,6 +44,12 @@ export class HoleTerrain {
     this.fwStart = (hole.fwStart || 0) * YD;
     // real ground: heights from the course DEM, relative to the tee
     this.F = hole.demFrame || null;
+    // the sea or a river at its real level (relative to the tee)
+    this.seaLevel = this.F && hole.waterLevel != null ? hole.waterLevel - this.F.teeH : null;
+    // real ground is graded through the playing corridor (embankments, ditches
+    // and drains smoothed, nothing left below the water line), easing back to
+    // the untouched land ~70 m out so the backdrop meets it exactly
+    if (this.F) this._buildGrade();
     this.greenBase = this.elevAt(1) + (this.F ? 0.25 : 0.4);
     // Green contours: two soft swells/swales per green (deterministic per hole)
     // on top of the overall tilt, flattened around the pin like a real hole
@@ -127,7 +133,7 @@ export class HoleTerrain {
   elevAt(t) {
     if (this.F) {
       const p = this.pointAt(Math.min(1, Math.max(0, t)) * this.length);
-      return this.F.height(p.x, p.z);
+      return this._grade ? this._graded(p.x, p.z) : this.F.height(p.x, p.z);
     }
     const e = this.hole.elev;
     if (t <= e[0][0]) return e[0][1];
@@ -163,6 +169,64 @@ export class HoleTerrain {
   }
 
   /** Ground shape without water (shared by physics and mesh). */
+  _buildGrade() {
+    const st = 4;
+    const b = this.bounds(240);
+    const nx = Math.ceil((b.maxx - b.minx) / st) + 1, nz = Math.ceil((b.maxz - b.minz) / st) + 1;
+    const raw = new Float32Array(nx * nz);
+    for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) raw[j * nx + i] = this.F.height(b.minx + i * st, b.minz + j * st);
+    // two passes of a separable box blur (radius 6 cells = 24 m): close to a Gaussian
+    const blur = (src) => {
+      const r = 6, tmp = new Float32Array(src.length), out = new Float32Array(src.length);
+      for (let j = 0; j < nz; j++) {
+        let acc = 0, n = 0;
+        for (let i = -r; i <= r; i++) { const ii = Math.min(nx - 1, Math.max(0, i)); acc += src[j * nx + ii]; n++; }
+        for (let i = 0; i < nx; i++) {
+          tmp[j * nx + i] = acc / n;
+          const add = Math.min(nx - 1, i + r + 1), sub = Math.max(0, i - r);
+          acc += src[j * nx + add] - src[j * nx + sub];
+        }
+      }
+      for (let i = 0; i < nx; i++) {
+        let acc = 0, n = 0;
+        for (let j = -r; j <= r; j++) { const jj = Math.min(nz - 1, Math.max(0, j)); acc += tmp[jj * nx + i]; n++; }
+        for (let j = 0; j < nz; j++) {
+          out[j * nx + i] = acc / n;
+          const add = Math.min(nz - 1, j + r + 1), sub = Math.max(0, j - r);
+          acc += tmp[add * nx + i] - tmp[sub * nx + i];
+        }
+      }
+      return out;
+    };
+    const sm = blur(blur(raw));
+    const corridor = Math.max(this.fwHalf, 14);
+    const grade = new Float32Array(nx * nz);
+    for (let j = 0; j < nz; j++) {
+      for (let i = 0; i < nx; i++) {
+        const x = b.minx + i * st, z = b.minz + j * st, k = j * nx + i;
+        const pr = this.project(x, z);
+        const inPlay = pr.s > -30 && pr.s < this.length + 40;
+        let w = inPlay ? smooth(corridor + 70, corridor + 20, Math.abs(pr.d)) : 0;
+        w = Math.max(w, smooth(this.greenR + 60, this.greenR + 15, Math.hypot(x - this.green.x, z - this.green.z)));
+        w = Math.max(w, smooth(50, 15, Math.hypot(x, z)));
+        let h = raw[k] + (sm[k] - raw[k]) * w;
+        // fill: playing ground never sits in the river or the sea
+        if (this.seaLevel != null && w > 0) h = Math.max(h, raw[k] + (Math.max(raw[k], this.seaLevel + 0.8) - raw[k]) * w);
+        grade[k] = h;
+      }
+    }
+    this._grade = { grade, nx, nz, st, minx: b.minx, minz: b.minz };
+  }
+
+  /** Graded ground (DEM courses): bilinear in the grade grid, raw DEM outside it. */
+  _graded(x, z) {
+    const G = this._grade;
+    const fi = (x - G.minx) / G.st, fj = (z - G.minz) / G.st;
+    if (fi < 0 || fj < 0 || fi > G.nx - 1.001 || fj > G.nz - 1.001) return this.F.height(x, z);
+    const i = Math.floor(fi), j = Math.floor(fj), u = fi - i, v = fj - j, k = j * G.nx + i, g = G.grade;
+    return g[k] * (1 - u) * (1 - v) + g[k + 1] * u * (1 - v) + g[k + G.nx] * (1 - u) * v + g[k + G.nx + 1] * u * v;
+  }
+
   /** The bare ground with no shaping (DEM courses only): what the backdrop meets. */
   baseGround(x, z) { return this.F ? this.F.height(x, z) : null; }
 
@@ -174,7 +238,7 @@ export class HoleTerrain {
     if (this.F) {
       // the real ground, plus a little mown-in roll on the corridor and
       // natural lumps in the rough (the DEM is ~8 m resolution)
-      h = this.F.height(x, z);
+      h = this._grade ? this._graded(x, z) : this.F.height(x, z);
       h += (vnoise(x * 0.03, z * 0.03) - 0.5) * 0.9 * smooth(corridor - 4, corridor + 20, ad);
       h += (vnoise(x * 0.09, z * 0.09) - 0.5) * 0.3;
     } else {
@@ -232,6 +296,10 @@ export class HoleTerrain {
   }
 
   _water(x, z, pr) {
+    if (this.seaLevel != null) {
+      const g = this._grade ? this._graded(x, z) : this.F.height(x, z);
+      if (g < this.seaLevel + 0.05) return { level: this.seaLevel, q: 0.5, sea: true };
+    }
     for (const c of this.creeks) {
       const u = Math.abs(pr.s - c.s);
       if (u < c.half + 6) return { level: c.level, q: u / c.half, bank: c.half };
@@ -251,7 +319,7 @@ export class HoleTerrain {
     const pr = this.project(x, z);
     let h = this._land(x, z, pr);
     const w = this._water(x, z, pr);
-    if (w) {
+    if (w && !w.sea) {
       const bowl = w.level - 1.4 * smooth(1.05, 0.4, w.q);
       const bank = smooth(1.45, 0.95, w.q);
       h = h + (Math.min(h, bowl) - h) * bank;
@@ -306,7 +374,7 @@ export class HoleTerrain {
   /** Bounding box of the playable area plus margin, for mesh building. */
   bounds(margin = 160) {
     let minx = Infinity, maxx = -Infinity, minz = Infinity, maxz = -Infinity;
-    const ext = [...this.pts, this.pin];
+    const ext = [...this.pts, this.pin].filter(Boolean);
     for (const p of ext) {
       minx = Math.min(minx, p.x); maxx = Math.max(maxx, p.x);
       minz = Math.min(minz, p.z); maxz = Math.max(maxz, p.z);

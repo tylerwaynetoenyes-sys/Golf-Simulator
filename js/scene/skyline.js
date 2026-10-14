@@ -110,7 +110,8 @@ export function archMaterial() {
         vec3 col = steel * up * facing * facet * uGlow + vec3(0.9, 0.85, 0.8) * rim * 0.35 * uGlow;
         // Daylight: brushed stainless reflecting the sky, a bright edge where the sun catches it
         float sunl = max(dot(vN, normalize(uSunDir)), 0.0);
-        vec3 dayc = mix(vec3(0.62, 0.68, 0.76), vec3(0.85, 0.88, 0.92), facing) * (0.7 + 0.5 * sunl) + vec3(1.0) * pow(sunl, 12.0) * 0.6;
+        // the face away from the sun reads a darker steel grey against the sky
+        vec3 dayc = mix(vec3(0.4, 0.44, 0.5), vec3(0.86, 0.89, 0.93), smoothstep(0.0, 0.8, sunl)) * (0.82 + 0.18 * facing) + vec3(1.0) * pow(sunl, 12.0) * 0.6;
         dayc = mix(dayc, vec3(0.66, 0.75, 0.84), 0.18); // distance haze
         col = mix(col, dayc, uDay);
         gl_FragColor = vec4(col, 1.0);

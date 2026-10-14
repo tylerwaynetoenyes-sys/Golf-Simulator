@@ -690,6 +690,7 @@ export class Game {
   /** Ball at the bottom of the cup: banner, sparks, gallery, Piasa. */
   _holeOutMoment(s) {
     radio.duck(0.3, 4500); // let the moment (and the crowd) be heard
+    bus.emit('course:holeout', { player: this.player?.id });
     const r = s.result;
     const o = s.outcome || {};
     const w = this.world;

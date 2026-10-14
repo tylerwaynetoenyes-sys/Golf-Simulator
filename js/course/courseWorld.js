@@ -27,8 +27,18 @@ const PALETTES = {
   western: { grass: C(0.66, 0.55, 0.32), scrub: C(0.46, 0.47, 0.34), rock: C(0.8, 0.71, 0.56), rockSlope: 0.42,
     rough: C(0.33, 0.47, 0.2), deep: C(0.5, 0.5, 0.27) },
   // Provençal garrigue on white Urgonian limestone, red Cap Canaille cliffs
-  coastal: { grass: C(0.4, 0.43, 0.26), scrub: C(0.3, 0.36, 0.22), rock: C(0.84, 0.8, 0.72), rockSlope: 0.45 },
-  urban: { grass: C(0.3, 0.42, 0.2), scrub: C(0.38, 0.38, 0.35), rock: C(0.55, 0.52, 0.48), rockSlope: 0.6 },
+  coastal: { grass: C(0.4, 0.43, 0.26), scrub: C(0.3, 0.36, 0.22), rock: C(0.84, 0.8, 0.72), rockSlope: 0.45,
+    rough: C(0.32, 0.45, 0.2), deep: C(0.42, 0.45, 0.26), shore: C(0.86, 0.8, 0.66) },
+  urban: { grass: C(0.3, 0.42, 0.2), scrub: C(0.38, 0.38, 0.35), rock: C(0.55, 0.52, 0.48), rockSlope: 0.6, shore: C(0.42, 0.4, 0.34) },
+  // East St. Louis: worn bottomland turf, weedy verges, gravel and river mud
+  industrial: { grass: C(0.34, 0.44, 0.21), scrub: C(0.43, 0.42, 0.32), rock: C(0.52, 0.5, 0.46), rockSlope: 0.5,
+    rough: C(0.29, 0.43, 0.18), deep: C(0.36, 0.42, 0.22), shore: C(0.45, 0.41, 0.33) },
+  // the Bois de Boulogne: deep parkland greens under oak and chestnut
+  paris: { grass: C(0.27, 0.41, 0.17), scrub: C(0.24, 0.35, 0.16), rock: C(0.55, 0.52, 0.46), rockSlope: 0.6,
+    shore: C(0.5, 0.47, 0.4) },
+  // a links-style harbor course: wispy fescue beyond the short grass
+  harbor: { grass: C(0.52, 0.53, 0.31), scrub: C(0.4, 0.45, 0.27), rock: C(0.56, 0.54, 0.5), rockSlope: 0.5,
+    rough: C(0.3, 0.46, 0.2), deep: C(0.5, 0.52, 0.3), shore: C(0.58, 0.55, 0.47) },
 };
 
 /** Scale the scene fog on one material (distant landmarks that should still read). */
@@ -221,6 +231,14 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
       g.add(m);
     }
 
+    // the sea or a river at its real level: one wide sheet of water; the
+    // real ground (and the hole mesh) runs down beneath it at the shore
+    if (T.seaLevel != null) {
+      const m = new THREE.Mesh(new THREE.CircleGeometry(9000, 96).rotateX(-Math.PI / 2), this._water({ y: T.seaLevel, tint: hole.waterTint ?? 0x1f3a48 }));
+      m.position.set(0, T.seaLevel, 0);
+      g.add(m);
+    }
+
     // ── tee markers + pin ──
     const teeY = T.teeHeight;
     const markerMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.4 });
@@ -287,11 +305,15 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
         const lm = buildLandmark(f.type);
         let [x, z] = T.F.toLocal(f.dem[0], f.dem[1]);
         const d = Math.hypot(x, z);
-        const D = Math.min(d, 2000);
+        const D = Math.min(d, f.maxD ?? 2000);
         x *= D / d; z *= D / d;
         const h = new THREE.Group();
         h.add(lm.group);
-        h.position.set(x, T.baseGround(x, z), z);
+        h.position.set(x, T.baseGround(x, z) + (f.dy || 0), z);
+        // far landmarks are modelled in map axes (+x east, +z south): turn them
+        // into the hole's frame, plus any extra turn the course asks for
+        h.rotation.y = T.F.bearing + (f.rot || 0);
+        if (f.scale) h.scale.setScalar(f.scale);
         for (const m of lm.haze || []) hazeLess(m, 0.55);
         g.add(h);
         this.farLms.push(lm);
@@ -392,7 +414,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
       const far = [];
       const R = 900;
       const cx = (b2.minx + b2.maxx) / 2, cz = (b2.minz + b2.maxz) / 2;
-      const N = Math.round(1400 * (this.treeDensity ?? 1) * TT.density);
+      const N = Math.round(1400 * (this.treeDensity ?? 1) * TT.density * (TT.scatter ?? 0.5));
       for (let i = 0; i < N * 3 && far.length < N; i++) {
         const x = cx + (rand() * 2 - 1) * R, z = cz + (rand() * 2 - 1) * R;
         if (x > b2.minx && x < b2.maxx && z > b2.minz && z < b2.maxz) continue;
@@ -529,8 +551,18 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     const n1 = 0.5 + 0.5 * Math.sin(x * 0.013 + Math.cos(z * 0.011) * 2) * Math.cos(z * 0.017 - x * 0.004);
     const n2 = 0.5 + 0.5 * Math.sin(x * 0.071 + z * 0.053) * Math.sin(z * 0.067 - x * 0.031);
     c.copy(P.grass).lerp(P.scrub, THREE.MathUtils.smoothstep(n1 * 0.7 + n2 * 0.3, 0.35, 0.75));
-    if (P.low && y < P.lowBelow) c.lerp(P.low, THREE.MathUtils.smoothstep(P.lowBelow - y, 0, 6));
-    c.lerp(P.rock, THREE.MathUtils.smoothstep(slope, P.rockSlope, P.rockSlope + 0.25));
+    // a strip of shore (sand, shingle or mud) just above the water line
+    if (T.seaLevel != null && y < T.seaLevel + 2.5) c.lerp(P.shore || COL.sand, THREE.MathUtils.smoothstep(T.seaLevel + 2.5 - y, 0, 2) * 0.85);
+    let rock = P.rock;
+    const zones = T.hole.rockZones;
+    if (zones?.length) {
+      const [X, Z] = T.F.toDem(x, z);
+      for (const zn of zones) {
+        const k = THREE.MathUtils.smoothstep(zn.r - Math.hypot(X - zn.dem[0], Z - zn.dem[1]), 0, zn.r * 0.35);
+        if (k > 0) rock = (this._rz || (this._rz = new THREE.Color())).copy(P.rock).lerp(zn._c || (zn._c = new THREE.Color(zn.color)), k);
+      }
+    }
+    c.lerp(rock, THREE.MathUtils.smoothstep(slope, P.rockSlope, P.rockSlope + 0.25));
     return c.multiplyScalar(0.94 + 0.12 * n2);
   }
 
@@ -923,7 +955,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       this.tuftMat = new THREE.MeshStandardMaterial({ color: 0x5f7f34, vertexColors: true, side: THREE.DoubleSide, roughness: 0.95 });
     }
     const N = Math.round(9000 * (this.treeDensity ?? 1));
-    const tint = { western: 0xb3a05a, coastal: 0x8f9a58 }[T.hole.theme];
+    const tint = { western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.theme];
     if (tint && !this.tuftMats?.[tint]) {
       this.tuftMats ||= {};
       this.tuftMats[tint] = this.tuftMat.clone();
@@ -1068,6 +1100,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
     this.lampMat.color.setRGB(0.5 + 4.5 * (1 - d), 0.48 + 3.6 * (1 - d), 0.42 + 2.6 * (1 - d));
     if (this.pinLight) this.pinLight.intensity = 6 * (1 - d);
     if (this.landmark) setLandmarkDay(this.landmark, d);
+    for (const lm of this.farLms || []) setLandmarkDay(lm, d);
     const fm = this.flag?.userData.flagMat;
     if (fm) fm.emissiveIntensity = 0.9 * (0.25 + 0.75 * (1 - d));
   }
@@ -1116,6 +1149,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
     }
     if (this.ring) this.ring.userData.update(dt, t);
     if (this.landmark?.update) this.landmark.update(t, dt, this.day);
+    for (const lm of this.farLms || []) lm.update?.(t, dt, this.day);
     updateTrees(t, this.wind);
     if (this.rings) {
       const u = this.rings.material.uniforms;

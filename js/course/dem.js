@@ -107,9 +107,20 @@ const YD = 0.9144;
  * segment straight ahead) with its `demFrame` attached.
  */
 export function prepareDemHoles(course, d) {
+  // far landmarks may be given by latitude/longitude: convert to DEM metres
+  const { lat, lon } = d.dem.meta;
+  const mLat = (Math.PI / 180) * 6378137, mLon = mLat * Math.cos((lat * Math.PI) / 180);
+  const far = (course.far || []).map((f) => (f.ll ? { ...f, dem: [(f.ll[1] - lon) * mLon, -(f.ll[0] - lat) * mLat] } : f));
   return course.holes.map((h) => {
     const f = demFrame(d, h.pts[0], h.pts[1]);
     const line = h.pts.map(([X, Z]) => { const [x, z] = f.toLocal(X, Z); return [x / YD, z / YD]; });
-    return { ...h, line, demFrame: f, course: course.id, theme: course.theme, far: course.far || [], elev: [[0, 0], [1, 0]] };
+    return {
+      ...h, line, demFrame: f, course: course.id, theme: course.theme, far,
+      // sea or river surface (m above sea level): water wherever the ground is below it
+      water: h.water || [], waterLevel: course.waterLevel ?? null, waterTint: course.waterTint ?? null,
+      // regions where the rock is a different colour (DEM metres, radius, hex)
+      rockZones: (course.rockZones || []).map((z) => (z.ll ? { ...z, dem: [(z.ll[1] - lon) * mLon, -(z.ll[0] - lat) * mLat] } : z)),
+      elev: [[0, 0], [1, 0]],
+    };
   });
 }
