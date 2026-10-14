@@ -47,6 +47,22 @@ export const PUTT_RINGS = {
   generous: { label: 'Generous', one: 15, two: 45 },
 };
 
+/** Mulligan rules: how many replays each player gets. */
+export const MULLIGANS = {
+  off: { label: 'Off', short: 'No mulligans', per: 0 },
+  nine: { label: '1 per nine', short: '1 mulligan per nine', per: 1, scope: 'nine' },
+  hole: { label: '1 per hole', short: '1 mulligan per hole', per: 1, scope: 'hole' },
+  free: { label: 'Unlimited', short: 'Unlimited mulligans', per: Infinity },
+};
+
+/** Lie effects (fraction of ball speed / spin kept, launch change in degrees). */
+export const LIES = {
+  first: { label: 'First cut', speed: 0.95, spin: 0.82, launch: 0.4, note: 'Slightly reduced spin' },
+  deep: { label: 'Rough', speed: 0.85, spin: 0.55, launch: 1.4, note: 'About 15% less distance · less spin' },
+  fairwaySand: { label: 'Fairway bunker', speed: 0.84, spin: 0.68, launch: 0.6, note: 'About 16% less distance' },
+  greensideSand: { label: 'Greenside bunker', speed: 0.7, spin: 0.82, launch: 5, note: 'Splash shot · about 30% less distance' },
+};
+
 export class CourseMode {
   constructor(game) {
     this.game = game;
@@ -57,6 +73,7 @@ export class CourseMode {
     this.roundOver = false;
     this.length = 9;
     this.rings = 'standard';
+    this.mulligans = 'nine';
   }
 
   get roster() { return this.game.roster; }
@@ -67,6 +84,9 @@ export class CourseMode {
   start(opts = {}) {
     if (opts.length) this.length = opts.length;
     if (opts.rings && PUTT_RINGS[opts.rings]) this.rings = opts.rings;
+    if (opts.mulligans && MULLIGANS[opts.mulligans]) this.mulligans = opts.mulligans;
+    this.mullUsed = new Map();
+    this._undo = null;
     const first = opts.startHole || 1;
     this.holes = HOLES.slice(first - 1, first - 1 + this.length);
     if (this.holes.length < this.length) this.holes = HOLES.slice(0, this.length);
@@ -98,6 +118,7 @@ export class CourseMode {
       x: T.tee.x, y: T.teeHeight, z: T.tee.z, surface: 'tee', teed: true, strokes: 0, holed: false, pickedUp: false, prev: null,
     }]));
     this.game.world.env.setWindDirection((this.hole.n * 67 + 30) % 360);
+    this._undo = null;
     this.holeStarted = Date.now();
   }
 
@@ -131,6 +152,7 @@ export class CourseMode {
       teed: b.teed,
       putting: false, // the rings settle the green; every shot is a full swing or chip
       lie: b.teed ? 'tee' : b.surface,
+      lieDetail: this._lieDetail(b, toPin),
       toPin,
       strokes: b.strokes,
     };
@@ -147,16 +169,65 @@ export class CourseMode {
     return clubForYards(Math.min(255, yards));
   }
 
+  /** Which LIES entry applies to a ball, or null for a clean lie. */
+  _lieDetail(b, toPin) {
+    if (b.teed) return null;
+    if (b.surface === 'rough') return this.T.roughDepth(b.x, b.z);
+    if (b.surface === 'sand') return toPin < 45 ? 'greensideSand' : 'fairwaySand';
+    return null;
+  }
+
   /** Lie effects for full shots (applied to R10 and demo launches alike). */
   adjustLaunch(launch, setup) {
     const l = { ...launch };
-    if (setup.lie === 'rough') {
-      l.ballSpeed *= 0.92; l.totalSpin *= 0.72; l.launchAngle += 0.8;
-    } else if (setup.lie === 'sand') {
-      const greenside = setup.toPin < 45;
-      l.ballSpeed *= greenside ? 0.78 : 0.88; l.totalSpin *= greenside ? 0.85 : 0.7; l.launchAngle += greenside ? 4 : 0.5;
-    }
+    const e = LIES[setup.lieDetail];
+    if (!e) return l;
+    let speed = e.speed;
+    // long clubs can't get through deep grass: woods and long irons lose more
+    if (setup.lieDetail === 'deep' && launch.ballSpeed > 60) speed -= 0.07;
+    l.ballSpeed *= speed;
+    l.totalSpin *= e.spin;
+    l.launchAngle += e.launch;
+    l.lie = setup.lieDetail;
     return l;
+  }
+
+  // ── mulligans ──
+
+  _nineKey() { const r = MULLIGANS[this.mulligans]; return r.scope === 'hole' ? `h${this.holeIdx}` : `n${Math.floor(this.holeIdx / 9)}`; }
+
+  mulligansLeft(pid) {
+    const r = MULLIGANS[this.mulligans] || MULLIGANS.off;
+    if (!r.per) return 0;
+    if (r.per === Infinity) return Infinity;
+    return Math.max(0, r.per - (this.mullUsed.get(`${pid}:${this._nineKey()}`) || 0));
+  }
+
+  /** The last shot can be replayed (no penalty) if the rule allows it. */
+  canMulligan(pid) {
+    const u = this._undo;
+    return !!u && u.pid === pid && u.holeIdx === this.holeIdx && !this.roundOver && this.mulligansLeft(pid) > 0;
+  }
+
+  /** Put the ball back where it was before the last shot. */
+  takeMulligan(pid) {
+    if (!this.canMulligan(pid)) return false;
+    const b = this.ball.get(pid);
+    Object.assign(b, this._undo.snap);
+    const k = `${pid}:${this._nineKey()}`;
+    this.mullUsed.set(k, (this.mullUsed.get(k) || 0) + 1);
+    this._undo = null;
+    return true;
+  }
+
+  /** Water: replay from where the last shot was played (stroke and distance). */
+  rehitFromPrevious(pid) {
+    const u = this._undo;
+    if (!u || u.pid !== pid) return false;
+    const b = this.ball.get(pid);
+    const s = u.snap;
+    Object.assign(b, { x: s.x, y: s.y, z: s.z, surface: s.surface, teed: s.teed });
+    return true;
   }
 
   wind() { return this.game.world.env.wind(0); }
@@ -192,6 +263,7 @@ export class CourseMode {
     const b = this.ball.get(player.id);
     const par = this.hole.par;
     const before = { x: b.x, y: b.y, z: b.z, surface: b.surface, teed: b.teed };
+    this._undo = { pid: player.id, holeIdx: this.holeIdx, snap: { ...b } };
     b.strokes += 1;
     let penalty = null;
     let holed = !!result.holed;
@@ -206,7 +278,7 @@ export class CourseMode {
         const d = this._dropPoint(result);
         b.x = d.x; b.z = d.z; b.teed = false;
         b.surface = T.terrain(d.x, d.z).surface;
-        penalty = 'Water · one-stroke penalty, drop';
+        penalty = 'Water · one-stroke penalty';
       } else {
         Object.assign(b, before);
         b.teed = before.teed;
@@ -253,11 +325,12 @@ export class CourseMode {
       sub = `Scores ${par + MAX_OVER} · on to the next`;
       category = 'pickup';
     } else if (penalty) {
-      headline = penalty.startsWith('Water') ? 'In the water' : 'Out of bounds';
+      headline = penalty.startsWith('Water') ? 'Water hazard' : 'Out of bounds';
       sub = penalty;
       category = penalty.startsWith('Water') ? 'water' : 'oob';
     } else {
-      const lie = { green: 'On the green', fringe: 'On the fringe', fairway: 'Fairway', rough: 'Rough', sand: 'Bunker', tee: 'Tee box' }[b.surface] || b.surface;
+      const depth = b.surface === 'rough' ? T.roughDepth(b.x, b.z) : null;
+      const lie = { green: 'On the green', fringe: 'On the fringe', fairway: 'Fairway', rough: depth === 'first' ? 'First cut' : 'Rough', sand: 'Bunker', tee: 'Tee box' }[b.surface] || b.surface;
       headline = b.surface === 'green' ? proximity(toPin) : `${dist(toPin)} ${distUnit()} to go`;
       sub = `${lie} · stroke ${b.strokes + 1} next`;
       if (b.surface === 'sand') category = 'sand';
@@ -266,11 +339,14 @@ export class CourseMode {
       else if (result.putt) category = toPin < 0.6 ? null : 'lagMiss';
     }
 
-    const out = { headline, sub, category, bests: [], holed: b.holed, penalty, ace: b.holed && b.strokes === 1, finish };
+    const out = { headline, sub, category, bests: [], holed: b.holed, penalty, ace: b.holed && b.strokes === 1, finish, lie: !b.holed && !penalty ? b.surface : null };
+    if (penalty && category === 'water' && !pickedUp) out.waterChoice = true;
     // the shot card shouldn't give away the drop: it shows the ring first
     if (finish) out.preview = { headline: `${proximity(finish.from)} · ${finish.putts}-putt`, sub: finish.putts === 3 ? 'On the green · three to get down' : `Inside the ${finish.putts === 1 ? 'inner' : 'outer'} ring` };
     if (b.holed && b.strokes === 1) out.bests.push({ label: 'Hole in one', value: this.hole.name });
 
+    // a finished hole can't be replayed
+    if (b.holed || pickedUp) this._undo = null;
     // hole finished for everyone?
     if (!this._alive().length) {
       for (const p of this.players) {
@@ -393,7 +469,7 @@ export class CourseMode {
     const done = !this._alive().length;
     return {
       title: `Hole ${h.n} · ${h.name} · Par ${h.par}`,
-      detail: done ? 'Hole complete' : s.putting ? `${proximity(s.toPin)} putt` : `${dist(s.toPin)} ${distUnit()} to the pin`,
+      detail: done ? 'Hole complete' : s.putting ? `${proximity(s.toPin)} putt` : `${dist(s.toPin)} ${distUnit()} to the pin${this._playsText(s)}`,
       chips: [{ kind: 'wind', mph: env.weather.windMph, fromDeg: env.windFromDeg - s.heading }, { kind: 'score', label: 'Thru', value: `${this.holeIdx}/${this.holes.length}` }],
     };
   }
@@ -426,6 +502,19 @@ export class CourseMode {
       return { name: `Team ${t.name}`, color: t.color, value: s, display: fmtToPar(s), sub: `best ball · thru ${n}`, members: t.members.map((m) => m.name) };
     }).sort((a, b) => a.value - b.value);
     return { title: 'Leaderboard', rows, teams, lowerBetter: true };
+  }
+
+  /** Elevation-adjusted distance (1 m of rise plays about 1 m longer). */
+  playsLike(s) {
+    const T = this.T;
+    const dh = T.groundHeight(T.pin.x, T.pin.z) - (s.origin.y - (s.teed ? 0.04 : 0.021));
+    return { plays: s.toPin + dh, dh };
+  }
+
+  _playsText(s) {
+    const { plays, dh } = this.playsLike(s);
+    if (Math.abs(dh) < 2.5) return '';
+    return ` · plays ${dist(plays)} ${dh > 0 ? '↑' : '↓'}`;
   }
 
   scorecard() {
@@ -468,7 +557,7 @@ export class CourseMode {
       rows: lb.rows.map((r, i) => ({ label: `${i + 1}. ${r.name}`, value: r.display, extra: `${this.toPar(r.id).strokes} strokes`, color: r.color })),
       teams: lb.teams,
       verdict: solo
-        ? me.toPar < 0 ? 'Under par on the Confluence. The rivers approve.' : me.toPar === 0 ? 'Level par. The Arch has no notes.' : me.toPar <= 9 ? 'A proper round. The landmarks held up their end.' : 'Every landmark got a good look. Some of them twice.'
+        ? me.toPar < 0 ? 'Under par on the Confluence Course.' : me.toPar === 0 ? 'Level par. A complete round.' : me.toPar <= 9 ? 'A solid round.' : 'Round complete.'
         : lb.teams?.length > 1 ? `${lb.teams[0].name} takes it.` : `${lb.rows[0].name} wins.`,
       scorecard: true,
     };
@@ -490,7 +579,7 @@ export class CourseMode {
   _save() {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
-        at: Date.now(), length: this.length, first: this.holes[0].n, holeIdx: this.holeIdx, rings: this.rings,
+        at: Date.now(), length: this.length, first: this.holes[0].n, holeIdx: this.holeIdx, rings: this.rings, mulligans: this.mulligans,
         names: this.players.map((p) => p.name),
         cards: this.players.map((p) => this.cards.get(p.id)),
         honor: this.honor.map((id) => this.players.findIndex((p) => p.id === id)),

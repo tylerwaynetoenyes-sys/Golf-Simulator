@@ -10,7 +10,7 @@ import { CLUBS, clubById, demoLaunch } from '../data/clubs.js';
 import { store } from '../data/store.js';
 import { audio } from '../audio/audio.js';
 import { createModes } from './modes.js';
-import { CourseMode } from './courseMode.js';
+import { CourseMode, LIES, MULLIGANS } from './courseMode.js';
 import { Roster } from './roster.js';
 import { commentFor, line } from './commentary.js';
 import { toast } from '../ui/dom.js';
@@ -157,7 +157,7 @@ export class Game {
   }
 
   restartMode() {
-    const opts = this.mode.course ? { length: this.mode.length, rings: this.mode.rings, startHole: this.mode.holes[0].n } : {};
+    const opts = this.mode.course ? { length: this.mode.length, rings: this.mode.rings, mulligans: this.mode.mulligans, startHole: this.mode.holes[0].n } : {};
     this.setMode(this.mode.id, opts);
   }
 
@@ -191,11 +191,54 @@ export class Game {
     if (sug) this.selectClub(sug, true); else this._updateHelper();
     this.refreshMode();
     this.hud.setTurn(this._turnInfo(), this.roster.multi || m.course);
+    this.hud.setLie(m.course ? this._lieChip(s) : null);
+    this._syncMulligan();
     this.hud.hideCard();
     this.hud.setSkip(false);
     if (this.roster.multi && prevPlayer && prevPlayer.id !== this.player.id && !immediate) {
       audio.click();
     }
+  }
+
+  /** The lie chip for the turn banner. */
+  _lieChip(s) {
+    if (!s || s.teed) return null;
+    const e = LIES[s.lieDetail];
+    if (e) return { kind: s.lieDetail === 'first' ? 'first' : s.lie, label: e.label, note: e.note };
+    if (s.lie === 'fairway') return { kind: 'fairway', label: 'Fairway', note: '' };
+    if (s.lie === 'fringe') return { kind: 'fairway', label: 'Fringe', note: '' };
+    if (s.lie === 'green') return { kind: 'fairway', label: 'Green', note: '' };
+    return null;
+  }
+
+  /** Who could take a mulligan right now (the player of the last shot). */
+  _mulliganPlayer() {
+    const m = this.mode;
+    if (!m.course || !m.canMulligan) return null;
+    if (this.state === 'rest' && this.shot && !this.shot.tapping) return m.canMulligan(this.shot.player.id) ? this.shot.player : null;
+    if (this.state === 'ready' && this.player) return m.canMulligan(this.player.id) ? this.player : null;
+    return null;
+  }
+
+  _syncMulligan() {
+    const p = this._mulliganPlayer();
+    this.hud.setMulligan(p ? { left: this.mode.mulligansLeft(p.id) } : null);
+  }
+
+  /** Replay the last shot from where it was played, no penalty. */
+  mulligan() {
+    const p = this._mulliganPlayer();
+    if (!p) return;
+    audio.click();
+    this.hud.hideDecision();
+    if (!this.mode.takeMulligan(p.id)) return;
+    this.shot = null;
+    this.world.tracer.reset();
+    this.world.effects.clear?.();
+    this.state = 'ready';
+    this._prepareTurn(true);
+    const left = this.mode.mulligansLeft(p.id);
+    toast('Mulligan', { kind: 'info', sub: `${this.roster.multi ? `${p.name} · ` : ''}replay from the same spot, no penalty${left === Infinity ? '' : ` · ${left} left`}`, ms: 2600 });
   }
 
   _turnInfo() {
@@ -204,8 +247,7 @@ export class Game {
     const team = this.roster.teamOf(p);
     let detail = '';
     if (this.mode.course) {
-      const lie = { tee: 'Tee shot', fairway: 'Fairway', rough: 'Rough', sand: 'Bunker', green: 'On the green', fringe: 'Fringe' }[s.lie] || s.lie;
-      detail = s.putting ? `${U.proximity(s.toPin)} putt` : `${lie} · ${U.dist(s.toPin)} ${U.distUnit()}`;
+      detail = s.putting ? `${U.proximity(s.toPin)} putt` : `${s.teed ? 'Tee shot · ' : ''}${U.dist(s.toPin)} ${U.distUnit()}`;
       detail += ` · stroke ${s.strokes + 1}`;
     }
     return { name: p.name, color: p.color, team: team ? `Team ${team.name}` : '', detail };
@@ -234,7 +276,8 @@ export class Game {
     const s = this.setup;
     if (tp && !s.putting) {
       const o = s.origin;
-      const want = Math.hypot(tp.x - o.x, tp.z - o.z);
+      // on the course, aim for the plays-like distance (uphill needs more)
+      const want = this.mode.course ? Math.max(5, this.mode.playsLike(s).plays) : Math.hypot(tp.x - o.x, tp.z - o.z);
       const wind = this.mode.wind();
       const useTotal = this.mode.id === 'ctp' || this.mode.course;
       const flat = () => ({ height: o.y - 0.03, surface: 'fairway' });
@@ -396,6 +439,7 @@ export class Game {
     const lie = this.mode.adjustLaunch ? this.mode.adjustLaunch(launch, s) : launch;
     const result = simulateShot(lie, {
       terrain: this.world.terrainFn, wind: this.mode.wind(), origin: s.origin, heading: s.heading, cup: this.mode.cup?.(s) || null,
+      trees: this.mode.course ? this.world.course.treeHit : null,
     });
     this._play(result, lie, source);
   }
@@ -441,7 +485,15 @@ export class Game {
       w.ball.spinRate = launch.totalSpin * RPM * 0.12;
       w.characters.swing(0);
       w.effects.burst(o.x, o.y + 0.05, o.z, { n: 16, color: 0xfff0d0, speed: 1.4, up: 1.2, life: 0.32, gravity: 2 });
-      if (club.id !== 'DR' || !this.setup.teed) w.effects.burst(o.x, o.y, o.z, { n: 22, color: this.setup.lie === 'sand' ? 0xe8dcb8 : 0x58702c, speed: 1.8, up: 2.6, life: 0.9 });
+      if (this.setup.lie === 'sand') {
+        // explosion: a heavy spray of sand and a lingering haze of dust
+        w.effects.burst(o.x, o.y, o.z, { n: 90, color: 0xe6d6ae, speed: 3.2, up: 4.2, life: 1.3, gravity: 9 });
+        w.effects.burst(o.x, o.y + 0.2, o.z, { n: 40, color: 0xd9c9a0, speed: 1.2, up: 1.4, life: 2.2, gravity: 0.6 });
+        audio.sandBlast(Math.min(1, 0.5 + launch.ballSpeed / 60));
+      } else if (club.id !== 'DR' || !this.setup.teed) {
+        const deep = this.setup.lieDetail === 'deep';
+        w.effects.burst(o.x, o.y, o.z, { n: deep ? 44 : 22, color: 0x58702c, speed: deep ? 2.4 : 1.8, up: deep ? 3.2 : 2.6, life: 0.9 });
+      }
       const expected = club.ballMph * MPH;
       const smash = launch.clubSpeed ? launch.ballSpeed / launch.clubSpeed : null;
       const quality = smash ? Math.min(1, Math.max(0, (smash - (club.smash - 0.2)) / 0.2)) : Math.min(1, launch.ballSpeed / expected);
@@ -456,6 +508,7 @@ export class Game {
     this.hud.setSkip(true);
     this.hud.meter(false, 0);
     this.hud.setTurn(null, false);
+    this.hud.setMulligan(null);
     bus.emit('shot:start', { launch, result, source });
   }
 
@@ -501,6 +554,28 @@ export class Game {
     s.restTimer = r.holed && (!s.tapping || s.ring) ? 3.0 : o.summary ? 2.6 : o.holeComplete ? 2.2 : r.putt ? 1.5 : 3.2 + (this.hud.commentEl.classList.contains('show') ? 0.8 : 0);
     // finished inside a putting ring: roll it in
     if (o.finish && !s.tapped) s.tapDelay = 0.9;
+    // in the water: the player chooses drop, re-hit or mulligan
+    if (o.waterChoice && !s.tapping) { s.awaitDecision = true; s.decisionDelay = 1.1; }
+    this._syncMulligan();
+  }
+
+  /** Water hazard: drop (default, already placed), re-hit, or mulligan. */
+  _waterDecision(s) {
+    const m = this.mode;
+    const p = s.player;
+    const left = m.mulligansLeft(p.id);
+    const done = () => { this.hud.hideDecision(); s.awaitDecision = false; s.restTimer = 0.35; };
+    const opts = [
+      { key: 'D', label: 'Drop', sub: 'Near where it crossed into the hazard · +1 stroke', primary: true, fn: () => { audio.click(); done(); } },
+      { key: 'B', label: 'Re-hit', sub: 'From where you just played · +1 stroke', fn: () => { audio.click(); m.rehitFromPrevious(p.id); done(); } },
+    ];
+    if (m.canMulligan(p.id)) {
+      opts.push({ key: 'U', label: 'Mulligan', sub: `Replay the shot, no penalty · ${left === Infinity ? 'unlimited' : `${left} left`}`, fn: () => this.mulligan() });
+    } else {
+      opts.push({ key: '–', label: 'Mulligan', sub: MULLIGANS[m.mulligans]?.per ? 'None left this round' : 'Mulligans are off for this round', fn: () => audio.error() });
+    }
+    this._decision = opts;
+    this.hud.showDecision({ kicker: 'Penalty area', title: 'In the water', sub: `${this.roster.multi ? `${p.name} · ` : ''}Choose how to continue.`, options: opts });
   }
 
   /**
@@ -583,6 +658,12 @@ export class Game {
       for (const b of outcome.bests) toast(`Personal best · ${b.label}`, { kind: 'pb', sub: b.value, ms: 4200 });
       if (!outcome.ace) this.world.effects.celebrate(result.rest.x, result.rest.y, result.rest.z);
     }
+    if (this.mode.course && !outcome.finish && !outcome.penalty && (outcome.lie === 'rough' || outcome.lie === 'sand')) {
+      const T = this.mode.T;
+      const k = outcome.lie === 'sand' ? (T.toPin(result.rest.x, result.rest.z) < 45 ? 'greensideSand' : 'fairwaySand') : T.roughDepth(result.rest.x, result.rest.z);
+      const e = LIES[k];
+      if (e && k !== 'first') toast(e.label, { kind: 'warn', sub: `Next shot: ${e.note.toLowerCase()}`, ms: 3200 });
+    }
     this.piasa?.reactTo({ result, outcome, launch, club });
     bus.emit('shot:result', { launch, result, outcome, source });
   }
@@ -592,6 +673,8 @@ export class Game {
     const s = this.shot;
     const o = s?.outcome || {};
     this.shot = null;
+    this.hud.hideDecision();
+    this._decision = null;
     if (o.summary) {
       this._showSummary(o.summary);
       return;
@@ -637,7 +720,7 @@ export class Game {
       { pos: V(g.x - f.x * 55 - T.finalRight.x * 20, gy(g.x, g.z) + 16, g.z - f.z * 55 - T.finalRight.z * 20), look: V(g.x + f.x * 40, gy(g.x, g.z) + 14, g.z + f.z * 40) },
     ];
     const rr = m.ringRadii;
-    this.hud.showHoleCard({ n: h.n, name: h.name, par: h.par, yards: Math.round(T.length / YD), note: h.note, idx: m.holeIdx + 1, of: m.holes.length, rings: `Gold ring ${Math.round(rr.one / 0.3048)} ft = 1-putt · white ${Math.round(rr.two / 0.3048)} ft = 2-putt` });
+    this.hud.showHoleCard({ n: h.n, name: h.name, par: h.par, yards: Math.round(T.length / YD), note: h.note, idx: m.holeIdx + 1, of: m.holes.length, rings: `Gold ring ${Math.round(rr.one / 0.3048)} ft = 1-putt · white ${Math.round(rr.two / 0.3048)} ft = 2-putt`, rules: `${MULLIGANS[m.mulligans]?.short || ''} · water: drop or re-hit, +1 stroke` });
     this.world.rig.flyover(keys, 6.5, () => this._endIntro());
   }
 
@@ -702,6 +785,9 @@ export class Game {
             audio.land(surf, e.speed, d);
           }
           w.ball.spinRate *= 0.3;
+        } else if (e.type === 'tree') {
+          audio.leaves(e.speed, d);
+          w.effects.burst(e.x, e.y, e.z, { n: 26, color: 0x4f7a2e, speed: 2.2, up: 0.6, life: 1.6, gravity: 1.2 });
         } else if (e.type === 'edge') {
           s.landed = true;
         } else if (e.type === 'bounce' && e.surface !== 'water' && e.surface !== 'oob') {
@@ -732,6 +818,11 @@ export class Game {
       if (s.tapDelay != null) {
         s.tapDelay -= dt;
         if (s.tapDelay <= 0) { s.tapDelay = null; this._tapIn(s); }
+      } else if (s.awaitDecision) {
+        if (s.decisionDelay != null) {
+          s.decisionDelay -= dt;
+          if (s.decisionDelay <= 0) { s.decisionDelay = null; this._waterDecision(s); }
+        }
       } else {
         s.restTimer -= dt;
         if (s.restTimer <= 0) this._afterShot();
@@ -896,6 +987,12 @@ export class Game {
       }
       if (this.state === 'idle') return;
       if (panelOpen()) return;
+      if (this.hud.decisionOpen && this._decision) {
+        const o = this._decision.find((d) => d.key.toLowerCase() === e.key.toLowerCase());
+        if (o) { e.preventDefault(); o.fn(); return; }
+        if (e.key === 'Enter') { e.preventDefault(); this._decision[0].fn(); return; }
+        if (e.key === ' ') { e.preventDefault(); return; }
+      }
       switch (e.key) {
         case ' ':
           e.preventDefault();
@@ -923,6 +1020,7 @@ export class Game {
         case 'n': case 'N': this.setTimeOfDay(this.world.env.isDay ? 'night' : 'day'); break;
         case 'h': case 'H': case '?': openHelp(this, 'pairing'); break;
         case 'r': case 'R': if (this.state === 'ready') this.setAim(0); break;
+        case 'u': case 'U': this.mulligan(); break;
         case 'g': case 'G':
           if (this.mode.course) {
             const c = this.world.course;
@@ -944,6 +1042,7 @@ export class Game {
     sb.addEventListener('pointercancel', () => this._swingRelease());
     const on = (id, fn) => document.getElementById(id)?.addEventListener('click', fn);
     on('skipButton', () => this.skip());
+    on('mulliganButton', () => this.mulligan());
     on('autoPuttButton', () => this.putt('auto'));
     on('manualButton', () => { audio.click(); openManual(this); });
     on('modeButton', () => { audio.click(); openModePicker(this); });

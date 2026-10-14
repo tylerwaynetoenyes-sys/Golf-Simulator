@@ -204,6 +204,9 @@ export function simulateShot(launch, opts = {}) {
   let holed = null;
   const terrain = opts.terrain || (() => ({ height: 0, surface: 'fairway' }));
   const wind = opts.wind || { x: 0, z: 0 };
+  // optional tree canopies: trees(x, y, z) → {id, x, z} when the point is inside one
+  const trees = opts.trees || null;
+  let lastTree = null;
   const dt = 1 / 240;
   const o = opts.origin || { x: 0, y: opts.teeHeight ?? 0.03, z: 0 };
   const hd = ((opts.heading || 0) * Math.PI) / 180;
@@ -274,6 +277,25 @@ export function simulateShot(launch, opts = {}) {
       t += dt;
 
       if (py > apex.y) apex = { y: py, x: px, z: pz, t };
+      // through a tree: leaves and branches take most of the pace and knock it
+      // off line (deterministic, so replays and previews agree)
+      if (trees && t > 0.08) {
+        const hit = trees(px, py, pz);
+        if (hit && hit.id !== lastTree) {
+          lastTree = hit.id;
+          const sp = Math.hypot(vx, vy, vz);
+          const h = Math.sin(px * 12.9898 + pz * 78.233) * 43758.5453;
+          const r1 = h - Math.floor(h);
+          const r2 = (h * 7.13) - Math.floor(h * 7.13);
+          const keep = 0.18 + 0.22 * r1;
+          const yaw = (r2 - 0.5) * 2.2;
+          const c = Math.cos(yaw), sn = Math.sin(yaw);
+          const nvx2 = (vx * c - vz * sn) * keep, nvz2 = (vx * sn + vz * c) * keep;
+          vx = nvx2; vz = nvz2; vy = Math.min(vy * keep, 1.5);
+          omega *= 0.25;
+          events.push({ type: 'tree', t, x: px, y: py, z: pz, speed: sp });
+        } else if (!hit) lastTree = null;
+      }
       if (!levelCross && vy < 0 && py <= o.y) {
         const hsl = Math.hypot(vx, vz);
         levelCross = { x: px, z: pz, t, descent: (Math.atan2(-vy, hsl) * 180) / Math.PI, speed: Math.hypot(vx, vy, vz) };

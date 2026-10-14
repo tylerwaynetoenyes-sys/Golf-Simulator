@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Landmark Preview</title>
+<style>html,body{margin:0;height:100%;background:#9fc3dc;overflow:hidden;font:13px system-ui;color:#fff}#hud{position:fixed;left:12px;top:10px;text-shadow:0 1px 2px #000}</style>
+<script type="importmap">{"imports":{"three":"../vendor/three/three.module.js","three/addons/":"../vendor/three/addons/"}}</script>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+// Dev tool: renders one landmark builder on a lawn.
+// /tools/landmark-preview.html?type=zoo&view=front|side|top|tee&night=1&dist=1&t=3
+import * as THREE from 'three';
+import { buildLandmark, setLandmarkDay } from '../js/course/landmarks.js';
+
+const q = new URLSearchParams(location.search);
+const type = q.get('type') || 'arch';
+const night = q.get('night') === '1';
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setSize(innerWidth, innerHeight);
+r.shadowMap.enabled = true;
+r.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(night ? 0x0b1220 : 0x9fc3dc);
+scene.fog = new THREE.FogExp2(scene.background, 0.0012);
+const hemi = new THREE.HemisphereLight(0xdfeeff, 0x4a5a32, night ? 0.15 : 0.9);
+const sun = new THREE.DirectionalLight(0xfff1dc, night ? 0.08 : 2.6);
+sun.position.set(120, 160, 80);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -250, right: 250, top: 250, bottom: -250, far: 800 });
+scene.add(hemi, sun);
+const lawn = new THREE.Mesh(new THREE.PlaneGeometry(3000, 3000).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x4f7a34, roughness: 1 }));
+lawn.receiveShadow = true;
+scene.add(lawn);
+// a golfer-height marker at the origin for scale (1.8 m)
+const marker = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.8, 0.3), new THREE.MeshStandardMaterial({ color: 0xff3366 }));
+marker.position.set(0, 0.9, 40);
+scene.add(marker);
+const lm = buildLandmark(type);
+scene.add(lm.group);
+setLandmarkDay(lm, night ? 0 : 1);
+const box = new THREE.Box3().setFromObject(lm.group);
+const size = box.getSize(new THREE.Vector3());
+const c = box.getCenter(new THREE.Vector3());
+const R = Math.max(size.x, size.y, size.z) * (Number(q.get('dist')) || 1);
+const cam = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 5000);
+const view = q.get('view') || 'front';
+const V = { front: [0.35, 0.45, 1.2], side: [1.3, 0.4, 0.2], top: [0.01, 1.6, 0.4], tee: [0.05, 0.08, 1.9], back: [-0.3, 0.45, -1.2] }[view] || [0.35, 0.45, 1.2];
+cam.position.set(c.x + V[0] * R, c.y + V[1] * R, c.z + V[2] * R);
+cam.lookAt(c);
+// drag to orbit
+let drag = null;
+addEventListener('pointerdown', (e) => { drag = { x: e.clientX, y: e.clientY }; });
+addEventListener('pointerup', () => { drag = null; });
+addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const off = cam.position.clone().sub(c);
+  off.applyAxisAngle(new THREE.Vector3(0, 1, 0), -(e.clientX - drag.x) * 0.006);
+  off.y = Math.max(2, off.y + (e.clientY - drag.y) * 0.5);
+  cam.position.copy(c).add(off); cam.lookAt(c);
+  drag = { x: e.clientX, y: e.clientY };
+});
+addEventListener('wheel', (e) => { cam.position.lerp(c, e.deltaY > 0 ? -0.1 : 0.1); cam.lookAt(c); });
+document.getElementById('hud').textContent = `${type} · ${size.x.toFixed(0)} × ${size.y.toFixed(0)} × ${size.z.toFixed(0)} m`;
+const clock = new THREE.Clock();
+let t = Number(q.get('t')) || 0;
+function frame() {
+  const dt = Math.min(0.05, clock.getDelta());
+  t += dt;
+  lm.update?.(t, dt, night ? 0 : 1);
+  r.render(scene, cam);
+  requestAnimationFrame(frame);
+}
+frame();
+window.__ready = true;
+</script>
+</body>
+</html>

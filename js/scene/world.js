@@ -16,6 +16,7 @@ import { CTP_GREEN, terrain as rangeTerrain, groundHeight as rangeGround } from 
 import { CourseWorld } from '../course/courseWorld.js';
 import { PlayerMarkers } from './markers.js';
 import { Environment } from './environment.js';
+import { Ambient } from './ambient.js';
 
 export class World {
   constructor(canvas, quality = 'high') {
@@ -36,6 +37,8 @@ export class World {
     this.characters = new Characters(scene);
     this.course = new CourseWorld(scene);
     this.markers = new PlayerMarkers(scene);
+    this.ambient = new Ambient(scene);
+    this.ambient.setCenter(0, -160);
     this.sceneMode = 'range';
     this.terrainFn = rangeTerrain;
     this.groundFn = rangeGround;
@@ -91,6 +94,7 @@ export class World {
       this.rig.nearPole = null;
       this.rig.setAddress(new THREE.Vector3(0, 0.1, 0), 0);
       this.markers.set([]);
+      this.ambient.setCenter(0, -160);
     }
     // the moon/sun key light lives in the range group; keep it lit everywhere
     this.range.group.visible = true;
@@ -109,6 +113,8 @@ export class World {
     this.rig.setGround(T.groundHeight);
     this.rig.obstacle = this.course.cameraClear;
     this.rig.nearPole = this.course.nearPole;
+    const mid = T.pointAt(T.length * 0.5);
+    this.ambient.setCenter(mid.x, mid.z);
     this.env.apply();
     return T;
   }
@@ -140,6 +146,7 @@ export class World {
     this.characters.update(dt);
     if (this.sceneMode === 'course') this.course.update(t, dt, this.camera);
     this.markers.update(t);
+    this.ambient.update(dt, t);
     if (render) this.r.render();
   }
 }

@@ -125,6 +125,8 @@ bridge. Use it on your home Wi-Fi, not on a network you don't trust.
 | **M** / **P** / **S** | Choose a game / players & teams / scorecard |
 | **N** | Day ↔ night |
 | **C** | Camera: Cinematic → Follow → Tee |
+| **U** | Mulligan (course, when the rule allows) |
+| **D** / **B** | After a ball in the water: drop, or re-hit from the previous spot |
 | **Tab** | Session stats and personal bests |
 | **H** or **?** | R10 help |
 | **Custom shot** | Type in launch numbers from any monitor |
@@ -132,18 +134,36 @@ bridge. Use it on your home Wi-Fi, not on a network you don't trust.
 ### Games
 
 - **The Confluence Course.** Front 9, back 9, or all 18 (par 70). Each hole
-  is themed on a landmark: the Gateway Arch, the Old Courthouse, Eads Bridge,
-  the Alton riverfront, the Piasa bluff, Chain of Rocks Bridge and its bend,
-  Monks Mound at Cahokia, the Cathedral Basilica, a riverboat, Union Station,
-  the Climatron, the Grand Avenue Water Tower, the confluence of the Missouri
-  and Mississippi, Mel Price Locks & Dam, the World's Fair Pavilion, the Jewel
-  Box, Robert Wadlow (the Alton giant), and the Arch again to finish. Holes
-  have elevation, doglegs, sloped greens, bunkers, creeks, ponds and an island
-  green. Each hole opens with a fly-over and a hole card. Rules: rough and sand
-  cost distance and spin, water is a one-stroke drop, out of bounds is stroke
-  and distance, and a pick-up at par + 4 keeps a six-ball moving. The green
-  is settled by putting rings (below). The round saves after every hole and
-  resumes after a reload.
+  is framed by a St. Louis or Alton landmark: the Gateway Arch and downtown
+  skyline, the Delmar Loop (Blueberry Hill, the Tivoli, Harry Weber's Chuck
+  Berry statue, the Loop Trolley), the Saint Louis Zoo (the 1904 Flight Cage,
+  the Zooline Railroad), the Alton riverfront (grain elevators, Clark Bridge,
+  the Argosy casino boat, the Riverfront Amphitheater), the Piasa bluff, the
+  Chain of Rocks Bridge and its 22° bend, Monks Mound at Cahokia (terraces,
+  Woodhenge, the palisade), the Cathedral Basilica on an elevated green, a
+  sternwheeler at the levee, Union Station, the Climatron, the Grand Avenue
+  Water Tower, the Confluence Tower, Mel Price Locks & Dam, the World's Fair
+  Pavilion, City Museum (rooftop bus, Ferris wheel, MonstroCity), Alton
+  Legends (bronzes of Robert Wadlow and Miles Davis), and the Arch again to
+  finish. Many landmarks move: the trolley runs, the paddle wheel turns, the
+  zoo train circles, the Ferris wheel spins.
+- **Real terrain.** Elevated tees, valleys, crests, side slopes that run
+  toward hazards, mounds and hollows, doglegs with stands of trees at the
+  corner, and a 40-foot climb to the Basilica green. The status bar shows the
+  plays-like distance (↑ uphill, ↓ downhill) and the demo swing helper aims
+  for it. Trees are solid: a ball that flies into a canopy loses most of its
+  pace and drops.
+- **Lies and penalties.** The turn banner shows the lie. First cut costs a
+  little spin; rough costs about 15% of the distance (more with woods);
+  fairway bunkers about 16%, greenside bunkers play as a splash shot (about
+  30% less) with a sand explosion. Water opens a decision: **Drop** near where
+  it crossed (+1), **Re-hit** from the previous spot (+1), or **Mulligan**.
+  Out of bounds is stroke and distance; a pick-up at par + 4 keeps a six-ball
+  moving.
+- **Mulligans.** Choose the rule in the course setup: off, 1 per nine, 1 per
+  hole, or unlimited. The Mulligan button (or **U**) appears only when one is
+  available and shows how many are left; the rule is printed on every hole
+  card. The round saves after every hole and resumes after a reload.
 - **Driving Range.** Free practice with ghost tracers, a dispersion mini-map
   and five lit target greens.
 - **Closest to Pin.** Five holes at varied distances (wedges, mixed or long),
@@ -267,7 +287,31 @@ bridge/                      Python R10 bridge (port of 10over) + tests
 vendor/three/                three.js r186, vendored so the game works offline
 tools/calibrate.mjs          physics calibration check
 tools/holes-check.mjs        course sanity check (tees, greens, hazards, par)
+tools/landmark-preview.html  render one landmark on its own (?type=zoo&night=1)
+tools/elevenlabs.mjs         generate recorded sounds with the ElevenLabs API
+js/course/lm/                one detailed builder per landmark (shared kit in kit.js)
+js/scene/trees.js            procedural oak / maple / sycamore / cedar, instanced, wind sway
+js/scene/ambient.js          bird flocks and airliners with navigation lights
+docs/design-notes.md         UI tokens, motion and patterns
 ```
+
+## Sound
+
+Impacts, the bunker splash, the water splash and the gallery applause are
+ElevenLabs sound effects in `assets/audio/` (listed in `manifest.json`).
+Everything else is synthesized in WebAudio, and any sound without a file
+falls back to its synthesized version. To regenerate or add recorded
+ambience beds and the airliner pass:
+
+```bash
+ELEVENLABS_API_KEY=... node tools/elevenlabs.mjs ambience_day ambience_night plane
+```
+
+## A future course: City Museum
+
+City Museum has a hole on the Confluence Course (16). Its ten storeys,
+caves, slides and MonstroCity could carry a standalone fantasy course of
+their own; that is noted here as future work.
 
 ## Adding Blender / glTF assets and scanned characters
 

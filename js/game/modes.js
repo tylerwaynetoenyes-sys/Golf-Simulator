@@ -281,7 +281,7 @@ export class ClosestToPinMode extends BaseMode {
       teams: lb.teams,
       footer: solo && Number.isFinite(avg) ? `Average proximity ${proximity(avg)}` : '',
       verdict: solo
-        ? total >= 380 ? 'Tour-level dart throwing.' : total >= 250 ? 'Very tidy. The pin felt it.' : total >= 140 ? 'Solid round. The greens were kind.' : 'The pins survived. They usually do.'
+        ? total >= 380 ? 'Tour-level proximity.' : total >= 250 ? 'Excellent distance control.' : total >= 140 ? 'Solid round.' : 'Room to tighten the dispersion.'
         : this.winnerLine(lb.rows, lb.teams),
     };
   }
@@ -379,7 +379,7 @@ export class TargetMode extends BaseMode {
       rows: solo ? [] : lb.rows.map((x, i) => ({ label: `${i + 1}. ${x.name}`, value: x.display, color: x.color })),
       teams: lb.teams,
       verdict: solo
-        ? total >= 300 ? 'Surgical.' : total >= 180 ? 'Dialed in.' : total >= 90 ? 'Getting there.' : 'The targets are fine. Physically and emotionally.'
+        ? total >= 300 ? 'Precise.' : total >= 180 ? 'Dialed in.' : total >= 90 ? 'Good progress.' : 'Work on carry distance control.'
         : this.winnerLine(lb.rows, lb.teams),
     };
   }
@@ -471,7 +471,7 @@ export class LongestDriveMode extends BaseMode {
       rows: solo ? [] : lb.rows.map((x, i) => ({ label: `${i + 1}. ${x.name}`, value: x.display, color: x.color })),
       teams: lb.teams,
       verdict: solo
-        ? b && b / YD > 320 ? 'Genuinely large.' : b && b / YD > 270 ? 'Plenty. The grid agrees.' : 'Distance is a journey.'
+        ? b && b / YD > 320 ? 'Elite distance.' : b && b / YD > 270 ? 'Strong, in-play distance.' : 'Speed training will add yards.'
         : this.winnerLine(lb.rows, lb.teams),
     };
   }

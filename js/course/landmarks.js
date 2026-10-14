@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { archGeometry, archMaterial } from '../scene/skyline.js';
 import { piasaCanvas } from '../ui/piasa.js';
+import { EXTRA } from './lm/index.js';
 
 const FT = 0.3048;
 
@@ -421,7 +422,7 @@ const B = {
 };
 
 export function buildLandmark(type) {
-  const b = B[type];
+  const b = EXTRA[type] || B[type];
   if (!b) return { group: new THREE.Group(), glow: [] };
   const out = b();
   out.group.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });

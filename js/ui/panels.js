@@ -3,7 +3,7 @@
 import { $, esc, copyButtons, toast } from './dom.js';
 import { bus } from '../core/events.js';
 import { HOLES } from '../course/holes.js';
-import { CourseMode, fmtToPar, PUTT_RINGS } from '../game/courseMode.js';
+import { CourseMode, fmtToPar, PUTT_RINGS, MULLIGANS } from '../game/courseMode.js';
 import { PLAYER_COLORS, TEAMS, MAX_PLAYERS } from '../game/roster.js';
 import { store } from '../data/store.js';
 import { CLUBS, clubById } from '../data/clubs.js';
@@ -121,7 +121,7 @@ export function openSession(game) {
     <h3>By club (this session)</h3>
     ${clubStats.length ? `<table class="data"><thead><tr><th>Club</th><th>Shots</th><th>Carry</th><th>Total</th><th>Ball spd</th><th>Launch</th><th>Spin</th><th>Spread</th></tr></thead><tbody>
       ${clubStats.map((s) => `<tr><td>${esc(clubById(s.club).name)}</td><td>${s.count}</td><td>${U.dist(s.carry)}</td><td>${U.dist(s.total)}</td><td>${U.speed(s.ballSpeed)}</td><td>${s.launch.toFixed(1)}°</td><td>${Math.round(s.spin)}</td><td>±${U.dist(s.offlineSd)}</td></tr>`).join('')}
-    </tbody></table>` : '<div class="empty">No shots yet. The range is patient.</div>'}
+    </tbody></table>` : '<div class="empty">No shots yet.</div>'}
     <h3>Recent shots</h3>
     ${recent.length ? `<table class="data"><thead><tr><th>Club</th><th>Source</th><th>Ball spd</th><th>Launch</th><th>Spin</th><th>Carry</th><th>Total</th><th>Offline</th></tr></thead><tbody>
       ${recent.map((s) => `<tr><td>${esc(clubById(s.club).short)}</td><td>${s.source === 'r10' ? 'R10' : s.source === 'mock' ? 'R10 sim' : s.source === 'manual' ? 'Custom' : 'Demo'}</td><td>${U.speed(s.ballSpeed)}</td><td>${s.launchAngle.toFixed(1)}°</td><td>${Math.round(s.totalSpin)}</td><td>${U.dist(s.carry)}</td><td>${s.lost ? '—' : U.dist(s.total)}</td><td>${s.lost ? 'lost' : U.signedDir(s.offline)}</td></tr>`).join('')}
@@ -339,6 +339,8 @@ function helpControls() {
     ['Enter', 'Skip the replay'],
     ['← →', 'Aim · R resets aim'],
     ['1–7 or ↑ ↓', 'Select club'],
+    ['U', 'Mulligan: replay the last shot (course, if the rule allows)'],
+    ['D · B', 'In the water: drop, or re-hit from the previous spot'],
     ['M', 'Choose game'],
     ['P', 'Players & teams'],
     ['S / Tab', 'Scorecard (course) · session & bests'],
@@ -534,6 +536,7 @@ export function openCourseSetup(game) {
   let length = s.courseLength || 9;
   let start = s.courseStart || 1;
   let rings = PUTT_RINGS[s.rings] ? s.rings : 'standard';
+  let mull = MULLIGANS[s.mulligans] ? s.mulligans : 'nine';
   const pick = () => (length === 18 ? HOLES : HOLES.slice(start - 1, start + 8));
   const holeList = () => {
     const hs = pick();
@@ -555,6 +558,9 @@ export function openCourseSetup(game) {
     <h3>On the green</h3>
     <div class="setting" style="border:0;padding-top:0"><div><div class="hint">No putting: two rings around every hole settle it. Finish inside the gold ring for a 1-putt, inside the white ring for a 2-putt, anywhere else on the green for a 3-putt. Roll it in the cup and it's holed.</div></div>
       <div class="seg" id="csRings">${Object.entries(PUTT_RINGS).map(([k, r]) => `<button data-v="${k}" aria-pressed="${rings === k}">${r.label} <small style="opacity:.7">${r.one}/${r.two} ft</small></button>`).join('')}</div></div>
+    <h3>Mulligans</h3>
+    <div class="setting" style="border:0;padding-top:0"><div><div class="hint">A mulligan replays your last shot from the same spot with no penalty. After a ball in the water you can also choose a drop or a re-hit, each with a one-stroke penalty.</div></div>
+      <div class="seg" id="csMull">${Object.entries(MULLIGANS).map(([k, r]) => `<button data-v="${k}" aria-pressed="${mull === k}">${r.label}</button>`).join('')}</div></div>
     <h3>Players</h3>
     <div class="setting" style="border:0;padding-top:0"><div>${players.map((p) => `<span class="tb-team" style="--pc:${p.color};margin-right:6px;display:inline-block;margin-bottom:4px">${esc(p.name)}</span>`).join('')}
       ${game.roster.teamMode ? `<div class="hint">Teams: ${game.roster.teams().map((t) => `${esc(t.name)} (${t.members.length})`).join(' vs ')}</div>` : ''}</div>
@@ -572,20 +578,26 @@ export function openCourseSetup(game) {
     rings = b.dataset.v;
     audio.tick();
   }));
+  el.querySelectorAll('#csMull button').forEach((b) => b.addEventListener('click', () => {
+    el.querySelectorAll('#csMull button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    mull = b.dataset.v;
+    audio.tick();
+  }));
   el.querySelector('#csPlayers').addEventListener('click', () => openPlayers(game, { then: () => openCourseSetup(game) }));
   el.querySelector('#csStart').addEventListener('click', () => {
     store.setSetting('courseLength', length);
     store.setSetting('courseStart', start);
     store.setSetting('rings', rings);
+    store.setSetting('mulligans', mull);
     onClose = null;
     closePanel();
     audio.click();
-    game.setMode('course', { length, rings, startHole: start });
+    game.setMode('course', { length, rings, mulligans: mull, startHole: start });
   });
   el.querySelector('#csResume')?.addEventListener('click', () => {
     onClose = null;
     closePanel();
-    game.setMode('course', { length: saved.length, rings: saved.rings, startHole: saved.first, resume: saved });
+    game.setMode('course', { length: saved.length, rings: saved.rings, mulligans: saved.mulligans, startHole: saved.first, resume: saved });
   });
 }
 

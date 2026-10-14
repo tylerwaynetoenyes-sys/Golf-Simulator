@@ -1,0 +1,527 @@
+// The Piasa bluff: the Mississippian limestone face on the Great River Road
+// just north of Alton, with the painted Piasa set into a smoothed panel about
+// 15-40 m up. Layered bedding, joints, ledges, talus, clinging cedars and an
+// oak-hickory crown; the road and guard rail run along the foot of the bluff.
+// Front faces +Z (toward the golfer). Footprint x -140..140, z -50..12.
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mat, seeded, canvasTex } from './kit.js';
+import { piasaCanvas } from '../../ui/piasa.js';
+
+// ---- small deterministic noise --------------------------------------------
+function hash(n) { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+function hash2(x, y) { const s = Math.sin(x * 127.1 + y * 311.7) * 43758.5453; return s - Math.floor(s); }
+function noise1(x) {
+  const i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+  return hash(i) * (1 - u) + hash(i + 1) * u;
+}
+function noise2(x, y) {
+  const ix = Math.floor(x), iy = Math.floor(y), fx = x - ix, fy = y - iy;
+  const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const a = hash2(ix, iy), b = hash2(ix + 1, iy), c = hash2(ix, iy + 1), d = hash2(ix + 1, iy + 1);
+  return (a * (1 - ux) + b * ux) * (1 - uy) + (c * (1 - ux) + d * ux) * uy;
+}
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+/** Give a geometry a flat vertex colour (optionally varied per vertex) and make it non-indexed. */
+function paint(geo, col, vary = 0, rnd = null, shadeBelow = 0) {
+  const g = geo.index ? geo.toNonIndexed() : geo;
+  const p = g.attributes.position, n = p.count;
+  const c = new Float32Array(n * 3);
+  const base = new THREE.Color(col);
+  g.computeBoundingBox();
+  const y0 = g.boundingBox.min.y, y1 = g.boundingBox.max.y;
+  for (let i = 0; i < n; i++) {
+    const v = vary ? 1 + (hash2(p.getX(i) * 3.1, p.getY(i) * 2.7 + p.getZ(i)) - 0.5) * vary : 1;
+    const ao = shadeBelow ? 1 - shadeBelow * (1 - (p.getY(i) - y0) / Math.max(0.001, y1 - y0)) : 1;
+    c[i * 3] = base.r * v * ao; c[i * 3 + 1] = base.g * v * ao; c[i * 3 + 2] = base.b * v * ao;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
+  return g;
+}
+/** Lumpy sphere: radial jitter keyed on direction so seams stay closed. */
+function lumpy(r, wseg, hseg, amt, seed) {
+  const g = new THREE.SphereGeometry(r, wseg, hseg);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const k = 1 + (hash2(Math.round(x / r * 40) + seed * 7.3, Math.round(y / r * 40) * 1.7 + Math.round(z / r * 40) * 3.1) - 0.5) * amt;
+    p.setXYZ(i, x * k, y * k * 0.92, z * k);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+// ---- the limestone face -----------------------------------------------------
+const X0 = -140, X1 = 140;
+const ZB = -15; // base line of the face
+/** Crest height of the bluff along x: 44-54 m in the middle, dropping into hollows at the ends. */
+function crest(x) {
+  const mid = 47 + 4 * Math.sin(x * 0.021 + 0.6) + 2.5 * Math.sin(x * 0.061 + 2) + 1.5 * noise1(x * 0.08);
+  return 8 + (mid - 8) * (1 - smooth(92, 140, Math.abs(x)));
+}
+/** Plan line of the face: gentle buttresses and re-entrants, wrapping back at the ends. */
+function planZ(x) {
+  return ZB + 2.6 * Math.sin(x * 0.034 + 1.1) + 1.4 * Math.sin(x * 0.093) - 16 * smooth(96, 140, Math.abs(x)) ** 1.4;
+}
+
+export default function build() {
+  const g = new THREE.Group();
+  const glow = [];
+  const rnd = seeded(1673); // Marquette & Jolliet passed the painting in 1673
+
+  // Bedding: alternating hard (protruding) and soft (recessed) beds.
+  const layers = [];
+  {
+    const r = seeded(91);
+    let y = 0;
+    const tints = [0xd3c7aa, 0xb4afa3, 0xdacfb6, 0xa8a090, 0xc9b998, 0x9e9a90, 0xd8ccae, 0xbba98a, 0xc4c0b4];
+    let k = 0;
+    while (y < 60) {
+      const hard = k % 2 === 0 ? r() < 0.75 : r() < 0.3;
+      const h = hard ? 1.6 + r() * 2.8 : 0.6 + r() * 1.3;
+      layers.push({ y0: y, y1: y + h, out: hard ? 0.4 + r() * 1.3 : -0.6 - r() * 0.9, tint: tints[Math.floor(r() * tints.length)], tv: (r() - 0.5) * 0.08, ph: r() * 100 });
+      y += h; k++;
+    }
+  }
+  // vertical joints (fractures) - positions + depth
+  const joints = [];
+  for (let x = X0 + 4; x < X1; x += 5 + rnd() * 10) joints.push({ x, d: 1.2 + rnd() * 2.8, w: 0.45 + rnd() * 0.8, top: 0.55 + rnd() * 0.5, bot: rnd() * 0.3 });
+  const PANEL = { x0: -19, x1: 19, y0: 14, y1: 41, z: ZB + 1.8 };
+
+  function layerAt(y) { for (const L of layers) if (y < L.y1) return L; return layers[layers.length - 1]; }
+  function jointDepth(x, y, H) {
+    let d = 0;
+    for (const j of joints) {
+      const dx = (x - j.x) / j.w;
+      if (dx * dx > 9) continue;
+      const yn = y / H;
+      if (yn > j.top || yn < j.bot) continue;
+      d = Math.max(d, j.d * Math.exp(-dx * dx));
+    }
+    return d;
+  }
+  function panelW(x, y) {
+    return smooth(PANEL.x0 - 3, PANEL.x0 + 0.5, x) * (1 - smooth(PANEL.x1 - 0.5, PANEL.x1 + 3, x)) *
+      smooth(PANEL.y0 - 3, PANEL.y0 + 0.5, y) * (1 - smooth(PANEL.y1 - 0.5, PANEL.y1 + 3, y));
+  }
+  /** Outward offset of the face at (x, y), and a recess measure for shading. */
+  function faceZ(x, y, H) {
+    const L = layerAt(y);
+    const along = 0.55 + 0.9 * noise1(x * 0.045 + L.ph); // beds come and go along x
+    let z = planZ(x) + L.out * along;
+    z += (noise2(x * 0.35, y * 0.5) - 0.5) * 0.7 + (noise2(x * 1.3, y * 1.6) - 0.5) * 0.25;
+    z -= jointDepth(x, y, H);
+    // slight batter: the bluff leans back near the crest
+    z -= smooth(H - 8, H, y) * 2.2;
+    const w = panelW(x, y);
+    return { z: z * (1 - w) + PANEL.z * w, recess: Math.min(1, Math.max(0, -L.out * along * 0.8 + jointDepth(x, y, H) * 0.4)), L, w };
+  }
+
+  // rows: two rows hugging every bed boundary (crisp ledges / overhangs)
+  const rowsY = [0.02];
+  for (const L of layers) {
+    if (L.y0 > 58) break;
+    const h = L.y1 - L.y0;
+    rowsY.push(L.y0 + 0.06);
+    const inner = Math.max(1, Math.round(h / 1.1));
+    for (let i = 1; i < inner; i++) rowsY.push(L.y0 + (h * i) / inner);
+    rowsY.push(L.y1 - 0.06);
+  }
+  const nFace = rowsY.length;
+  const brow = [[0.6, -1.2], [1.4, -3.5], [2.2, -8], [2.6, -16], [2.0, -26]]; // dy, dz behind the crest
+  const nRows = nFace + brow.length + 1;
+  const DX = 1.3;
+  const nCols = Math.round((X1 - X0) / DX) + 1;
+
+  const pos = new Float32Array(nCols * nRows * 3);
+  const col = new Float32Array(nCols * nRows * 3);
+  const uv = new Float32Array(nCols * nRows * 2);
+  const tmp = new THREE.Color(), soil = new THREE.Color(0x5b5233), moss = new THREE.Color(0x4c5a2e);
+  const ledges = []; // where shrubs can cling
+  for (let ci = 0; ci < nCols; ci++) {
+    const x = X0 + ci * DX;
+    const H = crest(x);
+    const streak = Math.max(0, noise1(x * 0.55 + 3) - 0.52) * 2.2 + Math.max(0, noise1(x * 0.17 + 9) - 0.6) * 1.4;
+    const iron = Math.max(0, noise1(x * 0.21 + 40) - 0.62) * 2;
+    let topZ = planZ(x), prevOut = null;
+    for (let ri = 0; ri < nRows; ri++) {
+      let y, z, c;
+      const vi = ci * nRows + ri;
+      if (ri < nFace && rowsY[ri] < H) {
+        y = rowsY[ri];
+        const f = faceZ(x, y, H);
+        z = f.z;
+        topZ = z;
+        tmp.set(f.L.tint);
+        const v = 1 + f.L.tv + (noise2(x * 0.8, y * 0.9) - 0.5) * 0.14;
+        tmp.multiplyScalar(v * (1 - 0.4 * f.recess) * (1 - 0.35 * Math.min(1, jointDepth(x, y, H) / 2)));
+        // water / lichen streaks run down from the ledges, darkest low on the face
+        const wet = Math.min(0.7, 1.4 * streak * (0.35 + 0.65 * (1 - y / H)) * (0.7 + 0.6 * noise2(x * 2, y * 0.15)));
+        tmp.lerp(new THREE.Color(0x4a4840), wet * (1 - f.w));
+        tmp.lerp(new THREE.Color(0xa77a4a), iron * 0.35 * smooth(0.2, 0.6, y / H) * (1 - f.w));
+        // base of the face: damp, mossy
+        tmp.lerp(moss, 0.35 * (1 - smooth(0, 4, y)));
+        // panel: cleaned, slightly paler limestone
+        tmp.lerp(new THREE.Color(0xdcd2bc), f.w * 0.8);
+        c = tmp;
+        if (prevOut !== null && f.z < prevOut - 0.45 && f.w < 0.05 && rnd() < 0.22) ledges.push([x, y, prevOut]);
+        prevOut = f.z;
+      } else if (ri < nFace) {
+        // rows above the crest roll back over the brow
+        const over = rowsY[ri] - H;
+        y = H + Math.min(0.5, over * 0.08);
+        z = topZ - 0.4 - over * 0.06;
+        c = tmp.copy(soil).lerp(moss, 0.5);
+      } else if (ri < nFace + brow.length) {
+        const [dy, dz] = brow[ri - nFace];
+        y = H + dy; z = Math.max(-50, topZ + dz);
+        if (ri === nFace + brow.length - 1) z = -40;
+        c = tmp.copy(soil).lerp(moss, 0.4 + 0.3 * noise1(x * 0.3));
+      } else {
+        y = 0; z = -50; c = tmp.copy(soil);
+      }
+      pos[vi * 3] = x + (ri < nFace ? (noise2(x * 0.7, y * 0.4) - 0.5) * 0.5 : 0);
+      pos[vi * 3 + 1] = y; pos[vi * 3 + 2] = z;
+      col[vi * 3] = c.r; col[vi * 3 + 1] = c.g; col[vi * 3 + 2] = c.b;
+      uv[vi * 2] = x / 14; uv[vi * 2 + 1] = y / 14;
+    }
+  }
+  const idx = [];
+  for (let ci = 0; ci < nCols - 1; ci++) for (let ri = 0; ri < nRows - 1; ri++) {
+    const a = ci * nRows + ri, b = (ci + 1) * nRows + ri;
+    idx.push(a, b, a + 1, b, b + 1, a + 1);
+  }
+  const faceGeo = new THREE.BufferGeometry();
+  faceGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  faceGeo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  faceGeo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  faceGeo.setIndex(idx);
+  faceGeo.computeVertexNormals();
+
+  // limestone grain: fine lamination, pits, speckle, drip lines
+  const grain = canvasTex(512, 512, (c, w, h) => {
+    const r = seeded(7);
+    c.fillStyle = '#e9e4da'; c.fillRect(0, 0, w, h);
+    for (let i = 0; i < 9000; i++) {
+      const v = 200 + r() * 55;
+      c.fillStyle = `rgba(${v},${v - 4},${v - 12},${0.25 + r() * 0.4})`;
+      c.fillRect(r() * w, r() * h, 1 + r() * 4, 1 + r() * 2);
+    }
+    for (let y = 0; y < h; y += 3 + r() * 9) {
+      c.strokeStyle = `rgba(90,82,70,${0.08 + r() * 0.16})`; c.lineWidth = 0.6 + r() * 1.4;
+      c.beginPath(); c.moveTo(0, y);
+      for (let x = 0; x <= w; x += 32) c.lineTo(x, y + (r() - 0.5) * 2.5);
+      c.stroke();
+    }
+    for (let i = 0; i < 700; i++) {
+      c.fillStyle = `rgba(70,64,56,${0.15 + r() * 0.35})`;
+      c.beginPath(); c.arc(r() * w, r() * h, 0.6 + r() * 2.2, 0, 7); c.fill();
+    }
+    for (let i = 0; i < 60; i++) {
+      const x = r() * w, y = r() * h, len = 30 + r() * 140;
+      const gr = c.createLinearGradient(0, y, 0, y + len);
+      gr.addColorStop(0, 'rgba(60,58,50,0.22)'); gr.addColorStop(1, 'rgba(60,58,50,0)');
+      c.fillStyle = gr; c.fillRect(x, y, 1.5 + r() * 4, len);
+    }
+  }, [1, 1]);
+  const rockMat = new THREE.MeshStandardMaterial({ map: grain, bumpMap: grain, bumpScale: 1.4, vertexColors: true, roughness: 0.96, color: 0xffffff });
+  const face = new THREE.Mesh(faceGeo, rockMat);
+  face.receiveShadow = true;
+  g.add(face);
+
+  // end caps (the profile at x = ±140, where the bluff has dropped into a hollow)
+  {
+    const caps = [];
+    for (const ci of [0, nCols - 1]) {
+      const v = [];
+      const cx = pos[ci * nRows * 3], cy = crest(cx) * 0.3, cz = -36;
+      for (let ri = 0; ri < nRows - 1; ri++) {
+        const a = (ci * nRows + ri) * 3, b = (ci * nRows + ri + 1) * 3;
+        const tri = [cx, cy, cz, pos[a], pos[a + 1], pos[a + 2], pos[b], pos[b + 1], pos[b + 2]];
+        if (ci === 0) v.push(...tri); else v.push(tri[0], tri[1], tri[2], tri[6], tri[7], tri[8], tri[3], tri[4], tri[5]);
+      }
+      const cg = new THREE.BufferGeometry();
+      cg.setAttribute('position', new THREE.Float32BufferAttribute(v, 3));
+      cg.computeVertexNormals();
+      caps.push(paint(cg, 0x6f6448));
+    }
+    const cm = new THREE.Mesh(mergeGeometries(caps), mat(0xffffff, { vertexColors: true, roughness: 1, side: THREE.DoubleSide }));
+    g.add(cm);
+  }
+
+  // ---- talus apron and rubble at the foot ----------------------------------
+  {
+    const parts = [];
+    // apron: a low scree slope from the face to the road shoulder
+    const ap = new THREE.PlaneGeometry(X1 - X0 - 30, 8, 120, 4).rotateX(-Math.PI / 2);
+    const p = ap.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), zz = p.getZ(i); // zz in -4..4, -4 = at face
+      const t = (zz + 4) / 8;
+      const z0 = planZ(x) + 0.3;
+      p.setZ(i, z0 + t * (-6.5 - z0 + 0.5 * Math.sin(x * 0.2)));
+      p.setY(i, (1 - t) ** 1.6 * (2.2 + 1.6 * noise1(x * 0.15)) + (noise2(x * 0.5, zz) - 0.5) * 0.3 + 0.03);
+    }
+    ap.computeVertexNormals();
+    const apc = paint(ap, 0x8f8571, 0.25);
+    parts.push(apc);
+    // blocks: limestone slabs fallen from the beds, piled at the joints
+    const r = seeded(33);
+    const rockCols = [0xb8ad95, 0xa39a86, 0xc6bba2, 0x8e8676, 0x9c917a];
+    for (let i = 0; i < 260; i++) {
+      let x = X0 + 18 + r() * (X1 - X0 - 36);
+      if (r() < 0.5) { const j = joints[Math.floor(r() * joints.length)]; x = Math.min(X1 - 16, Math.max(X0 + 16, j.x + (r() - 0.5) * 6)); }
+      const t = r() ** 1.7;
+      const s = (0.35 + r() * r() * 2.6) * (1 - t * 0.5);
+      const geo = new THREE.DodecahedronGeometry(s, 0);
+      geo.scale(1 + r() * 0.8, 0.45 + r() * 0.4, 0.8 + r() * 0.6);
+      geo.rotateY(r() * 6.28); geo.rotateZ((r() - 0.5) * 0.5);
+      const z = planZ(x) + 0.8 + t * 7.5;
+      const yb = (1 - t) ** 1.6 * 2.6;
+      geo.translate(x, yb + s * 0.25, Math.min(-6.4, z));
+      parts.push(paint(geo, rockCols[Math.floor(r() * rockCols.length)], 0.15));
+    }
+    const talus = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, map: grain }));
+    talus.receiveShadow = true;
+    g.add(talus);
+  }
+
+  // ---- vegetation: oak-hickory crown, cedars and shrubs on the ledges -------
+  {
+    const leaf = [], wood = [];
+    const r = seeded(5150);
+    const greens = [0x3e5a2b, 0x47622f, 0x35502a, 0x566a33, 0x2f4724, 0x4f6a3a, 0x5f6f34];
+    function broadleaf(x, y, z, s) {
+      const h = (4.5 + r() * 3) * s;
+      const tr = new THREE.CylinderGeometry(0.22 * s, 0.4 * s, h, 5).translate(x, y + h / 2, z);
+      wood.push(paint(tr, 0x4a3d2e));
+      const n = 4 + Math.floor(r() * 4);
+      const base = greens[Math.floor(r() * greens.length)];
+      for (let k = 0; k < n; k++) {
+        const rr = (2.8 + r() * 2.4) * s;
+        const a = r() * 6.28, d = (k === 0 ? 0 : 1.6 + r() * 2.6) * s;
+        const sg = lumpy(rr, 7, 5, 0.28, i++);
+        sg.translate(x + Math.cos(a) * d, y + h + (r() - 0.3) * 2.6 * s + (k === 0 ? 1.5 * s : 0), z + Math.sin(a) * d);
+        const cc = new THREE.Color(base).offsetHSL((r() - 0.5) * 0.03, (r() - 0.5) * 0.1, (r() - 0.5) * 0.06);
+        leaf.push(paint(sg, cc, 0.18, null, 0.45));
+      }
+    }
+    function cedar(x, y, z, s) {
+      const h = (4 + r() * 4) * s;
+      wood.push(paint(new THREE.CylinderGeometry(0.1 * s, 0.2 * s, h * 0.4, 5).translate(x, y + h * 0.2, z), 0x4f3a2a));
+      const cg = new THREE.ConeGeometry(h * 0.26, h, 7, 2);
+      const p = cg.attributes.position;
+      for (let k = 0; k < p.count; k++) { const q = 1 + (hash2(p.getX(k) * 9 + x, p.getY(k) * 7 + z) - 0.5) * 0.4; p.setX(k, p.getX(k) * q); p.setZ(k, p.getZ(k) * q); }
+      cg.computeVertexNormals();
+      cg.translate(x, y + h * 0.62, z);
+      leaf.push(paint(cg, new THREE.Color(0x2c4026).offsetHSL(0, 0, (r() - 0.5) * 0.05), 0.15, null, 0.4));
+    }
+    let i = 0;
+    // crown forest: dense along the brow, thinning behind
+    for (let n = 0; n < 108; n++) {
+      const x = X0 + 10 + r() * (X1 - X0 - 20);
+      const H = crest(x);
+      const back = r() ** 1.4;
+      const z = Math.max(-43, planZ(x) - 3 - back * 28);
+      const y = H + (back < 0.1 ? 0.6 : 2.0 + 0.4 * r());
+      if (H < 12 && r() < 0.5) cedar(x, y, z, 1.2); else broadleaf(x, y - 0.4, z, 0.8 + r() * 0.45 * (1 - back * 0.3));
+    }
+    // understory along the brow (sumac, dogwood, young cedar) hides the trunk line
+    for (let n = 0; n < 125; n++) {
+      const x = X0 + 9 + r() * (X1 - X0 - 18);
+      const H = crest(x);
+      if (r() < 0.3) { cedar(x, H, planZ(x) - 3.5 - r() * 3, 0.6 + r() * 0.5); continue; }
+      const sg = lumpy(1.6 + r() * 1.6, 7, 5, 0.35, i++);
+      sg.scale(1.5, 0.9, 1.1);
+      sg.translate(x, H + 1.3 + r(), planZ(x) - 3.2 - r() * 4);
+      leaf.push(paint(sg, new THREE.Color(greens[Math.floor(r() * greens.length)]).offsetHSL(0, 0, 0.02), 0.2, null, 0.5));
+    }
+    // ravine woods at the ends where the bluff drops
+    for (let n = 0; n < 18; n++) {
+      const side = n % 2 ? 1 : -1;
+      const x = side * (118 + r() * 14);
+      broadleaf(x, 0, planZ(x) + 2 + r() * 6, 0.9 + r() * 0.3);
+    }
+    // ledge vegetation: cedars and shrubs clinging to the bedding shelves
+    for (const [x, y, z] of ledges) {
+      if (y < 4 || r() < 0.45) continue;
+      if (r() < 0.35) cedar(x, y, z + 0.3, 0.45 + r() * 0.35);
+      else {
+        const base = new THREE.Color(greens[Math.floor(r() * greens.length)]).lerp(new THREE.Color(0x6b6a48), 0.35);
+        const n = 2 + Math.floor(r() * 3);
+        for (let k = 0; k < n; k++) {
+          const sg = lumpy(0.45 + r() * 0.6, 6, 4, 0.4, i++);
+          sg.scale(1.2, 0.85, 1);
+          sg.translate(x + (r() - 0.5) * 2.6, y + 0.25 + r() * 0.4, z + 0.1 + r() * 0.6);
+          leaf.push(paint(sg, base.clone().offsetHSL(0, 0, (r() - 0.5) * 0.06), 0.25, null, 0.4));
+        }
+        // trailing vine / moss down the riser below
+        if (r() < 0.5) {
+          const vg = new THREE.PlaneGeometry(1 + r() * 2, 1.5 + r() * 2.5, 2, 3);
+          vg.translate(x, y - 1, z + 0.15);
+          leaf.push(paint(vg, 0x445a2c, 0.3));
+        }
+      }
+    }
+    // shrubs and grass tufts at the very foot
+    for (let n = 0; n < 50; n++) {
+      const x = X0 + 15 + r() * (X1 - X0 - 30);
+      const sg = lumpy(0.8 + r() * 1.1, 7, 5, 0.3, i++);
+      sg.scale(1.5, 0.75, 1.1);
+      sg.translate(x, 0.6, -7 - r() * 1.5);
+      leaf.push(paint(sg, greens[Math.floor(r() * greens.length)], 0.2, null, 0.45));
+    }
+    const lm = new THREE.Mesh(mergeGeometries(leaf), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
+    const wm = new THREE.Mesh(mergeGeometries(wood), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
+    lm.receiveShadow = true;
+    g.add(lm, wm);
+  }
+
+  // ---- the Piasa mural -------------------------------------------------------
+  const muralMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, emissive: 0xffd9a8, emissiveIntensity: 0, polygonOffset: true, polygonOffsetFactor: -2 });
+  muralMat.userData.night = 0.35;
+  glow.push(muralMat);
+  const MW = 33, MH = 23.3;
+  const mural = new THREE.Mesh(new THREE.PlaneGeometry(MW, MH), muralMat);
+  mural.position.set(0, (PANEL.y0 + PANEL.y1) / 2, PANEL.z + 0.12);
+  mural.receiveShadow = true;
+  g.add(mural);
+  piasaCanvas(1024, 725).then((c) => {
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.anisotropy = 4;
+    muralMat.map = tex;
+    muralMat.emissiveMap = tex;
+    muralMat.needsUpdate = true;
+  });
+
+  // night: a soft floodlight wash over the panel (additive, faded by update)
+  const washTex = canvasTex(256, 256, (c, w, h) => {
+    const gr = c.createRadialGradient(w / 2, h * 0.62, 4, w / 2, h * 0.62, w * 0.5);
+    gr.addColorStop(0, 'rgba(255,214,160,0.85)');
+    gr.addColorStop(0.55, 'rgba(255,200,140,0.35)');
+    gr.addColorStop(1, 'rgba(255,190,130,0)');
+    c.fillStyle = gr; c.fillRect(0, 0, w, h);
+  });
+  const washMat = new THREE.MeshBasicMaterial({ map: washTex, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+  const wash = new THREE.Mesh(new THREE.PlaneGeometry(62, 46), washMat);
+  wash.position.set(0, 27, -9.4);
+  wash.renderOrder = 2;
+  g.add(wash);
+  // the flood fixtures at the foot of the bluff
+  const fixMat = mat(0x2a2b2d, { metalness: 0.6, roughness: 0.4 });
+  const lensMat = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xffe2b0, emissiveIntensity: 0 });
+  lensMat.userData.night = 2.5;
+  glow.push(lensMat);
+  for (const x of [-13, 13]) {
+    const f = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.45, 0.8, 10), fixMat);
+    const lens = new THREE.Mesh(new THREE.CircleGeometry(0.33, 12), lensMat);
+    lens.position.y = 0.41; lens.rotation.x = -Math.PI / 2;
+    f.add(body, lens);
+    f.rotation.x = -0.55; f.rotation.z = x > 0 ? 0.25 : -0.25;
+    f.position.set(x, 0.9, -7.2);
+    const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), fixMat);
+    post.position.set(x, 0.25, -7.2);
+    g.add(f, post);
+  }
+
+  // ---- the Great River Road ------------------------------------------------
+  {
+    const roadTex = canvasTex(64, 512, (c, w, h) => {
+      const r = seeded(4);
+      c.fillStyle = '#3b3c3e'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 2500; i++) { const v = 45 + r() * 40; c.fillStyle = `rgba(${v},${v},${v + 2},0.6)`; c.fillRect(r() * w, r() * h, 1, 1); }
+      c.fillStyle = '#e9e6dc'; c.fillRect(2, 0, 2, h); c.fillRect(w - 4, 0, 2, h);
+      c.fillStyle = '#d9b43a'; c.fillRect(w / 2 - 2.5, 0, 1.6, h); c.fillRect(w / 2 + 0.9, 0, 1.6, h);
+    }, [1, 12]);
+    roadTex.rotation = Math.PI / 2;
+    const roadMat = new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.92 });
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, 8.4).rotateX(-Math.PI / 2), roadMat);
+    // map the texture along x
+    const ruv = road.geometry.attributes.uv;
+    for (let i = 0; i < ruv.count; i++) { const u = ruv.getX(i), v = ruv.getY(i); ruv.setXY(i, v, u); }
+    roadTex.rotation = 0; roadTex.repeat.set(1, 20);
+    road.position.set(0, 0.06, -1.6);
+    road.receiveShadow = true;
+    g.add(road);
+    const shoulder = mat(0x8a8272, { roughness: 1 });
+    const sh = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, 1.6).rotateX(-Math.PI / 2), shoulder);
+    sh.position.set(0, 0.045, -6.6);
+    sh.receiveShadow = true;
+    g.add(sh);
+    // W-beam guard rail on the river side
+    const steel = mat(0xa9adb0, { metalness: 0.7, roughness: 0.38 });
+    const railGeo = new THREE.BoxGeometry(X1 - X0 - 20, 0.32, 0.06);
+    const rail = new THREE.Mesh(railGeo, steel);
+    rail.position.set(0, 0.62, 3.6);
+    const rail2 = new THREE.Mesh(new THREE.BoxGeometry(X1 - X0 - 20, 0.05, 0.14), steel);
+    rail2.position.set(0, 0.62, 3.6);
+    g.add(rail, rail2);
+    const postMat = mat(0x7d8084, { metalness: 0.5, roughness: 0.5 });
+    const nP = Math.floor((X1 - X0 - 20) / 1.9);
+    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.15, 0.78, 0.15), postMat, nP);
+    const m4 = new THREE.Matrix4();
+    for (let i = 0; i < nP; i++) { m4.makeTranslation(X0 + 10 + i * 1.9 + 0.95, 0.39, 3.72); posts.setMatrixAt(i, m4); }
+    posts.castShadow = false;
+    g.add(posts);
+    // grassy verge toward the river/golf side
+    const verge = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, 8).rotateX(-Math.PI / 2), mat(0x587a38, { roughness: 1 }));
+    verge.position.set(0, 0.03, 6.8);
+    verge.receiveShadow = true;
+    g.add(verge);
+  }
+
+  // ---- bald eagles soaring along the bluff --------------------------------
+  const birds = [];
+  {
+    const dark = mat(0x3a2a1d, { roughness: 0.85, side: THREE.DoubleSide });
+    const white = mat(0xf1eee6, { roughness: 0.7 });
+    const beak = mat(0xe0a826, { roughness: 0.6 });
+    const wingShape = new THREE.Shape();
+    // right wing in the XZ plane (x outward, -z forward): broad, with fingered primaries
+    wingShape.moveTo(0, 0.18); wingShape.lineTo(0.35, 0.3); wingShape.lineTo(0.85, 0.28);
+    wingShape.lineTo(1.05, 0.22); wingShape.lineTo(1.18, 0.05); wingShape.lineTo(1.12, -0.03);
+    wingShape.lineTo(1.2, -0.12); wingShape.lineTo(1.08, -0.15); wingShape.lineTo(1.12, -0.25);
+    wingShape.lineTo(0.95, -0.27); wingShape.lineTo(0.6, -0.3); wingShape.lineTo(0.25, -0.22); wingShape.lineTo(0, -0.2);
+    const wingGeo = new THREE.ShapeGeometry(wingShape).rotateX(Math.PI / 2);
+    for (let k = 0; k < 3; k++) {
+      const b = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.SphereGeometry(0.16, 8, 6).scale(1, 0.9, 3), dark);
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.11, 8, 6), white);
+      head.position.set(0, 0.04, -0.5);
+      const bk = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.14, 6).rotateX(-Math.PI / 2), beak);
+      bk.position.set(0, 0.02, -0.64);
+      const tail = new THREE.Mesh(new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(-0.08, 0), new THREE.Vector2(0.08, 0), new THREE.Vector2(0.16, 0.38), new THREE.Vector2(-0.16, 0.38)])).rotateX(Math.PI / 2), white);
+      tail.position.set(0, 0, 0.38);
+      const wl = new THREE.Group(), wr = new THREE.Group();
+      wr.add(new THREE.Mesh(wingGeo, dark));
+      const lm = new THREE.Mesh(wingGeo, dark); lm.scale.x = -1; wl.add(lm);
+      b.add(body, head, bk, tail, wl, wr);
+      b.scale.setScalar(1.25); // ~2.3 m wingspan
+      b.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+      g.add(b);
+      birds.push({ b, wl, wr, cx: -40 + k * 45, cz: -22 + k * 2, rad: 34 + k * 14, h: 60 + k * 7, sp: (0.11 + k * 0.03) * (k % 2 ? -1 : 1), ph: k * 2.1 });
+    }
+  }
+
+  return {
+    group: g,
+    glow,
+    update(t, dt, day) {
+      washMat.opacity = 0.6 * (1 - day);
+      wash.visible = day < 0.98;
+      for (const e of birds) {
+        const a = e.ph + t * e.sp;
+        const s = Math.sign(e.sp);
+        e.b.position.set(e.cx + Math.cos(a) * e.rad, e.h + Math.sin(t * 0.23 + e.ph) * 4, e.cz + Math.sin(a) * Math.min(26, e.rad * 0.5));
+        e.b.rotation.set(0, -a + (s > 0 ? Math.PI : 0), 0);
+        e.b.rotateZ(-0.32 * s);
+        const flex = 0.08 + Math.sin(t * 1.3 + e.ph) * 0.04 + Math.max(0, Math.sin(t * 0.4 + e.ph * 3) - 0.85) * 2.2 * Math.sin(t * 9);
+        e.wr.rotation.z = flex; e.wl.rotation.z = -flex;
+      }
+    },
+  };
+}

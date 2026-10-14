@@ -6,6 +6,12 @@
 //  land()     turf thud / green "pat" / river splash
 //  ambience   crickets, river wind, the odd distant barge horn
 //  ui         ticks, pairing pings, success chime, error tones, PB flourish
+//
+// Recorded sounds (e.g. generated with ElevenLabs by tools/elevenlabs.mjs) can
+// replace any synthesized one: list them in assets/audio/manifest.json as
+// { "name": "file.mp3" }. Names: impact_driver, impact_iron, sand_blast,
+// splash, cheer, cup, ambience_day, ambience_night, plane. Missing files are
+// ignored and the synthesized sound plays as before.
 
 class AudioEngine {
   constructor() {
@@ -54,6 +60,47 @@ class AudioEngine {
 
     this.noise = this._noiseBuffer(2);
     this._startAmbience();
+    this._loadSamples();
+  }
+
+  async _loadSamples() {
+    this.samples = {};
+    let list;
+    try {
+      const r = await fetch('assets/audio/manifest.json', { cache: 'no-cache' });
+      if (!r.ok) return;
+      list = await r.json();
+    } catch { return; }
+    await Promise.all(Object.entries(list || {}).map(async ([name, file]) => {
+      try {
+        const r = await fetch(`assets/audio/${file}`);
+        if (!r.ok) return;
+        this.samples[name] = await this.ctx.decodeAudioData(await r.arrayBuffer());
+      } catch { /* bad file: keep the synth */ }
+    }));
+    // recorded ambience beds loop under the synthesized wind
+    this._beds = {};
+    for (const k of ['day', 'night']) {
+      const src = this._sample(`ambience_${k}`, 1, { out: this.amb, loop: true });
+      if (src) this._beds[k] = src;
+    }
+    this.setDaytime(this.daytime);
+  }
+
+  /** Play a recorded sample if one is loaded; false lets the synth play instead. */
+  _sample(name, gain = 1, { out = this.sfx, rate = 1, loop = false } = {}) {
+    const buf = this.samples?.[name];
+    if (!buf) return false;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = loop;
+    src.playbackRate.value = rate;
+    const g = this.ctx.createGain();
+    g.gain.value = Math.max(1e-4, gain);
+    src.connect(g).connect(out);
+    src.start();
+    src.gainNode = g;
+    return src;
   }
 
   setVolume(v) {
@@ -149,6 +196,7 @@ class AudioEngine {
     const q = Math.max(0, Math.min(1, quality));
     const loud = Math.min(1, speed / 70) * 0.9 + 0.1;
     const wood = clubId === 'DR' || clubId === '3W';
+    if (this._sample(wood ? 'impact_driver' : 'impact_iron', loud, { rate: 0.94 + q * 0.1 })) return;
     if (wood) {
       // titanium "tink-crack": bright broadband snap + metallic ring
       this._noise(t, 0.07, { type: 'highpass', freq: 2400, q: 0.7, gain: 0.95 * loud });
@@ -209,8 +257,39 @@ class AudioEngine {
     this._noise(t, 0.07, { type: 'lowpass', freq: 500, q: 0.7, gain: 0.35 * v });
   }
 
+  /** Ball crashing through a tree canopy: a rustle and a woody knock. */
+  leaves(speed = 20, distance = 100) {
+    if (!this.ok) return;
+    const t = this.ctx.currentTime;
+    const v = Math.min(1, speed / 40) * Math.max(0.15, 1 - distance / 400);
+    this._noise(t, 0.5, { type: 'bandpass', freq: 3800, freqEnd: 2200, q: 0.6, gain: 0.3 * v, attack: 0.01 });
+    this._noise(t + 0.05, 0.35, { type: 'highpass', freq: 6000, q: 0.5, gain: 0.12 * v });
+    if (speed > 15) this._tone(t + 0.02, 420 + Math.random() * 200, 0.06, { type: 'triangle', gain: 0.12 * v, freqEnd: 260 });
+  }
+
+  /** Explosion out of a bunker: a heavy thud and a long spray of sand. */
+  sandBlast(level = 1) {
+    if (!this.ok) return;
+    if (this._sample('sand_blast', level)) return;
+    const t = this.ctx.currentTime + 0.005;
+    this._tone(t, 95, 0.14, { gain: 0.45 * level, freqEnd: 50 });
+    this._noise(t, 0.09, { type: 'lowpass', freq: 700, q: 0.8, gain: 0.6 * level });
+    this._noise(t + 0.02, 0.9, { type: 'bandpass', freq: 3200, freqEnd: 1600, q: 0.6, gain: 0.34 * level, attack: 0.01 });
+    this._noise(t + 0.15, 1.1, { type: 'highpass', freq: 5200, q: 0.4, gain: 0.07 * level, attack: 0.05 });
+  }
+
+  /** A jet passing high overhead (ambient). */
+  plane(level = 0.5, seconds = 14) {
+    if (!this.ok) return;
+    if (this._sample('plane', level, { out: this.amb })) return;
+    const t = this.ctx.currentTime;
+    this._noise(t, seconds, { type: 'lowpass', freq: 380, freqEnd: 220, q: 0.6, gain: 0.16 * level, attack: seconds * 0.45, out: this.amb });
+    this._noise(t, seconds, { type: 'bandpass', freq: 900, freqEnd: 600, q: 1.2, gain: 0.03 * level, attack: seconds * 0.45, out: this.amb });
+  }
+
   splash(level = 0.5) {
     if (!this.ok) return;
+    if (this._sample('splash', level)) return;
     const t = this.ctx.currentTime;
     this._noise(t, 0.6, { type: 'bandpass', freq: 1800, freqEnd: 400, q: 0.8, gain: 0.5 * level, attack: 0.005 });
     this._noise(t + 0.03, 1.2, { type: 'lowpass', freq: 600, q: 0.5, gain: 0.3 * level, attack: 0.02 });
@@ -263,6 +342,7 @@ class AudioEngine {
    */
   cheer(level = 0.5) {
     if (!this.ok) return;
+    if (this._sample('cheer', 0.25 + level * 0.75)) return;
     const ctx = this.ctx;
     const t = ctx.currentTime + 0.12;
     const out = this.sfx;
@@ -313,7 +393,14 @@ class AudioEngine {
   // ── UI ──
 
   /** Day: birds instead of crickets. */
-  setDaytime(day) { this.daytime = !!day; }
+  setDaytime(day) {
+    this.daytime = !!day;
+    // crossfade recorded ambience beds, if any
+    if (!this.ctx) return;
+    for (const [k, src] of Object.entries(this._beds || {})) {
+      src.gainNode.gain.setTargetAtTime((k === 'day') === this.daytime ? 0.7 : 0.0001, this.ctx.currentTime, 1.5);
+    }
+  }
 
   /** Wind roar follows the weather. */
   setWind(mph) {

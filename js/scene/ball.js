@@ -1,7 +1,7 @@
 // Golf ball: real-size, with ~330 actual dimples in the geometry (close-ups on
-// the green and in the cup), a clear-coat finish for crisp highlights, a
-// screen-space glow so it stays readable 250 m out at night, and a soft
-// contact shadow. A plain sphere stands in once it's more than a few metres away.
+// the green and in the cup), a clear-coat finish for crisp highlights and a
+// soft contact shadow. In daylight it is simply a white ball; only after dark
+// (or in low light) does a faint halo keep it readable far out. A plain sphere stands in once it's more than a few metres away.
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BALL } from '../core/physics.js';
@@ -97,6 +97,7 @@ export class Ball {
       color: 0xffffff, roughness: 0.32, metalness: 0, normalMap: dimpleNormalMap(),
       normalScale: new THREE.Vector2(0.6, 0.6), emissive: 0x332a20, emissiveIntensity: 0.6,
     });
+    this._mats = [mat, far];
     const hi = new THREE.Mesh(dimpledGeometry(BALL.radius), mat);
     const lo = new THREE.Mesh(new THREE.SphereGeometry(BALL.radius, 24, 16), far);
     hi.castShadow = lo.castShadow = true;
@@ -161,6 +162,12 @@ export class Ball {
     this.shadow.material.opacity = Math.max(0, 0.82 - hgt * 0.03) * (y < gh - 0.005 ? 0 : 1);
   }
 
+  /** 1 = full daylight (no halo, no self-light) … 0 = night (subtle halo). */
+  setDay(d) {
+    this.day = d;
+    for (const m of this._mats) m.emissiveIntensity = 0.55 * (1 - d);
+  }
+
   /** Bigger on-screen glow for TV / projector viewing. */
   setScale(s) { this.glowScale = s; }
 
@@ -171,8 +178,10 @@ export class Ball {
     // shrinks with distance like a real object (a constant-size blob makes a
     // 300-yard ball look like it's 30 yards away), with a floor of a few
     // pixels so it never vanishes against the sky.
-    const a = THREE.MathUtils.smoothstep(d, 4, 18);
+    const low = 1 - THREE.MathUtils.smoothstep(this.day ?? 0, 0.25, 0.75);
+    const a = THREE.MathUtils.smoothstep(d, 4, 18) * 0.6 * low;
     this.glow.material.opacity = a;
+    this.glow.visible = this.visible && a > 0.01;
     const view = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
     const k = this.glowScale || 1;
     const px = Math.max(0.0042 * k, (0.3 * k) / Math.max(1e-3, d * view));

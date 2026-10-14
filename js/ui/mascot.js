@@ -9,7 +9,7 @@ const FACTS = [
   ['The Piasa', 'In 1673 Marquette and Jolliet recorded two painted monsters on the bluffs near here, in green, red and black.'],
   ['The Piasa', 'The original painting was lost to quarrying in the 1800s. The one on the bluff today is a recreation.'],
   ['The Piasa', 'Horns, red eyes, a beard and a tail ending in a fish fin. The wings came later, with the legend.'],
-  ['The Piasa', 'It has watched the Mississippi for a long time. It has opinions about your grip.'],
+  ['The Piasa', 'The present mural, 48 feet long and 22 feet high, was painted on the bluff in 1999 and is touched up regularly.'],
 ];
 
 export class PiasaMascot {

@@ -172,6 +172,53 @@ export class HUD {
     el.classList.add('show');
   }
 
+  /** Lie chip in the turn banner: {kind, label, note} or null. */
+  setLie(lie) {
+    const el = $('#tbLie');
+    if (!el) return;
+    if (!lie) { el.hidden = true; return; }
+    el.hidden = false;
+    el.dataset.lie = lie.kind;
+    el.innerHTML = `<b>${escape(lie.label)}</b>${lie.note ? `<span>${escape(lie.note)}</span>` : ''}`;
+  }
+
+  /** Mulligan button: null hides it, otherwise {left} (Infinity = unlimited). */
+  setMulligan(state) {
+    const b = $('#mulliganButton');
+    if (!b) return;
+    b.hidden = !state;
+    if (state) $('#mullLeft').textContent = state.left === Infinity ? '' : `${state.left} left`;
+  }
+
+  /**
+   * Choice sheet (penalty decisions). options: [{key, label, sub, primary, fn}].
+   * Returns a close function.
+   */
+  showDecision({ kicker, title, sub, options }) {
+    const el = $('#decision');
+    if (!el) return () => {};
+    $('#decKicker').textContent = kicker || '';
+    $('#decTitle').textContent = title;
+    $('#decSub').textContent = sub || '';
+    const box = $('#decOptions');
+    box.innerHTML = options.map((o, i) => `<button class="dec-opt ${o.primary ? 'primary' : ''}" data-i="${i}">
+      <span class="dec-key">${escape(o.key)}</span><span class="dec-text"><b>${escape(o.label)}</b><small>${escape(o.sub || '')}</small></span></button>`).join('');
+    box.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => options[Number(b.dataset.i)].fn()));
+    el.hidden = false;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    box.querySelector('.primary')?.focus({ preventScroll: true });
+    return () => this.hideDecision();
+  }
+
+  hideDecision() {
+    const el = $('#decision');
+    if (el) { el.hidden = true; el.classList.remove('show'); }
+  }
+
+  get decisionOpen() { const el = $('#decision'); return !!el && !el.hidden; }
+
   // ── multiplayer layer ──
 
   /** Whose turn it is. info = {name, color, team, detail} */
@@ -243,6 +290,7 @@ export class HUD {
       <div class="hc-stats"><div><b>Par ${h.par}</b></div><div><b>${U.isMetric() ? Math.round(h.yards * YD) : h.yards}</b> ${U.distUnit()}</div>${h.wind ? `<div>${h.wind}</div>` : ''}</div>
       ${h.note ? `<p class="hc-note">${escape(h.note)}</p>` : ''}
       ${h.rings ? `<div class="hc-rings"><span class="ring-gold"></span><span class="ring-white"></span>${escape(h.rings)}</div>` : ''}
+      ${h.rules ? `<div class="hc-rules">${escape(h.rules)}</div>` : ''}
       <div class="hc-skip">Tap or press Enter to skip</div>`;
     el.dataset.visible = 'true';
   }

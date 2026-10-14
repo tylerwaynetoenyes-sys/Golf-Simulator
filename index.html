@@ -158,7 +158,7 @@
     <!-- bottom: prompt + swing meter -->
     <div class="bottom-center">
       <div class="turn-banner glass" id="turnBanner" data-visible="false">
-        <span class="tb-dot"></span><span class="tb-name" id="tbName"></span><span class="tb-team" id="tbTeam" hidden></span><span class="tb-detail" id="tbDetail" hidden></span>
+        <span class="tb-dot"></span><span class="tb-name" id="tbName"></span><span class="tb-team" id="tbTeam" hidden></span><span class="tb-detail" id="tbDetail" hidden></span><span class="tb-lie" id="tbLie" hidden></span>
       </div>
       <div class="prompt" id="prompt">
         <span class="prompt-key">Space</span> hold to swing, release to hit · <span class="prompt-key">← →</span> aim
@@ -176,9 +176,18 @@
         <button class="btn btn-swing" id="swingButton" aria-label="Hold to swing">Hold to swing</button>
         <button class="btn btn-primary" id="autoPuttButton" hidden title="Putt with a Tour-average stroke (Enter)">Auto putt</button>
         <button class="btn btn-quiet" id="manualButton" title="Enter launch numbers">Custom shot</button>
+        <button class="btn btn-quiet btn-mull" id="mulliganButton" hidden title="Replay the last shot from the same spot (U)">Mulligan <small id="mullLeft"></small></button>
         <button class="btn btn-quiet" id="skipButton" hidden>Skip ›</button>
       </div>
     </div>
+
+    <!-- penalty decision: ball in the water -->
+    <section class="decision glass-strong" id="decision" hidden aria-live="assertive" role="dialog" aria-labelledby="decTitle">
+      <div class="dec-kicker" id="decKicker">Penalty area</div>
+      <h2 class="dec-title" id="decTitle">In the water</h2>
+      <p class="dec-sub" id="decSub">Choose how to continue.</p>
+      <div class="dec-options" id="decOptions"></div>
+    </section>
 
     <!-- floating target marker (projected from 3D) -->
     <div class="pin-label" id="pinLabel" hidden><span class="pin-dist" id="pinDist"></span><span class="pin-stem"></span></div>
@@ -196,7 +205,7 @@
         <svg viewBox="0 0 120 70"><path d="M10 66 Q60 -26 110 66" fill="none" stroke="url(#archGrad)" stroke-width="5" stroke-linecap="round"/><defs><linearGradient id="archGrad" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffd7a1"/><stop offset="1" stop-color="#fff6e6"/></linearGradient></defs></svg>
       </div>
       <h1 class="launch-title">Alton Range</h1>
-      <p class="launch-tag">A night range on the bluffs above the Mississippi.<br />The Arch is on the horizon. The lights are on.</p>
+      <p class="launch-tag">A golf simulator on the bluffs above the Mississippi.<br />Range practice and an 18-hole course through St. Louis and Alton.</p>
 
       <div class="launch-actions">
         <button class="btn btn-primary btn-xl" id="pairButton">

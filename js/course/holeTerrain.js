@@ -68,6 +68,8 @@ export class HoleTerrain {
       return { x: p.x + p.rx * off, z: p.z + p.rz * off, dirx: p.dx, dirz: p.dz };
     };
     this.bunkers = (hole.bunkers || []).map((b) => ({ ...place(b.t, b.off), rx: b.rx, rz: b.rz }));
+    // shaping: mounds (+) and hollows (−) as soft Gaussian landforms
+    this.mounds = (hole.mounds || []).map((m) => ({ ...place(m.t, m.off), r: m.r, h: m.h }));
     this.ponds = [];
     this.creeks = [];
     for (const w of hole.water || []) {
@@ -75,8 +77,20 @@ export class HoleTerrain {
         this.creeks.push({ s: w.creek * this.length, half: w.width / 2, level: this.elevAt(w.creek) - 1.2 });
       } else {
         const p = place(w.t, w.off);
-        this.ponds.push({ ...p, rx: w.rx, rz: w.rz, level: this.elevAt(w.t) + (w.level ?? -1), island: !!w.island });
+        this.ponds.push({ ...p, rx: w.rx, rz: w.rz, level: this.elevAt(w.t) + (w.level ?? -1), off: w.level ?? -1, island: !!w.island });
       }
+    }
+    // shaped ground (side slopes, mounds) can dip below a pond's nominal
+    // level: sit the water a little under the lowest point of its banks
+    for (const p of this.ponds) {
+      let lo = Infinity;
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+        const ex = Math.cos(a) * p.rx * 1.05, ez = Math.sin(a) * p.rz * 1.05;
+        const x = p.x + ex * -p.dirz + ez * p.dirx, z = p.z + ex * p.dirx + ez * p.dirz;
+        if (p.island && Math.hypot(x - this.green.x, z - this.green.z) < this.greenR + 4) continue;
+        lo = Math.min(lo, this._land(x, z, this.project(x, z)));
+      }
+      if (Number.isFinite(lo)) p.level = Math.min(p.level, lo + Math.min(-0.5, p.off));
     }
   }
 
@@ -121,6 +135,20 @@ export class HoleTerrain {
     return e[e.length - 1][1];
   }
 
+  /** Cross slope (camber) at t: rise per metre to the golfer's right. */
+  tiltAt(t) {
+    const e = this.hole.tilt;
+    if (!e || !e.length) return 0;
+    if (t <= e[0][0]) return e[0][1];
+    for (let i = 0; i < e.length - 1; i++) {
+      if (t <= e[i + 1][0]) {
+        const k = (t - e[i][0]) / (e[i + 1][0] - e[i][0]);
+        return e[i][1] + (e[i + 1][1] - e[i][1]) * k * k * (3 - 2 * k);
+      }
+    }
+    return e[e.length - 1][1];
+  }
+
   _ellipse(o, x, z) {
     const dx = x - o.x, dz = z - o.z;
     const along = dx * o.dirx + dz * o.dirz;
@@ -138,6 +166,19 @@ export class HoleTerrain {
     h += 1.8 * smooth(corridor + 4, corridor + 40, ad) + 2.5 * smooth(corridor + 40, corridor + 110, ad);
     h += (vnoise(x * 0.025, z * 0.025) - 0.5) * 1.6 * smooth(4, corridor + 10, ad);
     h += (vnoise(x * 0.09, z * 0.09) - 0.5) * 0.35;
+    // side slope across the hole (fairways that cant toward a hazard), eased
+    // out well beyond the corridor
+    const tilt = this.tiltAt(Math.min(1, Math.max(0, t)));
+    if (tilt) {
+      const lim = corridor + 70;
+      const dd = Math.max(-lim, Math.min(lim, pr.d));
+      h += tilt * dd;
+    }
+    // mounds and hollows
+    for (const m of this.mounds) {
+      const q = ((x - m.x) ** 2 + (z - m.z) ** 2) / (2 * m.r * m.r);
+      if (q < 9) h += m.h * Math.exp(-q);
+    }
     // tee box: flat pad
     const dt = Math.hypot(x - this.tee.x, z - this.tee.z);
     const teeW = smooth(7, 3, dt);
@@ -220,6 +261,18 @@ export class HoleTerrain {
     else surface = 'rough';
     return { height: w && w.q < 1.3 ? Math.max(land, w.level) : land, surface };
   };
+
+  /**
+   * Rough depth at (x, z): 'first' (the first cut, a few metres off the
+   * fairway or green) or 'deep'. Only meaningful where the surface is rough.
+   */
+  roughDepth(x, z) {
+    const pr = this.project(x, z);
+    const ad = Math.abs(pr.d);
+    const edge = this.fwHalf > 0 && pr.s > this.fwStart && pr.s < this.length ? this.fairwayHalf(pr.s) : 0;
+    const gd = Math.hypot(x - this.green.x, z - this.green.z) - this.greenR;
+    return (edge > 0 && ad - edge < 4.5) || gd < 5 ? 'first' : 'deep';
+  }
 
   fairwayHalf(s) {
     // organic width: narrows a touch into the green, wobbles

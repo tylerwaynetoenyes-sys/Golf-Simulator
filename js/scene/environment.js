@@ -216,6 +216,8 @@ export class Environment {
     w.skyline.setDay(d);
     w.range.setDay(d);
     w.tracer.setDay(d);
+    w.ball?.setDay?.(d);
+    w.ambient?.setDay?.(d);
     w.course?.setDay?.(d);
     const windAmt = Math.min(1, this.weather.windMph / 18);
     w.range.setWind(windAmt, this.windFromDeg);

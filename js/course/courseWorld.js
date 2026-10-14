@@ -8,6 +8,7 @@ import { createWaterMaterial, waterMaterials } from '../scene/river.js';
 import { makeFlag, lightConeMaterial } from '../scene/rangeProps.js';
 import { CUP } from '../core/physics.js';
 import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
+import { plantTrees, updateTrees } from '../scene/trees.js';
 
 const C = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
 const COL = {
@@ -46,10 +47,6 @@ export class CourseWorld {
     this.day = 0;
     this.wind = 0.3;
     this.windFrom = 200;
-    this.conGeo = new THREE.ConeGeometry(1, 1, 7).translate(0, 0.5, 0);
-    this.decGeo = new THREE.IcosahedronGeometry(1, 1).translate(0, 0.9, 0);
-    this.treeMatA = new THREE.MeshStandardMaterial({ color: 0x244022, roughness: 0.92, flatShading: true });
-    this.treeMatB = new THREE.MeshStandardMaterial({ color: 0x324d26, roughness: 0.92, flatShading: true });
     this.detail = this._detailTexture();
   }
 
@@ -78,7 +75,7 @@ export class CourseWorld {
     if (this.holeGroup) {
       this.root.remove(this.holeGroup);
       this.holeGroup.traverse((o) => {
-        if (o.geometry && o.geometry !== this.conGeo && o.geometry !== this.decGeo) o.geometry.dispose();
+        if (o.geometry && !o.geometry.userData.shared) o.geometry.dispose();
       });
     }
     this.hole = hole;
@@ -192,9 +189,10 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     // ── tee markers + pin ──
     const teeY = T.teeHeight;
     const markerMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.4 });
-    for (const sx of [-3, 3]) {
-      const mk = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12), markerMat);
-      mk.position.set(sx, teeY + 0.1, -0.6);
+    // tee markers a few yards ahead of the ball, out of the address camera's face
+    for (const sx of [-3.2, 3.2]) {
+      const mk = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), markerMat);
+      mk.position.set(sx, teeY + 0.08, -3.4);
       mk.castShadow = true;
       g.add(mk);
     }
@@ -249,54 +247,83 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     const lmBox = new THREE.Box3().setFromObject(holder).expandByScalar(5);
     const inLandmark = (x, z) => x > lmBox.min.x && x < lmBox.max.x && z > lmBox.min.z && z < lmBox.max.z;
 
-    // ── trees ──
-    const N = 520;
-    const con = new THREE.InstancedMesh(this.conGeo, this.treeMatA, N);
-    const dec = new THREE.InstancedMesh(this.decGeo, this.treeMatB, N);
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p3 = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    let nc = 0, nd = 0;
-    // canopy index for camera collision: 20 m buckets of {x, z, r, top}
+    // ── trees: natural stands of oak, maple, sycamore and cedar ──
     this.treeGrid = new Map();
-    const addTree = (x, z, r, top) => {
-      const k = `${Math.floor(x / 20)},${Math.floor(z / 20)}`;
-      if (!this.treeGrid.has(k)) this.treeGrid.set(k, []);
-      this.treeGrid.get(k).push({ x, z, r, top });
-    };
-    for (let i = 0; i < N * 4 && (nc < N || nd < N); i++) {
-      const x = b.minx + rand() * (b.maxx - b.minx);
-      const z = b.minz + rand() * (b.maxz - b.minz);
+    this.treeList = [];
+    const treeSpots = [];
+    const ok = (x, z, clear) => {
       const pr = T.project(x, z);
-      const corridor = Math.max(T.fwHalf, 14) + 24 + rand() * 18;
-      const nearGreen = Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 30;
-      const nearTee = Math.hypot(x, z) < 25;
-      if (Math.abs(pr.d) < corridor || nearGreen || nearTee || inLandmark(x, z)) continue;
-      if (T.terrain(x, z).surface === 'water') continue;
-      const y = T.meshHeight(x, z);
-      q.setFromAxisAngle(up, rand() * 6.28);
-      if (rand() < 0.45) {
-        if (nc >= N) continue;
-        const h = 10 + rand() * 12;
-        sc.set(2.6 + rand() * 2, h, 2.6 + rand() * 2);
-        con.setMatrixAt(nc++, m4.compose(p3.set(x, y - 0.3, z), q, sc));
-        addTree(x, z, sc.x, y - 0.3 + h);
-      } else {
-        if (nd >= N) continue;
-        const r = 4 + rand() * 4;
-        sc.set(r, r * (0.9 + rand() * 0.4), r);
-        dec.setMatrixAt(nd++, m4.compose(p3.set(x, y + r * 0.4, z), q, sc));
-        addTree(x, z, r, y + r * 0.4 + sc.y * 1.9);
+      if (Math.abs(pr.d) < clear) return false;
+      if (Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 24) return false;
+      if (Math.hypot(x, z) < 22) return false;
+      if (inLandmark(x, z)) return false;
+      const sf = T.terrain(x, z).surface;
+      return sf !== 'water' && sf !== 'sand' && sf !== 'green' && sf !== 'fairway' && sf !== 'tee';
+    };
+    const plant = (x, z, variant, big = 1) => {
+      treeSpots.push({
+        x, z, y: T.meshHeight(x, z) - 0.25, variant, rot: rand() * 6.28,
+        scale: (0.78 + rand() * 0.5) * big, squash: 0.85 + rand() * 0.3,
+        hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(),
+      });
+    };
+    const quality = this.treeDensity ?? 1;
+    const corridor = Math.max(T.fwHalf, 14);
+    // stands along both sides: species-grouped clusters at varying depth
+    for (const side of [-1, 1]) {
+      for (let s = -30; s < T.length + 70; s += 26 + rand() * 26) {
+        if (rand() < 0.18) continue; // glades
+        const pt = T.pointAt(s);
+        const depth = corridor + 18 + rand() * 70;
+        const cx = pt.x + pt.rx * depth * side, cz = pt.z + pt.rz * depth * side;
+        const n = Math.round((3 + rand() * 8) * quality);
+        const rad = 8 + rand() * 16;
+        const species = rand() < 0.22 ? 4 + Math.floor(rand() * 2) : Math.floor(rand() * 4);
+        for (let i = 0; i < n; i++) {
+          const a = rand() * 6.28, r = Math.sqrt(rand()) * rad;
+          const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+          if (!ok(x, z, corridor + 14)) continue;
+          plant(x, z, rand() < 0.8 ? species : Math.floor(rand() * 6));
+        }
+      }
+      // a dark backdrop belt toward the boundary
+      for (let s = -40; s < T.length + 90; s += 9 + rand() * 7) {
+        const pt = T.pointAt(s);
+        const depth = T.oobLateral - 8 + rand() * 40;
+        const x = pt.x + pt.rx * depth * side, z = pt.z + pt.rz * depth * side;
+        if (ok(x, z, corridor + 30)) plant(x, z, rand() < 0.3 ? 4 + Math.floor(rand() * 2) : Math.floor(rand() * 4), 1.15);
       }
     }
-    con.count = nc; dec.count = nd;
-    // no two trees quite the same green
-    const tc = new THREE.Color();
-    for (let i = 0; i < nc; i++) con.setColorAt(i, tc.setHSL(0.3 + rand() * 0.06, 0.35 + rand() * 0.2, 0.75 + rand() * 0.45));
-    for (let i = 0; i < nd; i++) dec.setColorAt(i, tc.setHSL(0.22 + rand() * 0.1, 0.4 + rand() * 0.25, 0.7 + rand() * 0.5));
-    if (con.instanceColor) con.instanceColor.needsUpdate = true;
-    if (dec.instanceColor) dec.instanceColor.needsUpdate = true;
-    con.receiveShadow = dec.receiveShadow = true;
-    con.castShadow = dec.castShadow = true;
-    g.add(con, dec);
+    // specimen trees that come into play: big oaks a little off the fairway
+    for (let s = 150; s < T.length - 60; s += 70 + rand() * 60) {
+      const side = rand() < 0.5 ? -1 : 1;
+      const pt = T.pointAt(s);
+      const d = corridor + 6 + rand() * 8;
+      const x = pt.x + pt.rx * d * side, z = pt.z + pt.rz * d * side;
+      if (ok(x, z, corridor + 4)) plant(x, z, rand() < 0.5 ? 0 : 3, 1.25);
+    }
+    // the hole's own stands (dogleg corners, framing)
+    for (const st of hole.trees || []) {
+      const pt = T.pointAt(st.t * T.length);
+      const cx = pt.x + pt.rx * st.off, cz = pt.z + pt.rz * st.off;
+      for (let i = 0; i < (st.n || 8); i++) {
+        const a = rand() * 6.28, r = Math.sqrt(rand()) * (st.r || 12);
+        const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+        if (ok(x, z, Math.max(T.fwHalf + 3, 8))) plant(x, z, st.species ?? Math.floor(rand() * 4), 1.1);
+      }
+    }
+    const forest = plantTrees(treeSpots);
+    g.add(forest.group);
+    for (const t of forest.records) {
+      const key = `${Math.floor(t.x / 20)},${Math.floor(t.z / 20)}`;
+      if (!this.treeGrid.has(key)) this.treeGrid.set(key, []);
+      t.id = this.treeList.length;
+      this.treeList.push(t);
+      this.treeGrid.get(key).push(t);
+    }
+
+    // ── long grass in the rough: tufts thicken away from the fairway ──
+    this._buildRoughGrass(T, g, rand, b);
 
     // ── yardage stakes: 100 red, 150 white, 200 blue, 250 yellow (to the green) ──
     this._buildStakes(T, g);
@@ -665,6 +692,20 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
   /** Is a floodlight mast within r metres of (x, z)? (keeps cameras from parking behind one) */
   nearPole = (x, z, r = 4) => (this.poles || []).some((p) => Math.hypot(p.x - x, p.z - z) < r);
 
+  /** The tree canopy containing (x, y, z), if any (ball collision). */
+  treeHit = (x, y, z) => {
+    if (!this.treeGrid) return null;
+    const list = this.treeGrid.get(`${Math.floor(x / 20)},${Math.floor(z / 20)}`);
+    if (!list) return null;
+    for (const t of list) {
+      if (y > t.top || y < t.y0) continue;
+      const u = (y - t.y0) / Math.max(1, t.top - t.y0);
+      const r = t.kind === 'cedar' ? t.r * (1 - u * 0.85) : t.r * 0.82 * Math.sin(Math.PI * Math.min(1, 0.25 + u * 0.8));
+      if (Math.hypot(x - t.x, z - t.z) < r) return t;
+    }
+    return null;
+  };
+
   /** Lowest camera height that stays out of any tree canopy at (x, z). */
   cameraClear = (x, z) => {
     if (!this.treeGrid) return -Infinity;
@@ -681,6 +722,48 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
     }
     return y;
   };
+
+  _buildRoughGrass(T, g, rand, b) {
+    if (!this.tuftGeo) {
+      // a tuft: five blades fanned around the centre, darker at the root
+      const pos = [], col = [];
+      for (let i = 0; i < 5; i++) {
+        const a = (i / 5) * Math.PI * 2 + 0.3;
+        const lean = 0.35;
+        const ca = Math.cos(a), sa = Math.sin(a);
+        const w = 0.045;
+        pos.push(-sa * w, 0, ca * w, sa * w, 0, -ca * w, ca * lean * 0.5, 1, sa * lean * 0.5);
+        col.push(0.45, 0.5, 0.42, 0.45, 0.5, 0.42, 1.05, 1.1, 0.85);
+      }
+      this.tuftGeo = new THREE.BufferGeometry();
+      this.tuftGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      this.tuftGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+      this.tuftGeo.computeVertexNormals();
+      this.tuftGeo.userData.shared = true;
+      this.tuftMat = new THREE.MeshStandardMaterial({ color: 0x5f7f34, vertexColors: true, side: THREE.DoubleSide, roughness: 0.95 });
+    }
+    const N = Math.round(9000 * (this.treeDensity ?? 1));
+    const tufts = new THREE.InstancedMesh(this.tuftGeo, this.tuftMat, N);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    let n = 0;
+    for (let i = 0; i < N * 3 && n < N; i++) {
+      const s = -10 + rand() * (T.length + 40);
+      const pt = T.pointAt(s);
+      const edge = T.fwHalf > 0 && s > T.fwStart && s < T.length ? T.fairwayHalf(s) : Math.max(6, T.greenR * 0.6);
+      const d = (edge + 2 + Math.pow(rand(), 1.6) * 42) * (rand() < 0.5 ? -1 : 1);
+      const x = pt.x + pt.rx * d, z = pt.z + pt.rz * d;
+      if (T.terrain(x, z).surface !== 'rough') continue;
+      if (Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 3) continue;
+      const deep = T.roughDepth(x, z) === 'deep';
+      const h = (deep ? 0.22 : 0.12) + rand() * (deep ? 0.18 : 0.06);
+      q.setFromAxisAngle(up, rand() * 6.28);
+      sc.set(1 + rand() * 0.6, h, 1 + rand() * 0.6);
+      tufts.setMatrixAt(n++, m4.compose(p.set(x, this._coarseH(x, z) - 0.02, z), q, sc));
+    }
+    tufts.count = n;
+    tufts.receiveShadow = true;
+    g.add(tufts);
+  }
 
   _buildStakes(T, g) {
     const YDM = 0.9144;
@@ -772,6 +855,8 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       }
     }
     if (this.ring) this.ring.userData.update(dt, t);
+    if (this.landmark?.update) this.landmark.update(t, dt, this.day);
+    updateTrees(t, this.wind);
     if (this.rings) {
       const u = this.rings.material.uniforms;
       u.uTime.value = t;

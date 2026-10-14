@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = {
   timeOfDay: 'night', // night | day
   weather: 'clear', // clear | cloudy | breezy | windy
   rings: 'standard', // putting rings: tight | standard | generous
+  mulligans: 'nine', // off | nine | hole | free
   courseLength: 9,
   courseStart: 1,
 };

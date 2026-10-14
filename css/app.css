@@ -605,3 +605,76 @@ body.tv #vignette { background: radial-gradient(130% 100% at 50% 45%, transparen
 body.tv .popover { top: 64px; }
 @media (max-width: 1300px) { body.tv { --tvz: 1.2; } }
 
+
+/* ───────── Lie chip, mulligan, penalty decision ───────── */
+.tb-lie { display: inline-flex; align-items: baseline; gap: 8px; padding: 3px 10px 3px 9px; margin-left: 2px; border-radius: 999px; font-size: 12.5px; background: var(--lie-bg, rgba(255, 255, 255, 0.08)); color: var(--lie-fg, var(--text)); border: 1px solid var(--lie-line, transparent); animation: chipIn 0.5s var(--ease) both; }
+.tb-lie b { font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-size: 11.5px; }
+.tb-lie span { color: color-mix(in srgb, var(--lie-fg, #fff) 72%, transparent); font-size: 12px; }
+.tb-lie[data-lie="fairway"] { --lie-bg: rgba(116, 200, 110, 0.14); --lie-fg: #b9efb0; }
+.tb-lie[data-lie="first"] { --lie-bg: rgba(170, 196, 96, 0.16); --lie-fg: #dbeaa6; }
+.tb-lie[data-lie="rough"] { --lie-bg: rgba(214, 160, 62, 0.2); --lie-fg: #ffd58e; --lie-line: rgba(255, 196, 102, 0.45); }
+.tb-lie[data-lie="sand"] { --lie-bg: rgba(232, 208, 150, 0.2); --lie-fg: #f6e3b4; --lie-line: rgba(246, 227, 180, 0.4); }
+@keyframes chipIn { from { opacity: 0; transform: translateY(3px) scale(0.96); } to { opacity: 1; transform: none; } }
+.btn-mull { color: var(--amber-hi); border-color: rgba(255, 196, 120, 0.3); }
+.btn-mull small { color: var(--text-3); font-weight: 500; font-size: 12px; }
+.btn-mull:not([hidden]) { animation: chipIn 0.4s var(--ease) both; }
+.hc-rules { margin-top: 6px; font-size: 12.5px; color: var(--text-3); }
+
+.decision { position: absolute; left: 50%; top: 50%; width: min(520px, calc(100vw - 32px)); transform: translate(-50%, -46%) scale(0.97); opacity: 0; border-radius: 24px; padding: 22px 22px 18px; box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.65); z-index: 30; }
+.decision.show { animation: decIn 0.45s var(--spring) forwards; }
+@keyframes decIn { to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+.dec-kicker { font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--blue); font-weight: 700; }
+.dec-title { margin: 4px 0 2px; font-size: 26px; letter-spacing: -0.01em; }
+.dec-sub { margin: 0 0 14px; color: var(--text-2); font-size: 14px; }
+.dec-options { display: grid; gap: 8px; }
+.dec-opt { display: flex; align-items: center; gap: 14px; text-align: left; padding: 12px 14px; border-radius: 16px; border: 1px solid var(--hairline-strong); background: rgba(255, 255, 255, 0.05); cursor: pointer; transition: background 0.2s, transform 0.2s var(--ease), border-color 0.2s; }
+.dec-opt:hover, .dec-opt:focus-visible { background: rgba(255, 255, 255, 0.1); transform: translateY(-1px); outline: none; border-color: rgba(255, 255, 255, 0.25); }
+.dec-opt:active { transform: scale(0.985); }
+.dec-opt.primary { border-color: rgba(111, 183, 255, 0.5); background: rgba(111, 183, 255, 0.12); }
+.dec-key { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-weight: 700; font-size: 13px; background: rgba(255, 255, 255, 0.1); flex: none; font-family: var(--mono); }
+.dec-text { display: flex; flex-direction: column; gap: 2px; }
+.dec-text b { font-size: 15.5px; }
+.dec-text small { color: var(--text-2); font-size: 12.5px; }
+body.tv .decision { width: min(680px, calc(100vw - 48px)); }
+body.tv .dec-title { font-size: 34px; }
+body.tv .dec-text b { font-size: 20px; }
+body.tv .dec-text small { font-size: 15px; }
+body.tv .tb-lie { font-size: 15px; }
+@media (prefers-reduced-motion: reduce) { .decision.show { animation: none; opacity: 1; transform: translate(-50%, -50%); } .tb-lie, .btn-mull:not([hidden]) { animation: none; } }
+
+/* ───────── Design system v2 (see docs/design-notes.md) ─────────
+   Apple-style materials: deeper blur with saturation, a hairline highlight on
+   the top edge, layered soft shadows. Motion on three durations and two
+   curves; everything moves with purpose and respects reduced motion. */
+:root {
+  --s-1: 4px; --s-2: 8px; --s-3: 12px; --s-4: 16px; --s-5: 24px; --s-6: 32px; --s-7: 48px;
+  --t-caption: 12px; --t-body: 14px; --t-callout: 16px; --t-title3: 20px; --t-title2: 26px; --t-title1: 34px;
+  --dur-1: 140ms; --dur-2: 260ms; --dur-3: 480ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --fairway: #7fd18a;
+  --water: #6fb7ff;
+  --sand: #f2deb0;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.25), 0 8px 24px -8px rgba(0, 0, 0, 0.45);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.25), 0 24px 60px -18px rgba(0, 0, 0, 0.6);
+  --edge: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+}
+.glass { backdrop-filter: blur(24px) saturate(170%); -webkit-backdrop-filter: blur(24px) saturate(170%); box-shadow: var(--edge), var(--shadow-1); }
+.glass-strong { backdrop-filter: blur(32px) saturate(180%); -webkit-backdrop-filter: blur(32px) saturate(180%); box-shadow: var(--edge), var(--shadow-2); }
+/* daylight: a touch more opacity so text holds against a bright sky */
+body.day { --glass: rgba(14, 18, 26, 0.64); --glass-strong: rgba(14, 18, 26, 0.88); }
+.btn { transition: transform var(--dur-2) var(--spring), background var(--dur-1), box-shadow var(--dur-2) var(--ease-out), opacity var(--dur-1), color var(--dur-1); }
+.btn:active { transform: scale(0.96); transition-duration: var(--dur-1); }
+.club { transition: background var(--dur-2) var(--ease-out), color var(--dur-1), transform var(--dur-2) var(--spring); }
+.club:hover { background: rgba(255, 255, 255, 0.05); color: var(--text); }
+.club[aria-pressed="true"] { transform: translateX(2px); }
+.shot-card { transition: transform var(--dur-3) var(--ease-out), opacity var(--dur-2) var(--ease-out); }
+.shot-card[data-visible="false"] { transform: translateX(24px) scale(0.985); }
+.hero-value { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.toast { box-shadow: var(--edge), var(--shadow-1); }
+.mode-title, .tb-name, .dec-title { letter-spacing: -0.005em; }
+.icon-btn { transition: color var(--dur-1), background var(--dur-2) var(--ease-out), transform var(--dur-2) var(--spring); }
+.icon-btn:active { transform: scale(0.92); }
+:focus-visible { outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; }
+}
