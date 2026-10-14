@@ -124,18 +124,48 @@ export default function build() {
 
   // ---------- Robert Wadlow ----------
   const WX = -5.4, WZ = -1.2;
-  B.add(M(new THREE.BoxGeometry(2.2, 0.32, 1.8), granite, WX, 0.16 + 0.16, WZ));
-  B.add(M(new THREE.BoxGeometry(2.3, 0.06, 1.9), graniteDark, WX, 0.5, WZ));
-  figureWadlow(new THREE.Matrix4().compose(V(WX, 0.53, WZ), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.12, 0)), V(1, 1, 1)));
-  plaque(WX, 0.34, WZ + 0.91, 0.42, 0.22);
+  // (from Tyler's photographs) a broad grey granite plinth, its front face
+  // cut with his name and dates; granite benches and sloped tablets nearby
+  const inscr = new THREE.MeshStandardMaterial({
+    roughness: 0.6,
+    map: canvasTex(512, 96, (c, w, h) => {
+      c.fillStyle = '#8f8d88'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 1500; i++) { const v = 110 + Math.random() * 60; c.fillStyle = `rgba(${v},${v},${v - 4},0.5)`; c.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5); }
+      c.fillStyle = '#d9c9a0'; c.textAlign = 'center';
+      c.font = '600 34px Georgia, serif'; c.fillText('ROBERT PERSHING WADLOW', w / 2, 42);
+      c.font = '500 24px Georgia, serif'; c.fillText('FEBRUARY 22, 1918 — JULY 15, 1940', w / 2, 78);
+    }),
+  });
+  B.add(M(new THREE.BoxGeometry(2.7, 0.46, 2.3), granite, WX, 0.15 + 0.23, WZ));
+  B.add(M(new THREE.PlaneGeometry(2.4, 0.42), inscr, WX, 0.38, WZ + 1.152));
+  figureWadlow(new THREE.Matrix4().compose(V(WX, 0.61, WZ), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.12, 0)), V(1, 1, 1)));
+  for (const [x, z, ry] of [[WX - 3.6, WZ - 2.6, 0.3], [WX + 2.6, WZ - 3.0, -0.2]]) {
+    for (const dx of [-0.7, 0.7]) B.add(M(new THREE.BoxGeometry(0.3, 0.42, 0.42), granite, x + dx * Math.cos(ry), 0.36, z - dx * Math.sin(ry), 0, ry, 0));
+    B.add(M(new THREE.BoxGeometry(1.9, 0.12, 0.5), granite, x, 0.62, z, 0, ry, 0));
+  }
+  for (const [x, ry] of [[WX - 4.6, 0.5], [WX + 4.0, -0.5]]) B.add(M(new THREE.BoxGeometry(1.4, 0.5, 0.9), granite, x, 0.35, WZ + 1.6, -0.35, ry, 0));
   // his armchair (replica, bronze)
   chair(new THREE.Matrix4().compose(V(WX - 2.4, 0.14, WZ + 0.1), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.25, 0)), V(1, 1, 1)));
 
   // ---------- Miles Davis ----------
   const MX = 6, MZ = -1.2, PH = 0.95;
-  B.add(M(new THREE.BoxGeometry(1.8, 0.12, 1.8), graniteDark, MX, 0.2, MZ));
-  B.add(M(new THREE.BoxGeometry(1.5, PH - 0.2, 1.5), graniteDark, MX, 0.26 + (PH - 0.2) / 2, MZ));
-  B.add(M(new THREE.BoxGeometry(1.66, 0.1, 1.66), graniteDark, MX, PH + 0.11, MZ));
+  // (from Tyler's photographs) a round concrete plinth on a wider round
+  // base, set in the brick and engraved-granite paving, a bronze foot plate,
+  // and a rough limestone planter wall behind
+  const concrete = mat(0xb9b6ae, { roughness: 0.95 });
+  B.add(M(new THREE.CylinderGeometry(1.25, 1.25, 0.12, 32), concrete, MX, 0.2, MZ));
+  B.add(M(new THREE.CylinderGeometry(0.85, 0.88, PH - 0.2, 32), concrete, MX, 0.26 + (PH - 0.2) / 2, MZ));
+  B.add(M(new THREE.CylinderGeometry(0.5, 0.5, 0.04, 6), bronzeDark, MX, PH + 0.18, MZ));
+  {
+    const lime = mat(0xd9d2c0, { roughness: 1, flatShading: true });
+    for (let i = 0; i < 16; i++) {
+      const a = -2.4 + (i / 15) * 1.6, r = 3.1;
+      for (let row = 0; row < 2; row++) {
+        const blk = M(new THREE.BoxGeometry(0.7 + rnd() * 0.25, 0.32, 0.45), lime, MX + Math.cos(a) * r, 0.3 + row * 0.33, MZ + Math.sin(a) * r, (rnd() - 0.5) * 0.06, -a, 0);
+        B.add(blk);
+      }
+    }
+  }
   plaque(MX, 0.45, MZ + 0.76, 0.5, 0.3);
   figureMiles(new THREE.Matrix4().compose(V(MX, PH + 0.16, MZ), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -0.25, 0)), V(1, 1, 1)));
   // inlaid notes and a wave line in the paving
@@ -233,25 +263,28 @@ export default function build() {
     const hc = V(0, y(0.905), 0.01);
     B.add(ell(0.083, 0.11, 0.098, b, hc), P);
     B.add(ell(0.07, 0.045, 0.06, b, V(0, hc.y - 0.07, 0.035)), P); // jaw
+    B.add(ell(0.04, 0.012, 0.02, d, V(0, hc.y - 0.05, 0.088), [0, 0, 0], 8), P); // the smile
     B.add(ell(0.088, 0.06, 0.1, d, V(0, hc.y + 0.05, -0.006)), P); // hair
     B.add(ell(0.017, 0.03, 0.022, b, V(0, hc.y - 0.01, 0.1), [0.2, 0, 0], 8), P); // nose
     for (const sx of [-1, 1]) {
       B.add(ell(0.014, 0.028, 0.02, b, V(sx * 0.083, hc.y, 0.0), [0, 0, 0], 8), P); // ears
-      const lens = new THREE.Mesh(new THREE.TorusGeometry(0.022, 0.0045, 4, 12), d);
-      lens.position.set(sx * 0.035, hc.y + 0.012, 0.093); B.add(lens, P);
-      B.add(M(new THREE.BoxGeometry(0.004, 0.004, 0.09), d, sx * 0.075, hc.y + 0.014, 0.05), P);
+
     }
     // arms hanging naturally at his sides, slight bend
     const shY = y(0.805);
     for (const sx of [-1, 1]) {
-      const sh = V(sx * 0.2, shY, 0), el = V(sx * 0.235, y(0.62), -0.02), wr = V(sx * 0.225, y(0.465), 0.05);
+      // his left hand (+x) rests forward on the cane
+      const sh = V(sx * 0.2, shY, 0), el = V(sx * 0.235, y(0.62), sx > 0 ? 0.04 : -0.02), wr = sx > 0 ? V(0.26, y(0.47), 0.16) : V(sx * 0.225, y(0.465), 0.05);
       B.add(ell(0.085, 0.08, 0.08, b, sh), P); // shoulder pad
       B.add(limb(sh, el, 0.058, b), P);
       B.add(limb(el, wr, 0.05, b), P);
       B.add(M(new THREE.CylinderGeometry(0.052, 0.056, 0.05, 10), d, wr.x, wr.y + 0.01, wr.z, 0.2, 0, 0), P); // cuff
-      const hand = ell(0.032, 0.085, 0.05, b, V(sx * 0.222, wr.y - 0.085, wr.z + 0.012), [0.1, 0, -sx * 0.05], 10);
+      const hand = ell(0.032, 0.085, 0.05, b, V(wr.x - sx * 0.003, wr.y - 0.085, wr.z + 0.012), [0.1, 0, -sx * 0.05], 10);
       B.add(hand, P);
     }
+    // the cane: a slim shaft from his hand to the plinth, a crook under the palm
+    B.add(limb(V(0.27, y(0.44), 0.18), V(0.32, 0.0, 0.34), 0.012, d), P);
+    B.add(M(new THREE.TorusGeometry(0.035, 0.011, 6, 10, Math.PI), d, 0.27, y(0.445), 0.15, 0, Math.PI / 2, 0), P);
   }
   /** Miles Davis, after Preston Jackson: leaning back, trumpet raised skyward. */
   function figureMiles(P0) {
@@ -259,7 +292,7 @@ export default function build() {
     const y = (f) => f * H;
     // feet / legs: left leg forward, knees soft, weight back
     const hipY = y(0.49);
-    const lean = new THREE.Matrix4().makeRotationX(-0.32); // upper body leans back
+    const lean = new THREE.Matrix4().makeRotationX(-0.46); // leaning far back from the hips
     const pelvis = V(0, hipY, -0.06);
     const UB = new THREE.Matrix4().makeTranslation(pelvis.x, pelvis.y, pelvis.z).multiply(lean).multiply(new THREE.Matrix4().makeTranslation(-pelvis.x, -pelvis.y, -pelvis.z));
     const P = P0, PU = P0.clone().multiply(UB);
@@ -270,6 +303,11 @@ export default function build() {
     for (const L of legs) {
       B.add(limb(L.hip, L.knee, 0.07, b), P);
       B.add(limb(L.knee, L.ank, 0.058, b), P);
+      // the flared trousers of the time
+      const flare = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.115, 0.34, 12), b);
+      flare.position.set(L.ank.x, L.ank.y + 0.12, L.ank.z);
+      flare.quaternion.setFromUnitVectors(V(0, 1, 0), L.knee.clone().sub(L.ank).normalize());
+      B.add(flare, P);
       B.add(ell(0.055, 0.045, 0.14, d, V(L.ank.x, 0.05, L.ank.z + 0.07)), P);
     }
     B.add(ell(0.17, 0.11, 0.12, b, V(0, hipY + 0.02, -0.06)), P); // hips
@@ -281,15 +319,15 @@ export default function build() {
     B.add(limb(neckBase, V(0, y(0.86), -0.07), 0.045, b), PU);
     // head tilted further back, facing up along the horn
     const hc = V(0, y(0.905), -0.08);
-    const HP = PU.clone().multiply(new THREE.Matrix4().makeTranslation(hc.x, hc.y, hc.z)).multiply(new THREE.Matrix4().makeRotationX(-0.45));
+    const HP = PU.clone().multiply(new THREE.Matrix4().makeTranslation(hc.x, hc.y, hc.z)).multiply(new THREE.Matrix4().makeRotationX(0.12));
     B.add(ell(0.075, 0.1, 0.09, b, V(0, 0, 0)), HP);
     B.add(ell(0.064, 0.042, 0.055, b, V(0, -0.065, 0.03)), HP);
     B.add(ell(0.08, 0.05, 0.088, d, V(0, 0.05, -0.012)), HP);
     B.add(ell(0.015, 0.026, 0.02, b, V(0, -0.005, 0.09), [0.2, 0, 0], 8), HP);
     for (const sx of [-1, 1]) B.add(ell(0.013, 0.025, 0.018, b, V(sx * 0.075, 0, 0), [0, 0, 0], 8), HP);
-    // trumpet: mouthpiece at the lips, raised ~55° in the head frame
+    // trumpet: mouthpiece at the lips, held out forward and a touch up
     const mouth = V(0, -0.04, 0.095);
-    const TP = HP.clone().multiply(new THREE.Matrix4().makeTranslation(mouth.x, mouth.y, mouth.z)).multiply(new THREE.Matrix4().makeRotationX(-0.55));
+    const TP = HP.clone().multiply(new THREE.Matrix4().makeTranslation(mouth.x, mouth.y, mouth.z)).multiply(new THREE.Matrix4().makeRotationX(0.18));
     B.add(M(new THREE.CylinderGeometry(0.008, 0.012, 0.06, 8).rotateX(Math.PI / 2), brass, 0, 0, 0.03), TP);
     B.add(M(new THREE.CylinderGeometry(0.009, 0.009, 0.3, 8).rotateX(Math.PI / 2), brass, 0, 0, 0.2), TP);
     B.add(M(new THREE.CylinderGeometry(0.009, 0.009, 0.3, 8).rotateX(Math.PI / 2), brass, 0, -0.045, 0.2), TP);

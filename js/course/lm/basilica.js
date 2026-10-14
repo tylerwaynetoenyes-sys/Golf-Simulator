@@ -303,29 +303,44 @@ export default function build() {
       }
     }
     corbels(B, trim, [cx - TWW / 2, Y0 + TWH - 1.1, TWZ1 + 0.25], [cx + TWW / 2, Y0 + TWH - 1.1, TWZ1 + 0.25], 'x');
-    // parapet with corner pinnacles
+    // (from Tyler's photographs) the towers end in tall pointed spires of
+    // green tile, with a small stone gable on each face at the spire's foot
+    // and a round corner turret under a stone conical cap at each corner
     B.add(box(TWW, 1.2, d, stone, cx, Y0 + TWH, cz), S);
-    for (const ex of [-1, 1]) for (const ez of [-1, 1]) {
-      B.add(box(1.3, 2.2, 1.3, trim, cx + ex * (TWW / 2 - 0.65), Y0 + TWH, cz + ez * (d / 2 - 0.65)), S);
-      B.add(mesh(new THREE.ConeGeometry(0.85, 2.2, 4), tiles, cx + ex * (TWW / 2 - 0.65), Y0 + TWH + 3.3, cz + ez * (d / 2 - 0.65), Math.PI / 4), { s: 2 });
-    }
-    // octagonal drum + green cupola + lantern + cross
     const ty = Y0 + TWH + 1.2;
-    B.add(mesh(new THREE.CylinderGeometry(4.0, 4.3, 4.2, 8), stoneFront, cx, ty + 2.1, cz, Math.PI / 8), S);
-    for (let i = 0; i < 8; i++) { const a = (i + 0.5) / 8 * Math.PI * 2 + Math.PI / 8 - Math.PI / 8; addWin(cx + Math.sin(a) * 3.75, ty + 0.8, cz + Math.cos(a) * 3.75, 0.9, 2.6, a, false, louver); }
-    B.add(mesh(new THREE.CylinderGeometry(4.5, 4.5, 0.45, 8), trim, cx, ty + 4.35, cz, Math.PI / 8), S);
-    const cp = [];
-    for (let i = 0; i <= 12; i++) { const t = i / 12 * Math.PI / 2; cp.push(new THREE.Vector2(Math.max(0.01, 4.3 * Math.cos(t)), 5.6 * Math.sin(t))); }
-    B.add(mesh(new THREE.LatheGeometry(cp, 24), tilesDome, cx, ty + 4.55, cz));
-    for (let i = 0; i < 8; i++) {
-      const a = i / 8 * Math.PI * 2, pts = [];
-      for (let k = 0; k <= 8; k++) { const t = k / 8 * Math.PI / 2 * 0.9; const r = 4.3 * Math.cos(t) + 0.08; pts.push(new THREE.Vector3(cx + Math.sin(a) * r, ty + 4.6 + 5.6 * Math.sin(t), cz + Math.cos(a) * r)); }
-      B.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 10, 0.13, 4), ribM));
+    for (const [fx, fz, ry] of [[0, d / 2, 0], [TWW / 2, 0, Math.PI / 2], [-TWW / 2, 0, -Math.PI / 2], [0, -d / 2, Math.PI]]) {
+      const gs = new THREE.Shape();
+      gs.moveTo(-3, 0); gs.lineTo(3, 0); gs.lineTo(0, 4.2); gs.closePath();
+      const gg = new THREE.Mesh(new THREE.ExtrudeGeometry(gs, { depth: 1.2, bevelEnabled: false }).translate(0, 0, -0.6), trim);
+      gg.position.set(cx + fx * 0.86, ty, cz + fz * 0.86);
+      gg.rotation.y = ry;
+      B.add(gg, S);
+      addWin(cx + fx * 0.86 + Math.sin(ry) * 0.62, ty + 0.4, cz + fz * 0.86 + Math.cos(ry) * 0.62, 1.4, 2.4, ry, true, louver);
     }
-    B.add(mesh(new THREE.CylinderGeometry(0.9, 1.1, 1.8, 8), stone, cx, ty + 10.6, cz), S);
-    B.add(mesh(new THREE.SphereGeometry(1.0, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), tilesDome, cx, ty + 11.5, cz));
-    B.add(mesh(new THREE.SphereGeometry(0.3, 8, 6), gold, cx, ty + 12.7, cz));
-    crossAt(cx, ty + 12.9, cz, 2.8, gold);
+    // the spire: an eight-sided pyramid of green tile, ~17 m
+    B.add(mesh(new THREE.ConeGeometry(4.9, 17, 8, 1, false), tilesDome, cx, ty + 8.5, cz, Math.PI / 8));
+    for (let i = 0; i < 8; i++) {
+      const a = ((i + 0.5) / 8) * Math.PI * 2 + Math.PI / 8;
+      B.add(new THREE.Mesh(new THREE.TubeGeometry(new THREE.LineCurve3(
+        new THREE.Vector3(cx + Math.sin(a) * 4.55, ty, cz + Math.cos(a) * 4.55), new THREE.Vector3(cx, ty + 17, cz)), 4, 0.1, 4), ribM));
+    }
+    B.add(mesh(new THREE.SphereGeometry(0.35, 8, 6), gold, cx, ty + 17.2, cz));
+    crossAt(cx, ty + 17.4, cz, 2.6, gold);
+    // corner turrets
+    for (const ex of [-1, 1]) for (const ez of [-1, 1]) {
+      const tx = cx + ex * (TWW / 2 - 0.4), tz = cz + ez * (d / 2 - 0.4);
+      B.add(cyl(1.15, 1.25, 4.4, trim, tx, Y0 + TWH - 2, tz, 12), S);
+      for (let k = 0; k < 4; k++) { const a = (k / 4) * Math.PI * 2; addWin(tx + Math.sin(a) * 1.18, Y0 + TWH - 0.6, tz + Math.cos(a) * 1.18, 0.4, 1.4, a, false, louver); }
+      B.add(mesh(new THREE.ConeGeometry(1.4, 3.6, 12), trim, tx, Y0 + TWH + 4.2, tz));
+      B.add(mesh(new THREE.SphereGeometry(0.18, 6, 4), trim, tx, Y0 + TWH + 6.1, tz));
+    }
+  }
+  // turrets flanking the central gable, under stone conical caps
+  for (const sx of [-1, 1]) {
+    const tx = sx * (NW - 0.6), tz = zFront + 0.4;
+    B.add(cyl(1.3, 1.4, NAVE_H + 2, trim, tx, Y0, tz, 12), S);
+    for (let y = 6; y < NAVE_H; y += 6) for (let k = -1; k <= 1; k++) addWin(tx + k * 0.6, Y0 + y, tz + 1.36, 0.35, 2.2, 0, false, louver);
+    B.add(mesh(new THREE.ConeGeometry(1.6, 4.4, 12), trim, tx, Y0 + NAVE_H + 4.2, tz));
   }
   // central gable face: rose + arcade of windows + corbelled rake
   rose(0, Y0 + 24.5, zFront + 0.62, 4.0, 0);

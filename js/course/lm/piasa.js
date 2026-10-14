@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, seeded, canvasTex } from './kit.js';
-import { piasaCanvas } from '../../ui/piasa.js';
+import { piasaCanvas, piasaEngravedCanvas } from '../../ui/piasa.js';
 
 // ---- small deterministic noise --------------------------------------------
 function hash(n) { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
@@ -76,7 +76,8 @@ export default function build() {
   {
     const r = seeded(91);
     let y = 0;
-    const tints = [0xd3c7aa, 0xb4afa3, 0xdacfb6, 0xa8a090, 0xc9b998, 0x9e9a90, 0xd8ccae, 0xbba98a, 0xc4c0b4];
+    // cream and buff beds, as in the photographs
+    const tints = [0xdfd2b3, 0xcdbf9e, 0xe6dabe, 0xc4b593, 0xd8c8a3, 0xbfb08f, 0xe2d5b5, 0xcfba95, 0xd5c9ad];
     let k = 0;
     while (y < 60) {
       const hard = k % 2 === 0 ? r() < 0.75 : r() < 0.3;
@@ -380,15 +381,19 @@ export default function build() {
   }
 
   // ---- the Piasa mural -------------------------------------------------------
-  const muralMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, emissive: 0xffd9a8, emissiveIntensity: 0, polygonOffset: true, polygonOffsetFactor: -2 });
+  // painted straight onto the rock: the canvas is transparent between the strokes
+  const muralMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, emissive: 0xffd9a8, emissiveIntensity: 0, polygonOffset: true, polygonOffsetFactor: -2, transparent: true, alphaTest: 0.08, depthWrite: false });
   muralMat.userData.night = 0.35;
   glow.push(muralMat);
-  const MW = 33, MH = 23.3;
+  // John Wright's 1898 engraving in the mural's colours (js/ui/piasa.js);
+  // your own artwork via ASSET_MANIFEST.piasa, or the drawn version, if not
+  const MW = 38, MH = 20.5;
   const mural = new THREE.Mesh(new THREE.PlaneGeometry(MW, MH), muralMat);
   mural.position.set(0, (PANEL.y0 + PANEL.y1) / 2, PANEL.z + 0.12);
   mural.receiveShadow = true;
   g.add(mural);
-  piasaCanvas(1024, 725).then((c) => {
+  piasaEngravedCanvas(1600).then((c) => c || piasaCanvas(1024, 725)).then((c) => {
+    if (c.width / c.height < 1.6) mural.scale.set(33 / MW, 23.3 / MH, 1); // the drawn version's proportions
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.anisotropy = 4;
@@ -422,54 +427,109 @@ export default function build() {
     lens.position.y = 0.41; lens.rotation.x = -Math.PI / 2;
     f.add(body, lens);
     f.rotation.x = -0.55; f.rotation.z = x > 0 ? 0.25 : -0.25;
-    f.position.set(x, 0.9, -7.2);
+    f.position.set(x, 2.0, -7.2);
     const post = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), fixMat);
-    post.position.set(x, 0.25, -7.2);
+    post.position.set(x, 1.35, -7.2);
     g.add(f, post);
   }
 
-  // ---- the Great River Road ------------------------------------------------
+  // ---- caves, walkway and the Great River Road (from Tyler's photos) --------
+  // Two dark cave arches open at the foot of the face either side of the
+  // mural; a block retaining wall with a black railing and lamp posts runs
+  // along the viewing walk; then the bike trail and four lanes of the Great
+  // River Road between the bluff and the river.
   {
-    const roadTex = canvasTex(64, 512, (c, w, h) => {
+    const dark = new THREE.MeshBasicMaterial({ color: 0x0d0b09 });
+    const lip = mat(0xbfb39a, { roughness: 1 });
+    for (const cx of [-31, 31]) {
+      const W = 9.5, H = 13.5;
+      const sh = new THREE.Shape();
+      sh.moveTo(-W / 2, 0); sh.lineTo(-W / 2, H - W / 2); sh.absarc(0, H - W / 2, W / 2, Math.PI, 0, true); sh.lineTo(W / 2, 0); sh.closePath();
+      const z = planZ(cx) + 0.6;
+      const mouth = new THREE.Mesh(new THREE.ShapeGeometry(sh, 16), dark);
+      mouth.position.set(cx, 0.2, z);
+      g.add(mouth);
+      // the weathered rim of the opening
+      const rim = new THREE.Mesh(new THREE.TorusGeometry(W / 2 + 0.5, 0.7, 6, 20, Math.PI), lip);
+      rim.position.set(cx, 0.2 + H - W / 2, z + 0.1);
+      g.add(rim);
+      for (const sx of [-1, 1]) g.add(new THREE.Mesh(new THREE.BoxGeometry(1.4, H - W / 2, 1.2), lip).translateX(cx + sx * (W / 2 + 0.5)).translateY(0.2 + (H - W / 2) / 2).translateZ(z));
+    }
+    // retaining wall (split-face block), railing and lamps along the walk
+    const block = new THREE.MeshStandardMaterial({
+      roughness: 1,
+      map: canvasTex(256, 64, (c, w, h) => {
+        const r = seeded(31);
+        c.fillStyle = '#a49f94'; c.fillRect(0, 0, w, h);
+        for (let row = 0; row < 3; row++) for (let i = -1; i < 9; i++) {
+          const v = 150 + r() * 40;
+          c.fillStyle = `rgb(${v},${v - 4},${v - 12})`;
+          c.fillRect(i * 32 + (row % 2) * 16 + 1, row * 21 + 1, 30, 19);
+        }
+      }, [16, 1]),
+    });
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(150, 1.1, 0.6), block);
+    wall.position.set(0, 0.55, -5.2);
+    wall.receiveShadow = true; wall.castShadow = true;
+    g.add(wall);
+    const black = mat(0x1c1d1f, { metalness: 0.5, roughness: 0.45 });
+    for (const y of [1.55, 2.05]) g.add(new THREE.Mesh(new THREE.BoxGeometry(150, 0.05, 0.05), black).translateY(y).translateZ(-5.2));
+    const nPost = 76;
+    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 1.0, 0.05), black, nPost);
+    const pm = new THREE.Matrix4();
+    for (let i = 0; i < nPost; i++) { pm.makeTranslation(-75 + i * 2, 1.6, -5.2); posts.setMatrixAt(i, pm); }
+    g.add(posts);
+    const lampGlass = new THREE.MeshStandardMaterial({ color: 0xf4efe2, emissive: 0xffd9a0, emissiveIntensity: 0 });
+    lampGlass.userData.night = 2.2;
+    glow.push(lampGlass);
+    for (const x of [-58, -30, 30, 58]) {
+      g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.1, 5.2, 8), black).translateX(x).translateY(2.6 + 1.1).translateZ(-5.6));
+      g.add(new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.5, 0.35), lampGlass).translateX(x).translateY(6.55).translateZ(-5.6));
+    }
+    // the paved walk between the wall and the rock
+    const walk = new THREE.Mesh(new THREE.PlaneGeometry(150, 4).rotateX(-Math.PI / 2), mat(0x8f897e, { roughness: 1 }));
+    walk.position.set(0, 1.1, -7.4);
+    g.add(walk);
+
+    // bike trail (the Sam Vadalabene trail) and four lanes of the Great River Road
+    const trail = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, 3).rotateX(-Math.PI / 2), mat(0x45464a, { roughness: 0.95 }));
+    trail.position.set(0, 0.05, -2.9);
+    trail.receiveShadow = true;
+    g.add(trail);
+    const roadTex = canvasTex(128, 512, (c, w, h) => {
       const r = seeded(4);
-      c.fillStyle = '#3b3c3e'; c.fillRect(0, 0, w, h);
-      for (let i = 0; i < 2500; i++) { const v = 45 + r() * 40; c.fillStyle = `rgba(${v},${v},${v + 2},0.6)`; c.fillRect(r() * w, r() * h, 1, 1); }
-      c.fillStyle = '#e9e6dc'; c.fillRect(2, 0, 2, h); c.fillRect(w - 4, 0, 2, h);
-      c.fillStyle = '#d9b43a'; c.fillRect(w / 2 - 2.5, 0, 1.6, h); c.fillRect(w / 2 + 0.9, 0, 1.6, h);
-    }, [1, 12]);
-    roadTex.rotation = Math.PI / 2;
-    const roadMat = new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.92 });
-    const road = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, 8.4).rotateX(-Math.PI / 2), roadMat);
-    // map the texture along x
+      c.fillStyle = '#38393b'; c.fillRect(0, 0, w, h);
+      for (let i = 0; i < 5000; i++) { const v = 42 + r() * 40; c.fillStyle = `rgba(${v},${v},${v + 2},0.6)`; c.fillRect(r() * w, r() * h, 1, 1); }
+      c.fillStyle = '#e9e6dc'; c.fillRect(2, 0, 2.4, h); c.fillRect(w - 4.4, 0, 2.4, h); // edge lines
+      c.fillStyle = '#d9b43a'; c.fillRect(w / 2 - 3, 0, 2, h); c.fillRect(w / 2 + 1, 0, 2, h); // double yellow
+      c.fillStyle = '#e9e6dc';
+      for (let y = 0; y < h; y += 128) { c.fillRect(w * 0.25 - 1, y, 2, 40); c.fillRect(w * 0.75 - 1, y, 2, 40); } // lane dashes (10 ft of 40)
+    }, [1, 1]);
+    const roadMat = new THREE.MeshStandardMaterial({ map: roadTex, roughness: 0.9 });
+    const LEN = X1 - X0, RW = 14.6;
+    const road = new THREE.Mesh(new THREE.PlaneGeometry(LEN, RW).rotateX(-Math.PI / 2), roadMat);
+    // map the texture's long axis along the road (x)
     const ruv = road.geometry.attributes.uv;
-    for (let i = 0; i < ruv.count; i++) { const u = ruv.getX(i), v = ruv.getY(i); ruv.setXY(i, v, u); }
-    roadTex.rotation = 0; roadTex.repeat.set(1, 20);
-    road.position.set(0, 0.06, -1.6);
+    for (let i = 0; i < ruv.count; i++) { const u = ruv.getX(i), v = ruv.getY(i); ruv.setXY(i, v, u * (LEN / 12)); }
+    roadTex.wrapT = THREE.RepeatWrapping;
+    road.position.set(0, 0.06, -1.4 + RW / 2);
     road.receiveShadow = true;
     g.add(road);
-    const shoulder = mat(0x8a8272, { roughness: 1 });
-    const sh = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, 1.6).rotateX(-Math.PI / 2), shoulder);
-    sh.position.set(0, 0.045, -6.6);
-    sh.receiveShadow = true;
-    g.add(sh);
     // W-beam guard rail on the river side
     const steel = mat(0xa9adb0, { metalness: 0.7, roughness: 0.38 });
-    const railGeo = new THREE.BoxGeometry(X1 - X0 - 20, 0.32, 0.06);
-    const rail = new THREE.Mesh(railGeo, steel);
-    rail.position.set(0, 0.62, 3.6);
-    const rail2 = new THREE.Mesh(new THREE.BoxGeometry(X1 - X0 - 20, 0.05, 0.14), steel);
-    rail2.position.set(0, 0.62, 3.6);
-    g.add(rail, rail2);
+    const railZ = -1.4 + RW + 0.9;
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(LEN - 20, 0.32, 0.06), steel).translateY(0.62).translateZ(railZ));
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(LEN - 20, 0.05, 0.14), steel).translateY(0.62).translateZ(railZ));
     const postMat = mat(0x7d8084, { metalness: 0.5, roughness: 0.5 });
-    const nP = Math.floor((X1 - X0 - 20) / 1.9);
-    const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.15, 0.78, 0.15), postMat, nP);
+    const nP = Math.floor((LEN - 20) / 1.9);
+    const rposts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.15, 0.78, 0.15), postMat, nP);
     const m4 = new THREE.Matrix4();
-    for (let i = 0; i < nP; i++) { m4.makeTranslation(X0 + 10 + i * 1.9 + 0.95, 0.39, 3.72); posts.setMatrixAt(i, m4); }
-    posts.castShadow = false;
-    g.add(posts);
-    // grassy verge toward the river/golf side
-    const verge = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, 8).rotateX(-Math.PI / 2), mat(0x587a38, { roughness: 1 }));
-    verge.position.set(0, 0.03, 6.8);
+    for (let i = 0; i < nP; i++) { m4.makeTranslation(X0 + 10 + i * 1.9 + 0.95, 0.39, railZ + 0.12); rposts.setMatrixAt(i, m4); }
+    rposts.castShadow = false;
+    g.add(rposts);
+    // a grassy verge toward the river/golf side
+    const verge = new THREE.Mesh(new THREE.PlaneGeometry(LEN, 8).rotateX(-Math.PI / 2), mat(0x587a38, { roughness: 1 }));
+    verge.position.set(0, 0.03, railZ + 4.4);
     verge.receiveShadow = true;
     g.add(verge);
   }

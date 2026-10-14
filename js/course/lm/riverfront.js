@@ -131,7 +131,8 @@ function usFlagTex() {
 
 // ── the Argosy Casino Alton: a permanently moored, steamboat-styled casino ──
 function casino(tex, glow, B, bulbPts) {
-  const white = mat(0xf3f1ea, { roughness: 0.55 });
+  // the Argosy is painted a warm yellow with white railings and gold trim
+  const white = mat(0xf0d57a, { roughness: 0.55 });
   const hull = mat(0x1f2b38, { roughness: 0.5, metalness: 0.3 });
   const gold = lit(0xc9a24a, 0xffcf70, { metalness: 0.7, roughness: 0.35, night: 0.5 });
   const red = mat(0xa3202a, { roughness: 0.5 });
@@ -140,7 +141,7 @@ function casino(tex, glow, B, bulbPts) {
   glow.push(gold);
   // window-band facade
   const winTex = canvasTex(256, 64, (g, w, h) => {
-    g.fillStyle = '#f2efe6'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#f0d47c'; g.fillRect(0, 0, w, h);
     for (let i = 0; i < 8; i++) {
       const x = i * 32 + 7;
       g.fillStyle = '#26323e'; g.fillRect(x, 16, 18, 34);
@@ -229,6 +230,50 @@ function casino(tex, glow, B, bulbPts) {
   const sm = new THREE.Mesh(new THREE.PlaneGeometry(20, 3.6).rotateY(Math.PI / 2), signM);
   sm.position.set(6.6, 13.4, 2);
   return sm;
+}
+
+/**
+ * A large overnight sternwheeler (from Tyler's photograph at the Alton
+ * levee): five white decks with red trim and rows of cabin windows, a pilot
+ * house, twin black stacks, and a big red stern paddle wheel. ~100 m long.
+ */
+function sternwheeler(B, glow) {
+  const white = mat(0xf6f5f0, { roughness: 0.55 });
+  const red = mat(0xb02a26, { roughness: 0.5 });
+  const black = mat(0x18191b, { roughness: 0.6 });
+  const blue = mat(0x2f5f8a, { roughness: 0.5 });
+  const cabins = new THREE.MeshStandardMaterial({
+    roughness: 0.5, emissive: 0xffffff, emissiveIntensity: 0,
+    map: canvasTex(256, 32, (g, w, h) => { g.fillStyle = '#f6f5f0'; g.fillRect(0, 0, w, h); for (let i = 0; i < 16; i++) { g.fillStyle = '#2a3440'; g.fillRect(i * 16 + 3, 6, 10, 18); } g.fillStyle = '#b02a26'; g.fillRect(0, 28, w, 3); }),
+    emissiveMap: canvasTex(256, 32, (g, w, h) => { g.fillStyle = '#000'; g.fillRect(0, 0, w, h); for (let i = 0; i < 16; i++) if ((i * 7) % 3) { g.fillStyle = '#ffd59a'; g.fillRect(i * 16 + 3, 6, 10, 18); } }),
+  });
+  cabins.map.wrapS = cabins.emissiveMap.wrapS = THREE.RepeatWrapping;
+  cabins.userData.night = 1.2;
+  glow.push(cabins);
+  const band = (w, h, d, x, y, z) => {
+    const g = new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z);
+    const n = g.attributes.normal, uv = g.attributes.uv;
+    for (let i = 0; i < uv.count; i++) {
+      if (Math.abs(n.getY(i)) > 0.5) { uv.setXY(i, 0.01, 0.5); continue; }
+      uv.setX(i, uv.getX(i) * (Math.abs(n.getX(i)) > 0.5 ? d : w) / 16);
+    }
+    return g;
+  };
+  B.add(white, bx(17, 3, 98, 0, -1, 0));
+  B.add(red, bx(17.2, 0.4, 98.2, 0, 1.8, 0));
+  for (let k = 0; k < 5; k++) {
+    const y = 2.2 + k * 3.1, L = 90 - k * 9, W = 16.4 - k * 0.8;
+    B.add(cabins, band(W - 1.6, 2.6, L - 4, 0, y, -k * 2));
+    B.add(white, bx(W, 0.35, L, 0, y + 2.65, -k * 2));
+    for (const sx of [-1, 1]) B.add(white, bx(0.08, 1.0, L - 1, sx * (W / 2 - 0.2), y + 3.0, -k * 2));
+  }
+  B.add(blue, bx(9, 0.3, 30, 0, 17.6, -12)); // the sun deck's awning
+  B.add(white, bx(6, 3, 6, 0, 17.9, -30)); // pilot house
+  for (const sx of [-1, 1]) B.add(black, cy(0.9, 1.0, 12, sx * 3.2, 17.9, -36, 14));
+  // the stern wheel, red with white bucket boards
+  const wheel = new THREE.CylinderGeometry(7, 7, 14, 24, 1, false).rotateZ(Math.PI / 2);
+  B.add(red, place(wheel, 0, 4.6, 54));
+  for (let k = 0; k < 12; k++) B.add(white, place(new THREE.BoxGeometry(14.4, 0.35, 14.6), 0, 4.6, 54, 0, 1, 1, 1, (k / 12) * Math.PI));
 }
 
 // ── a Mississippi towboat pushing four covered hopper barges (moves along Z) ──
@@ -416,10 +461,38 @@ export default function build() {
     B.add(steel, span(new THREE.Vector3(-32, 30, 92), new THREE.Vector3(-58, 18, 92), 2.6, 2.8));
     B.add(steel, cy(1.2, 1.2, 18, -59, 0, 92, 10), rod(new THREE.Vector3(-59, 17, 92), new THREE.Vector3(-66, 4, 92), 0.45, 8));
     B.add(steel, rod(new THREE.Vector3(-46, 0, 92), new THREE.Vector3(-46, 24, 92), 0.4, 6));
+    // the riverfront face of the headhouse: "Welcome to ALTON" over a painted
+    // US flag, white like the bins (from Tyler's photograph)
+    {
+      const muralTex = canvasTex(256, 1024, (g, w, h) => {
+        g.fillStyle = '#eeebe4'; g.fillRect(0, 0, w, h);
+        g.fillStyle = '#2b3a55';
+        g.font = 'italic 600 46px Georgia, serif'; g.textAlign = 'center';
+        g.fillText('Welcome', w / 2, 140); g.fillText('to', w / 2, 196);
+        g.font = '700 84px Georgia, serif';
+        g.fillText('ALTON', w / 2, 300);
+        // the flag (stripes and canton), lower on the face
+        const fx = 22, fy = 520, fw = w - 44, fh = fw * 0.55;
+        for (let i = 0; i < 13; i++) { g.fillStyle = i % 2 ? '#f4f2ee' : '#b22234'; g.fillRect(fx, fy + (i * fh) / 13, fw, fh / 13 + 0.5); }
+        g.fillStyle = '#3c3b6e'; g.fillRect(fx, fy, fw * 0.4, (fh * 7) / 13);
+        g.fillStyle = '#ffffff';
+        for (let r = 0; r < 9; r++) for (let c = 0; c < (r % 2 ? 5 : 6); c++) g.fillRect(fx + 6 + c * 15 + (r % 2 ? 7 : 0), fy + 5 + r * 8.6, 3, 3);
+      });
+      const muralM = new THREE.MeshStandardMaterial({ map: muralTex, roughness: 0.85, emissive: 0xfff0d8, emissiveMap: muralTex, emissiveIntensity: 0 });
+      muralM.userData.night = 0.4;
+      glow.push(muralM);
+      // on the river face, as in life, and on the face toward the golf
+      for (const [x, ry] of [[-32.08, -Math.PI / 2], [-19.92, Math.PI / 2]]) {
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(12.6, 50.4), muralM);
+        face.rotation.y = ry;
+        face.position.set(x, 25.5, 92);
+        group.add(face);
+      }
+    }
     // windows on the headhouse
     const hw = lit(0x2d353c, 0xffcf8a, { night: 0.7 });
     glow.push(hw);
-    for (let y = 6; y < 50; y += 6) B.add(hw, bx(2, 1.6, 0.2, -20, y, 85.4), bx(0.2, 1.6, 2, -19.9, y, 92));
+    for (let y = 6; y < 50; y += 6) B.add(hw, bx(2, 1.6, 0.2, -20, y, 85.4));
   }
 
   // ── the casino, moored against the quay with a covered gangway ──
@@ -452,42 +525,72 @@ export default function build() {
     B.add(paving, bx(14, 0.08, 30, -38, 0, -40));
   }
 
+  // ── a big sternwheeler tied up at the levee below the elevators ──
+  {
+    const sg = new THREE.Group();
+    const SB = new Batch();
+    sternwheeler(SB, glow);
+    SB.build(sg);
+    sg.position.set(-80, WY + 1.2, 150);
+    group.add(sg);
+  }
+
   // ── Riverfront Park amphitheater: tensile canopy over the stage, lawn bowl ──
   const SC = new THREE.Vector3(-36, 0, 40); // stage centre
   {
     const conc = mat(0xcfc9bd, { roughness: 0.8 });
-    const stageLit = lit(0x3a3330, 0xffb46a, { night: 1.3 });
-    glow.push(stageLit);
-    B.add(conc, bx(14, 1.4, 28, SC.x, 0, SC.z));
-    B.add(stageLit, bx(13.6, 0.1, 27.4, SC.x, 1.4, SC.z));
-    B.add(conc, bx(3, 8, 30, SC.x - 7.5, 0, SC.z)); // back wall
-    // membrane: two peaked bays with scalloped edges
+    // (from Tyler's photographs) a circular brick-red stage plaza with
+    // concentric bands, a long white arched membrane on stone-block pylons,
+    // a round fountain in the plaza behind and a splash pad beside it
+    const brick = lit(0x8a3d30, 0xffb46a, { night: 0.5, roughness: 0.9 });
+    const brickL = mat(0xa45a46, { roughness: 0.9 });
+    glow.push(brick);
+    B.add(conc, place(new THREE.CylinderGeometry(19, 19.4, 1.1, 48).translate(0, 0.55, 0), SC.x - 4, 0, SC.z));
+    B.add(brick, place(new THREE.CylinderGeometry(18.4, 18.4, 0.12, 48).translate(0, 0.06, 0), SC.x - 4, 1.1, SC.z));
+    for (const r of [6, 11, 15.5]) B.add(brickL, place(new THREE.TorusGeometry(r, 0.25, 4, 48).rotateX(Math.PI / 2), SC.x - 4, 1.24, SC.z));
+    // stone pylons: split-face limestone block, two at each end of the canopy
+    const stoneTex = canvasTex(64, 128, (c, w, h) => {
+      const r = seeded(77);
+      c.fillStyle = '#b9ad96'; c.fillRect(0, 0, w, h);
+      for (let y = 0; y < h; y += 16) for (let x = (y / 16) % 2 ? -16 : 0; x < w; x += 32) { const v = 165 + r() * 40; c.fillStyle = `rgb(${v},${v - 8},${v - 24})`; c.fillRect(x + 1, y + 1, 30, 14); }
+    }, [1, 3]);
+    const stone = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 1 });
+    const pylons = [[SC.x - 9, SC.z - 19], [SC.x + 3, SC.z - 19], [SC.x - 9, SC.z + 19], [SC.x + 3, SC.z + 19]];
+    for (const [x, z] of pylons) B.add(stone, bx(2.6, 10, 2.6, x, 0, z), bx(3.2, 0.6, 3.2, x, 10, z));
+    // the membrane: a long barrel vault, highest along its centre line,
+    // with the seams of its arched ribs
     const mem = new THREE.MeshStandardMaterial({ color: 0xfbfaf6, roughness: 0.6, side: THREE.DoubleSide, emissive: 0xffd7a8, emissiveIntensity: 0 });
     mem.userData.night = 0.55;
     glow.push(mem);
-    const nu = 18, nv = 24;
+    const nu = 16, nv = 32, Lz = 42, Wx = 16;
     const pos = [], idx = [];
     for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) {
       const u = i / nu, v = j / nv;
-      const x = SC.x - 9 + u * 20, z = SC.z - 17 + v * 34;
-      const peak = (zc) => Math.exp(-(((z - zc) / 6.5) ** 2) - (((x - (SC.x - 1)) / 8) ** 2));
-      const edge = Math.min(u, 1 - u, v, 1 - v);
-      const y = 8.2 + 7.5 * Math.max(peak(SC.z - 8), peak(SC.z + 8)) + 1.6 * Math.min(1, edge * 6) - (u > 0.98 ? 0 : 0) + 1.2 * (1 - u);
+      const x = SC.x - 3 - Wx / 2 + u * Wx, z = SC.z - Lz / 2 + v * Lz;
+      const across = Math.sin(u * Math.PI); // the vault's cross-section
+      const along = 1 - 0.18 * (2 * v - 1) ** 2; // a gentle saddle toward the ends
+      const y = 10.6 + 3.2 * across * along + 0.25 * Math.sin(v * Math.PI * 10) * across; // rib seams
       pos.push(x, y, z);
     }
-    for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1; idx.push(a, c, b, b, c, d); }
+    for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) { const a = j * (nu + 1) + i, b2 = a + 1, c = a + nu + 1, d = c + 1; idx.push(a, c, b2, b2, c, d); }
     const mg = new THREE.BufferGeometry();
     mg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     mg.setIndex(idx); mg.computeVertexNormals();
     const memMesh = new THREE.Mesh(mg, mem);
     memMesh.castShadow = true;
     group.add(memMesh);
-    // masts and edge cables
+    // steel edge beams along the long sides, resting on the pylons
     const mast = mat(0xd9dcde, { metalness: 0.5, roughness: 0.4 });
-    for (const zc of [SC.z - 8, SC.z + 8]) B.add(mast, rod(new THREE.Vector3(SC.x - 1, 1.4, zc), new THREE.Vector3(SC.x - 1, 16.5, zc), 0.22, 8));
-    for (const [x, z] of [[SC.x + 11, SC.z - 17], [SC.x + 11, SC.z + 17], [SC.x + 11, SC.z], [SC.x - 9, SC.z - 17], [SC.x - 9, SC.z + 17]]) {
-      B.add(mast, rod(new THREE.Vector3(x, 0, z), new THREE.Vector3(x - (x > SC.x ? 0.6 : -0.4), x > SC.x ? 9.0 : 10.2, z), 0.18, 8));
-    }
+    for (const x of [SC.x - 11, SC.x + 5]) B.add(mast, span(new THREE.Vector3(x, 10.7, SC.z - 21), new THREE.Vector3(x, 10.7, SC.z + 21), 0.6, 0.6));
+    // the fountain plaza behind the stage, and the splash pad
+    const water = mat(0x4f8aa0, { roughness: 0.1, metalness: 0.3 });
+    B.add(conc, place(new THREE.CylinderGeometry(6, 6.2, 0.8, 32).translate(0, 0.4, 0), SC.x - 30, 0, SC.z));
+    B.add(water, place(new THREE.CylinderGeometry(5.3, 5.3, 0.1, 32).translate(0, 0.05, 0), SC.x - 30, 0.72, SC.z));
+    B.add(paving, place(new THREE.CylinderGeometry(13, 13, 0.06, 40).translate(0, 0.03, 0), SC.x - 30, 0, SC.z));
+    const pad = mat(0x3fa0c8, { roughness: 0.6 }), padG = mat(0x6cc070, { roughness: 0.6 });
+    B.add(pad, place(new THREE.CylinderGeometry(9, 9, 0.08, 36).translate(0, 0.04, 0), SC.x - 20, 0, SC.z + 36));
+    B.add(padG, place(new THREE.CylinderGeometry(4.5, 4.5, 0.1, 24).translate(0, 0.05, 0), SC.x - 23, 0.02, SC.z + 33));
+    halos.push(SC.x - 30, 2.2, SC.z);
     // terraced lawn bowl rising away from the stage (toward +X)
     const a0 = -1.05, a1 = 1.05, segs = 24;
     const rings = [];
