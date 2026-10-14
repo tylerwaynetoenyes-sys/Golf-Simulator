@@ -24,6 +24,7 @@ Required credit:
 | Paris (Bois de Boulogne) | `assets/courses/paris/` | EU-DEM / SRTM |
 | Cassis (Provence) | `assets/courses/cassis/` | EU-DEM / SRTM |
 | Pebble Beach (CA) | `assets/courses/pebble/` | USGS 3DEP |
+| TPC Sawgrass (FL) | `assets/courses/sawgrass/` | USGS 3DEP |
 
 ## Map data
 
@@ -31,12 +32,14 @@ Required credit:
   https://www.openstreetmap.org/copyright): the Statue of Liberty course's
   hole lines, greens, fairways, bunkers and water (Liberty National's front
   nine; Pebble Beach Golf Links' front nine, inside the OSM boundary of
-  "Pebble Beach Golf Course"; imported with `tools/import-course.mjs` through the Overpass API), and
+  "Pebble Beach Golf Course"; the TPC Sawgrass Stadium Course back nine,
+  inside "TPC Sawgrass", with the 17th's lake redrawn as one island pond;
+  imported with `tools/import-course.mjs` through the Overpass API), and
   the positions of landmarks on the East St. Louis, Paris and Cassis courses
   (Eads Bridge, grain elevators, Gateway Arch, harbour and château).
 - **OpenGolfAPI** (https://opengolfapi.org, ODbL 1.0; course data
-  © OpenStreetMap contributors): course search and the Liberty National and Pebble Beach
-  scorecards (pars, yardages, stroke indexes). Credit: "© OpenStreetMap
+  © OpenStreetMap contributors): course search and the Liberty National, Pebble Beach and TPC Sawgrass
+  Stadium scorecards (pars, yardages, stroke indexes). Credit: "© OpenStreetMap
   contributors (ODbL 1.0) via OpenGolfAPI".
 
 Data under the ODbL can be used and adapted, including commercially, as long

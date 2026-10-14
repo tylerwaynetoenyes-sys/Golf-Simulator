@@ -97,6 +97,29 @@ Checks: `node tools/holes-check.mjs` (all six courses OK),
 Dev shortcut: `?play=<course>&hole=<n>&day` opens a hole in demo mode;
 add `&manual` to drive frames with `window.__advance(seconds)`.
 
+## Second pass, same day (from the full original brief)
+
+- **Course atmosphere**: East St. Louis decay (fences, razor wire, poles,
+  graffiti warehouses), Liberty flags and night fireworks (a volley on
+  every hole-out), Cassis 9 rerouted down to the beach.
+- **Design direction** (`docs/design-direction.md`) and an interface pass
+  to match: Jost (bundled, OFL), brass as the one accent, film grain on the
+  glass, GSAP motion (`js/ui/motion.js`, vendored in `vendor/gsap/`) for
+  panels, hole card, hole curtain and launch screen; reduced motion falls
+  back to plain fades.
+- **Light and weather**: Poly Haven HDRIs for image-based light (the sun
+  aligned to the scene's), overcast and night variants; **Rain** weather
+  (`js/scene/rain.js`, audio hiss, wet turf in `simulateShot` via `wet`).
+- **Ground colour** from Copernicus Sentinel-2 (`tools/fetch-sat.py`, runs
+  with rasterio + Pillow) on every real-ground backdrop; steep faces keep
+  their rock colour. EOX Cloudless was rejected on licence (CC BY-NC-SA).
+- **Pebble Beach** front nine and the **TPC Sawgrass** Stadium back nine
+  (island green at 17); `--course` keeps OSM holes inside one course and
+  imports keep real hole numbers.
+- **Tools review**: `docs/tools-review.md` (3D generation and R3F decisions).
+- Multiplayer checked in the browser: 4 players, two teams, honour then
+  farthest-away order, best-ball team scores, tie verdicts fixed.
+
 ## Next steps
 
 - Long and middle irons land 2–4° flatter than Trackman; closing that needs

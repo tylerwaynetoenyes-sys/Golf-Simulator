@@ -33,7 +33,7 @@ const LINES = {
   gir: ['Green in regulation.', 'On the green in regulation.'],
   lagMiss: ['Lag finishes short of the hole.', 'Pace was off.'],
   courseWater: ['In the water. Penalty stroke.'],
-  rough: ['In the rough. The lie will cost distance and spin.', 'Misses the fairway. Rough.'],
+  rough: ['In the rough. The lie will cost distance and spin.', 'In the rough.'],
   welcome: ['Range is open. Hit when ready.', 'Conditions are set. Hit when ready.'],
   r10: ['R10 connected. Live shot data on every swing.', 'Launch monitor ready.'],
 };

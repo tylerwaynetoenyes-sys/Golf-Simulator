@@ -5,6 +5,7 @@
 import { HOLES } from './holes.js';
 import { loadDem, prepareDemHoles } from './dem.js';
 import oregon from './courses/oregon.js';
+import sawgrass from './courses/sawgrass.js';
 import pebble from './courses/pebble.js';
 import liberty from './courses/liberty.js';
 import eaststl from './courses/eaststl.js';
@@ -21,7 +22,7 @@ const CONFLUENCE = {
 };
 
 /** Every course, in picker order (holes may still need loading: see loadCourse). */
-export const COURSES = [CONFLUENCE, eaststl, oregon, paris, cassis, liberty, pebble];
+export const COURSES = [CONFLUENCE, eaststl, oregon, paris, cassis, liberty, pebble, sawgrass];
 
 export const courseById = (id) => COURSES.find((c) => c.id === id) || CONFLUENCE;
 
