@@ -94,6 +94,7 @@ function cassisport() {
   for (let i = 0; i < 90; i++) {
     const a = Math.PI * (0.05 + rnd() * 0.9), r = 70 + rnd() * 260;
     const x = Math.cos(a) * r * 1.4, z = -Math.sin(a) * r * 0.9;
+    if (x > 300) continue; // the home hole runs down to the beach east of the town
     const w = 8 + rnd() * 8, d = 8 + rnd() * 6, h = 7 + Math.floor(rnd() * 3) * 3;
     const f = pastel[Math.floor(rnd() * pastel.length)];
     const house = new THREE.Group();

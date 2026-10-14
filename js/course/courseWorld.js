@@ -10,6 +10,8 @@ import { makeFlag, lightConeMaterial } from '../scene/rangeProps.js';
 import { CUP } from '../core/physics.js';
 import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
 import { plantTrees, updateTrees, THEME_TREES } from '../scene/trees.js';
+import { buildDecay } from './decay.js';
+import { dressPinFlag, flagpole, fireworks } from './usa.js';
 
 const C = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
 const COL = {
@@ -32,7 +34,7 @@ const PALETTES = {
   urban: { grass: C(0.3, 0.42, 0.2), scrub: C(0.38, 0.38, 0.35), rock: C(0.55, 0.52, 0.48), rockSlope: 0.6, shore: C(0.42, 0.4, 0.34) },
   // East St. Louis: worn bottomland turf, weedy verges, gravel and river mud
   industrial: { grass: C(0.34, 0.44, 0.21), scrub: C(0.43, 0.42, 0.32), rock: C(0.52, 0.5, 0.46), rockSlope: 0.5,
-    rough: C(0.29, 0.43, 0.18), deep: C(0.36, 0.42, 0.22), shore: C(0.45, 0.41, 0.33) },
+    rough: C(0.29, 0.43, 0.18), deep: C(0.36, 0.42, 0.22), shore: C(0.45, 0.41, 0.33), bare: C(0.44, 0.38, 0.29) },
   // the Bois de Boulogne: deep parkland greens under oak and chestnut
   paris: { grass: C(0.27, 0.41, 0.17), scrub: C(0.24, 0.35, 0.16), rock: C(0.55, 0.52, 0.46), rockSlope: 0.6,
     shore: C(0.5, 0.47, 0.4) },
@@ -276,6 +278,31 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     this.flag.add(beacon);
     this.flag.userData.beacon = beacon;
     g.add(this.flag);
+    // the Statue of Liberty course flies the Stars and Stripes
+    this.flagpoles = [];
+    this.fireworks?.userData.dispose?.();
+    this.fireworks = null;
+    if (hole.theme === 'harbor') {
+      dressPinFlag(this.flag);
+      const spots = [[-11, -3], [11, -3]]; // either side of the tee, in view at address
+      const gb = [T.green.x - T.finalDir.x * (T.greenR + 16) * -1 + T.finalRight.x * 10, T.green.z - T.finalDir.z * (T.greenR + 16) * -1 + T.finalRight.z * 10];
+      spots.push(gb);
+      for (const [x, z] of spots) {
+        const fp = flagpole(x === gb[0] ? 14 : 11);
+        fp.position.set(x, T.meshHeight(x, z), z);
+        fp.rotation.y = ((this.windFrom + 90) * Math.PI) / 180;
+        g.add(fp);
+        this.flagpoles.push(fp);
+      }
+      // fireworks out over the water toward the Statue
+      const st = (hole.far || []).find((f) => f.type === 'statueofliberty');
+      if (st && T.F) {
+        const [lx, lz] = T.F.toLocal(st.dem[0], st.dem[1]);
+        const k = 0.6; // between the course and the island
+        this.fireworks = fireworks(new THREE.Vector3(lx * k, T.seaLevel ?? 0, lz * k));
+        g.add(this.fireworks);
+      }
+    }
     const cup = buildCup();
     cup.position.set(T.pin.x, pinY, T.pin.z);
     g.add(cup);
@@ -461,6 +488,19 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
       this.treeGrid.get(key).push(t);
     }
 
+    // ── East St. Louis: the decay beyond the boundary (never in play) ──
+    if (hole.theme === 'industrial') {
+      const cor = Math.max(T.fwHalf, 14);
+      const clear = (x, z) => {
+        if (inLandmark(x, z)) return true;
+        const pr = T.project(x, z);
+        if (Math.abs(pr.d) < cor + 30 && pr.s > -40 && pr.s < T.length + 50) return true;
+        if (Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 40 || Math.hypot(x, z) < 40) return true;
+        return T.terrain(x, z).surface === 'water';
+      };
+      g.add(buildDecay(T, rand, (x, z) => T.meshHeight(x, z), clear));
+    }
+
     // ── long grass in the rough: tufts thicken away from the fairway ──
     this._buildRoughGrass(T, g, rand, b);
     if (hole.theme === 'western' || hole.theme === 'coastal') this._buildShrubs(T, g, rand, hole.theme);
@@ -618,6 +658,11 @@ diffuseColor.rgb *= 0.5 + 0.62 * mix(bd, bd2, 0.45);`);
         const P = PALETTES[T.hole.theme] || PALETTES.parkland;
         const deep = Math.min(1, Math.max(0, (Math.abs(pr.d) - Math.max(T.fwHalf, 12) - 8) / 30));
         c.copy(P.rough || COL.rough).lerp(P.deep || COL.deep, deep);
+        // worn, bare ground breaking through the neglected rough
+        if (P.bare) {
+          const n = 0.5 + 0.5 * Math.sin(x * 0.09 + Math.sin(z * 0.07) * 2.3) * Math.cos(z * 0.11 - x * 0.05);
+          c.lerp(P.bare, THREE.MathUtils.smoothstep(n, 0.62, 0.86) * deep * 0.85);
+        }
         if (T.F) {
           // real-ground courses: the maintained rough gives way to the land
           // itself (an irregular edge, not a ruler line)
@@ -1182,6 +1227,8 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
     if (this.ring) this.ring.userData.update(dt, t);
     if (this.landmark?.update) this.landmark.update(t, dt, this.day);
     for (const lm of this.farLms || []) lm.update?.(t, dt, this.day);
+    for (const fp of this.flagpoles || []) fp.userData.update(t, this.wind);
+    this.fireworks?.userData.update(dt, this.day);
     updateTrees(t, this.wind);
     if (this.rings) {
       const u = this.rings.material.uniforms;
