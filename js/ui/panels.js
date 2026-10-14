@@ -2,7 +2,7 @@
 // entry, R10 help, players & teams, course setup, scorecards and summaries.
 import { $, esc, copyButtons, toast } from './dom.js';
 import { bus } from '../core/events.js';
-import { HOLES } from '../course/holes.js';
+import { COURSES, courseById, loadCourse } from '../course/courses.js';
 import { CourseMode, fmtToPar, PUTT_RINGS, MULLIGANS } from '../game/courseMode.js';
 import { PLAYER_COLORS, TEAMS, MAX_PLAYERS } from '../game/roster.js';
 import { store } from '../data/store.js';
@@ -530,30 +530,55 @@ export function openScorecard(game, { onContinue } = {}) {
   });
 }
 
+/** Horizontal length of a hole in yards (works before a DEM course is loaded). */
+function holeYards(h) {
+  const P = h.pts ? h.pts.map(([x, z]) => [x / 0.9144, z / 0.9144]) : h.line;
+  let s = 0;
+  for (let i = 0; i < P.length - 1; i++) s += Math.hypot(P[i + 1][0] - P[i][0], P[i + 1][1] - P[i][1]);
+  return Math.round(s);
+}
+
 export function openCourseSetup(game) {
   const s = store.settings;
   const saved = CourseMode.savedRound(game.roster);
+  let course = courseById(s.course || 'confluence');
   let length = s.courseLength || 9;
   let start = s.courseStart || 1;
   let rings = PUTT_RINGS[s.rings] ? s.rings : 'standard';
   let mull = MULLIGANS[s.mulligans] ? s.mulligans : 'nine';
-  const pick = () => (length === 18 ? HOLES : HOLES.slice(start - 1, start + 8));
+  const fix = () => {
+    if (course.holes.length < 18) { length = 9; start = 1; }
+  };
+  fix();
+  const pick = () => (length === 18 ? course.holes : course.holes.slice(start - 1, start + 8));
   const holeList = () => {
     const hs = pick();
-    return `<div class="tiles" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${hs.map((h) => `<div class="tile" style="padding:10px 12px"><div style="font-size:12px;color:var(--text-3)">${h.n} · Par ${h.par}</div><div style="font-weight:600;font-size:14px">${esc(h.name)}</div></div>`).join('')}</div>`;
+    return `<div class="tiles" style="grid-template-columns:repeat(auto-fill,minmax(150px,1fr))">${hs.map((h) => `<div class="tile" style="padding:10px 12px"><div style="font-size:12px;color:var(--text-3)">${h.n} · Par ${h.par} · ${holeYards(h)} yd</div><div style="font-weight:600;font-size:14px">${esc(h.name)}</div></div>`).join('')}</div>`;
   };
-  const players = game.roster.players;
-  const el = openPanel(`
-    ${closeX}
-    <h2>The Confluence Course</h2>
-    <p class="panel-sub">Eighteen holes past the Arch, Chain of Rocks, Cahokia, the Basilica and the old Alton riverfront. Stroke play; teams play best ball.</p>
-    ${saved ? `<div class="callout" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>Round in progress: hole ${HOLES[saved.first - 1 + saved.holeIdx]?.n ?? saved.holeIdx + 1}, ${saved.length} holes</span><button class="btn btn-primary" id="csResume">Resume round</button></div>` : ''}
-    <h3>Holes</h3>
-    <div class="seg" id="csLen">
+  const courseCards = () => COURSES.map((c) => {
+    const par = c.holes.reduce((a, h) => a + h.par, 0);
+    const yd = c.holes.reduce((a, h) => a + holeYards(h), 0);
+    return `<button class="course-card" data-course="${c.id}" aria-pressed="${c.id === course.id}">
+      <span class="cc-place">${esc(c.place)}</span>
+      <span class="cc-name">${esc(c.name)}</span>
+      <span class="cc-meta">${c.holes.length} holes · Par ${par} · ${yd.toLocaleString()} yd${c.dem ? ' · Real terrain' : ''}</span>
+    </button>`;
+  }).join('');
+  const lengthSeg = () => course.holes.length >= 18 ? `
       <button data-v="f9" aria-pressed="${length === 9 && start === 1}">Front 9</button>
       <button data-v="b9" aria-pressed="${length === 9 && start === 10}">Back 9</button>
-      <button data-v="18" aria-pressed="${length === 18}">Full 18</button>
-    </div>
+      <button data-v="18" aria-pressed="${length === 18}">Full 18</button>` : '<button data-v="f9" aria-pressed="true">9 holes</button>';
+  const players = game.roster.players;
+  const savedCourse = saved ? courseById(saved.course || 'confluence') : null;
+  const el = openPanel(`
+    ${closeX}
+    <h2>Play a course</h2>
+    <p class="panel-sub" id="csBlurb">${esc(course.blurb)}</p>
+    ${saved ? `<div class="callout" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>Round in progress: ${esc(savedCourse.name)}, hole ${savedCourse.holes[saved.first - 1 + saved.holeIdx]?.n ?? saved.holeIdx + 1}, ${saved.length} holes</span><button class="btn btn-primary" id="csResume">Resume round</button></div>` : ''}
+    <h3>Course</h3>
+    <div class="course-cards" id="csCourse">${courseCards()}</div>
+    <h3>Holes</h3>
+    <div class="seg" id="csLen">${lengthSeg()}</div>
     <div id="csHoles" style="margin-top:12px">${holeList()}</div>
     <h3>On the green</h3>
     <div class="setting" style="border:0;padding-top:0"><div><div class="hint">No putting: two rings around every hole settle it. Finish inside the gold ring for a 1-putt, inside the white ring for a 2-putt, anywhere else on the green for a 3-putt. Roll it in the cup and it's holed.</div></div>
@@ -566,10 +591,21 @@ export function openCourseSetup(game) {
       ${game.roster.teamMode ? `<div class="hint">Teams: ${game.roster.teams().map((t) => `${esc(t.name)} (${t.members.length})`).join(' vs ')}</div>` : ''}</div>
       <button class="btn btn-quiet" id="csPlayers">Edit players</button></div>
     <div class="panel-actions"><button class="btn btn-ghost" data-close>Cancel</button><button class="btn btn-primary" id="csStart">Tee off</button></div>`, { wide: true });
-  el.querySelectorAll('#csLen button').forEach((b) => b.addEventListener('click', () => {
+  const bindLen = () => el.querySelectorAll('#csLen button').forEach((b) => b.addEventListener('click', () => {
     el.querySelectorAll('#csLen button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     length = b.dataset.v === '18' ? 18 : 9;
     start = b.dataset.v === 'b9' ? 10 : 1;
+    el.querySelector('#csHoles').innerHTML = holeList();
+    audio.tick();
+  }));
+  bindLen();
+  el.querySelectorAll('#csCourse [data-course]').forEach((b) => b.addEventListener('click', () => {
+    course = courseById(b.dataset.course);
+    fix();
+    el.querySelectorAll('#csCourse [data-course]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    el.querySelector('#csBlurb').textContent = course.blurb;
+    el.querySelector('#csLen').innerHTML = lengthSeg();
+    bindLen();
     el.querySelector('#csHoles').innerHTML = holeList();
     audio.tick();
   }));
@@ -584,20 +620,33 @@ export function openCourseSetup(game) {
     audio.tick();
   }));
   el.querySelector('#csPlayers').addEventListener('click', () => openPlayers(game, { then: () => openCourseSetup(game) }));
-  el.querySelector('#csStart').addEventListener('click', () => {
+  // real-terrain courses fetch their elevation before the first tee
+  const go = async (btn, id, opts) => {
+    btn.disabled = true;
+    const label = btn.textContent;
+    btn.textContent = 'Loading terrain…';
+    let c;
+    try { c = await loadCourse(id); } catch (e) {
+      console.error(e);
+      btn.disabled = false; btn.textContent = label;
+      toast('Course terrain could not load', { kind: 'warn', sub: 'Check the connection to the game server and try again.' });
+      return;
+    }
+    onClose = null;
+    closePanel();
+    game.setMode('course', { ...opts, course: c });
+  };
+  el.querySelector('#csStart').addEventListener('click', (e) => {
+    store.setSetting('course', course.id);
     store.setSetting('courseLength', length);
     store.setSetting('courseStart', start);
     store.setSetting('rings', rings);
     store.setSetting('mulligans', mull);
-    onClose = null;
-    closePanel();
     audio.click();
-    game.setMode('course', { length, rings, mulligans: mull, startHole: start });
+    go(e.currentTarget, course.id, { length, rings, mulligans: mull, startHole: start });
   });
-  el.querySelector('#csResume')?.addEventListener('click', () => {
-    onClose = null;
-    closePanel();
-    game.setMode('course', { length: saved.length, rings: saved.rings, mulligans: saved.mulligans, startHole: saved.first, resume: saved });
+  el.querySelector('#csResume')?.addEventListener('click', (e) => {
+    go(e.currentTarget, savedCourse.id, { length: saved.length, rings: saved.rings, mulligans: saved.mulligans, startHole: saved.first, resume: saved });
   });
 }
 

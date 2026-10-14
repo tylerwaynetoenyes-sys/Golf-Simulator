@@ -10,7 +10,8 @@
 // the inner ring and it's a 1-putt, inside the outer ring a 2-putt, anywhere
 // else on the green a 3-putt. A ball that rolls into the cup is simply holed.
 import { simulatePutt, puttSpeedFor, YD } from '../core/physics.js';
-import { HOLES, coursePar } from '../course/holes.js';
+import { coursePar } from '../course/holes.js';
+import { loadedCourse } from '../course/courses.js';
 import { HoleTerrain } from '../course/holeTerrain.js';
 import { store } from '../data/store.js';
 import { proximity, dist, distUnit } from '../core/units.js';
@@ -67,7 +68,8 @@ export class CourseMode {
   constructor(game) {
     this.game = game;
     this.id = 'course';
-    this.name = 'The Confluence Course';
+    this.def = loadedCourse('confluence');
+    this.name = this.def.name;
     this.blurb = '9 or 18 holes past the Arch, Chain of Rocks, Cahokia and more.';
     this.course = true;
     this.roundOver = false;
@@ -87,9 +89,15 @@ export class CourseMode {
     if (opts.mulligans && MULLIGANS[opts.mulligans]) this.mulligans = opts.mulligans;
     this.mullUsed = new Map();
     this._undo = null;
+    // opts.course: a course from loadCourse() (DEM already fetched)
+    if (opts.course) this.def = opts.course;
+    this.name = this.def.name;
+    this.blurb = this.def.blurb;
+    const all = this.def.holes;
+    this.length = Math.min(this.length, all.length);
     const first = opts.startHole || 1;
-    this.holes = HOLES.slice(first - 1, first - 1 + this.length);
-    if (this.holes.length < this.length) this.holes = HOLES.slice(0, this.length);
+    this.holes = all.slice(first - 1, first - 1 + this.length);
+    if (this.holes.length < this.length) this.holes = all.slice(0, this.length);
     this.holeIdx = 0;
     this.roundOver = false;
     this.cards = new Map(this.players.map((p) => [p.id, []]));
@@ -579,7 +587,7 @@ export class CourseMode {
   _save() {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
-        at: Date.now(), length: this.length, first: this.holes[0].n, holeIdx: this.holeIdx, rings: this.rings, mulligans: this.mulligans,
+        at: Date.now(), course: this.def.id, length: this.length, first: this.holes[0].n, holeIdx: this.holeIdx, rings: this.rings, mulligans: this.mulligans,
         names: this.players.map((p) => p.name),
         cards: this.players.map((p) => this.cards.get(p.id)),
         honor: this.honor.map((id) => this.players.findIndex((p) => p.id === id)),

@@ -42,7 +42,9 @@ export class HoleTerrain {
     this.slope = hole.green.slope;
     this.fwHalf = hole.fw / 2;
     this.fwStart = (hole.fwStart || 0) * YD;
-    this.greenBase = this.elevAt(1) + 0.4;
+    // real ground: heights from the course DEM, relative to the tee
+    this.F = hole.demFrame || null;
+    this.greenBase = this.elevAt(1) + (this.F ? 0.25 : 0.4);
     // Green contours: two soft swells/swales per green (deterministic per hole)
     // on top of the overall tilt, flattened around the pin like a real hole
     // location. Peak slopes stay around 2–3%.
@@ -123,6 +125,10 @@ export class HoleTerrain {
   }
 
   elevAt(t) {
+    if (this.F) {
+      const p = this.pointAt(Math.min(1, Math.max(0, t)) * this.length);
+      return this.F.height(p.x, p.z);
+    }
     const e = this.hole.elev;
     if (t <= e[0][0]) return e[0][1];
     for (let i = 0; i < e.length - 1; i++) {
@@ -157,15 +163,27 @@ export class HoleTerrain {
   }
 
   /** Ground shape without water (shared by physics and mesh). */
+  /** The bare ground with no shaping (DEM courses only): what the backdrop meets. */
+  baseGround(x, z) { return this.F ? this.F.height(x, z) : null; }
+
   _land(x, z, pr) {
     const t = Math.min(1.15, Math.max(-0.1, pr.s / this.length));
-    let h = this.elevAt(Math.min(1, Math.max(0, t)));
     const ad = Math.abs(pr.d);
     const corridor = Math.max(this.fwHalf, 12);
-    // mounding and tree-line rise outside the corridor
-    h += 1.8 * smooth(corridor + 4, corridor + 40, ad) + 2.5 * smooth(corridor + 40, corridor + 110, ad);
-    h += (vnoise(x * 0.025, z * 0.025) - 0.5) * 1.6 * smooth(4, corridor + 10, ad);
-    h += (vnoise(x * 0.09, z * 0.09) - 0.5) * 0.35;
+    let h;
+    if (this.F) {
+      // the real ground, plus a little mown-in roll on the corridor and
+      // natural lumps in the rough (the DEM is ~8 m resolution)
+      h = this.F.height(x, z);
+      h += (vnoise(x * 0.03, z * 0.03) - 0.5) * 0.9 * smooth(corridor - 4, corridor + 20, ad);
+      h += (vnoise(x * 0.09, z * 0.09) - 0.5) * 0.3;
+    } else {
+      h = this.elevAt(Math.min(1, Math.max(0, t)));
+      // mounding and tree-line rise outside the corridor
+      h += 1.8 * smooth(corridor + 4, corridor + 40, ad) + 2.5 * smooth(corridor + 40, corridor + 110, ad);
+      h += (vnoise(x * 0.025, z * 0.025) - 0.5) * 1.6 * smooth(4, corridor + 10, ad);
+      h += (vnoise(x * 0.09, z * 0.09) - 0.5) * 0.35;
+    }
     // side slope across the hole (fairways that cant toward a hazard), eased
     // out well beyond the corridor
     const tilt = this.tiltAt(Math.min(1, Math.max(0, t)));
@@ -238,9 +256,9 @@ export class HoleTerrain {
       const bank = smooth(1.45, 0.95, w.q);
       h = h + (Math.min(h, bowl) - h) * bank;
     }
-    // far skirt drops gently to meet the course's base plane
-    const ad = Math.abs(pr.d);
-    h -= 4 * smooth(this.oobLateral + 40, this.oobLateral + 160, ad);
+    // far skirt drops gently to meet the course's base plane (real-ground
+    // holes meet the backdrop terrain instead; see CourseWorld)
+    if (!this.F) h -= 4 * smooth(this.oobLateral + 40, this.oobLateral + 160, Math.abs(pr.d));
     return h;
   }
 

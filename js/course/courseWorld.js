@@ -18,6 +18,18 @@ const COL = {
   sand: C(0.88, 0.8, 0.62), tee: C(0.38, 0.6, 0.25), bed: C(0.3, 0.32, 0.22),
 };
 
+// Natural ground beyond the golf (the real-terrain backdrop), per course theme.
+const PALETTES = {
+  parkland: { grass: C(0.27, 0.42, 0.17), scrub: C(0.22, 0.34, 0.15), rock: C(0.5, 0.47, 0.4), rockSlope: 0.6 },
+  // short-grass prairie in late summer: cured buffalo and grama grass, sage,
+  // and the buff Brule siltstone and Gering sandstone of the bluffs
+  western: { grass: C(0.66, 0.55, 0.32), scrub: C(0.46, 0.47, 0.34), rock: C(0.8, 0.71, 0.56), rockSlope: 0.42,
+    rough: C(0.33, 0.47, 0.2), deep: C(0.5, 0.5, 0.27) },
+  // Provençal garrigue on white Urgonian limestone, red Cap Canaille cliffs
+  coastal: { grass: C(0.4, 0.43, 0.26), scrub: C(0.3, 0.36, 0.22), rock: C(0.84, 0.8, 0.72), rockSlope: 0.45 },
+  urban: { grass: C(0.3, 0.42, 0.2), scrub: C(0.38, 0.38, 0.35), rock: C(0.55, 0.52, 0.48), rockSlope: 0.6 },
+};
+
 function seeded(seed) {
   let s = seed >>> 0;
   return () => {
@@ -98,20 +110,26 @@ export class CourseWorld {
     const uv = new Float32Array(nx * nz * 2);
     const sd = new Float32Array(nx * nz * 2); // arc length + lateral offset, for mowing patterns
     const fw = new Float32Array(nx * nz); // 1 on fairway / tee, for the stripes
-    const c = new THREE.Color();
+    const c = new THREE.Color(), c2 = new THREE.Color();
+    const bx1 = b.minx + (nx - 1) * step, bz0 = b.maxz - (nz - 1) * step;
+    this.base.visible = !T.F;
     let k = 0;
     for (let j = 0; j < nz; j++) {
       for (let i = 0; i < nx; i++) {
         const x = b.minx + i * step, z = b.maxz - j * step;
         let h = T.meshHeight(x, z);
-        const edge = Math.min(x - b.minx, b.maxx - x, z - b.minz, b.maxz - z);
+        const edge = Math.min(x - b.minx, bx1 - x, z - bz0, b.maxz - z);
         const ek = Math.min(1, Math.max(0, 1 - edge / 50));
-        // dive well below the base plane so the two cross steeply instead of
-        // running almost coplanar (a wide z-fighting band at distance)
-        h += (baseY - 6 - h) * ek * ek;
+        // real ground: settle onto the bare DEM at the edge, where the
+        // backdrop picks up exactly the same vertices. Otherwise dive well
+        // below the base plane so the two cross steeply instead of running
+        // almost coplanar (a wide z-fighting band at distance)
+        if (T.F) h += (T.baseGround(x, z) - h) * ek * ek * (3 - 2 * ek);
+        else h += (baseY - 6 - h) * ek * ek;
         pos.set([x, h, z], k * 3);
         uv.set([x * 0.15, z * 0.15], k * 2);
         const surf = this._colorAt(T, x, z, c);
+        if (T.F && ek > 0 && surf !== 'water') c.lerp(this._backColor(T, x, z, h, 4, c2), ek * ek);
         col.set([c.r, c.g, c.b], k * 3);
         const prj = T.project(x, z);
         sd.set([prj.s, prj.d], k * 2);
@@ -157,6 +175,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     const ground = new THREE.Mesh(geo, groundMat);
     ground.receiveShadow = true;
     g.add(ground);
+    if (T.F) this._buildBackdrop(T, g, pos, nx, nz);
     // the coarse mesh exactly as drawn (two triangles per cell, split b–c)
     const coarseH = (x, z) => {
       const fi = (x - b.minx) / step, fj = (b.maxz - z) / step;
@@ -363,6 +382,80 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     return T;
   }
 
+  /**
+   * Real-ground courses: the land beyond the hole out to the horizon, from
+   * the course DEM. A ring mesh whose inner loop is the hole mesh's own
+   * border (same vertices, same heights), so the two meet with no seam or
+   * overlap; rings grow geometrically outward to ~7 km.
+   */
+  _buildBackdrop(T, g, pos, nx, nz) {
+    const loop = [];
+    for (let i = 0; i < nx; i++) loop.push(i);
+    for (let j = 1; j < nz; j++) loop.push(j * nx + nx - 1);
+    for (let i = nx - 2; i >= 0; i--) loop.push((nz - 1) * nx + i);
+    for (let j = nz - 2; j >= 1; j--) loop.push(j * nx);
+    const L = loop.length;
+    const P = (v) => [pos[v * 3], pos[v * 3 + 1], pos[v * 3 + 2]];
+    const x0 = pos[0], x1 = pos[(nx - 1) * 3], z1 = pos[2], z0 = pos[((nz - 1) * nx) * 3 + 2];
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, hw = (x1 - x0) / 2, hd = (z1 - z0) / 2;
+    const ds = [0];
+    for (let d = 0, inc = 2.5; d < 7000; inc *= 1.17) { d += inc; ds.push(d); }
+    const R = ds.length;
+    const vp = new Float32Array(R * L * 3), vc = new Float32Array(R * L * 3);
+    const c = new THREE.Color();
+    for (let r = 0; r < R; r++) {
+      const d = ds[r];
+      const sx = (hw + d) / hw, sz = (hd + d) / hd;
+      const spacing = Math.max(4, (ds[r + 1] ?? d * 1.2) - d);
+      for (let k = 0; k < L; k++) {
+        const [px, py, pz] = P(loop[k]);
+        const x = cx + (px - cx) * sx, z = cz + (pz - cz) * sz;
+        const y = r === 0 ? py : T.baseGround(x, z);
+        vp.set([x, y, z], (r * L + k) * 3);
+        this._backColor(T, x, z, y, spacing, c);
+        vc.set([c.r, c.g, c.b], (r * L + k) * 3);
+      }
+    }
+    const idx = [];
+    for (let r = 0; r < R - 1; r++) {
+      for (let k = 0; k < L; k++) {
+        const a = r * L + k, b = r * L + ((k + 1) % L), a2 = a + L, b2 = b + L;
+        idx.push(a, a2, b, b, a2, b2);
+      }
+    }
+    // keep the faces pointing up whichever way the loop runs
+    {
+      const v = (i) => new THREE.Vector3(vp[i * 3], vp[i * 3 + 1], vp[i * 3 + 2]);
+      const [a, b2, c2] = [v(idx[0]), v(idx[1]), v(idx[2])];
+      if (b2.sub(a).cross(c2.sub(a)).y < 0) for (let i = 0; i < idx.length; i += 3) [idx[i + 1], idx[i + 2]] = [idx[i + 2], idx[i + 1]];
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(vp, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(vc, 3));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }));
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    g.add(mesh);
+    this.backdrop = mesh;
+  }
+
+  /** Colour of the natural ground (no golf) at a point: grass, scrub, or rock on steep faces. */
+  _backColor(T, x, z, y, spacing, c) {
+    const P = PALETTES[T.hole.theme] || PALETTES.parkland;
+    const e = Math.max(2, spacing * 0.5);
+    const gx = (T.baseGround(x + e, z) - T.baseGround(x - e, z)) / (2 * e);
+    const gz = (T.baseGround(x, z + e) - T.baseGround(x, z - e)) / (2 * e);
+    const slope = Math.hypot(gx, gz);
+    const n1 = 0.5 + 0.5 * Math.sin(x * 0.013 + Math.cos(z * 0.011) * 2) * Math.cos(z * 0.017 - x * 0.004);
+    const n2 = 0.5 + 0.5 * Math.sin(x * 0.071 + z * 0.053) * Math.sin(z * 0.067 - x * 0.031);
+    c.copy(P.grass).lerp(P.scrub, THREE.MathUtils.smoothstep(n1 * 0.7 + n2 * 0.3, 0.35, 0.75));
+    if (P.low && y < P.lowBelow) c.lerp(P.low, THREE.MathUtils.smoothstep(P.lowBelow - y, 0, 6));
+    c.lerp(P.rock, THREE.MathUtils.smoothstep(slope, P.rockSlope, P.rockSlope + 0.25));
+    return c.multiplyScalar(0.94 + 0.12 * n2);
+  }
+
   _colorAt(T, x, z, c) {
     const t = T.terrain(x, z);
     const pr = T.project(x, z);
@@ -380,8 +473,17 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
       case 'tee': c.copy(COL.tee); break;
       case 'water': c.copy(COL.bed); break;
       default: {
+        const P = PALETTES[T.hole.theme] || PALETTES.parkland;
         const deep = Math.min(1, Math.max(0, (Math.abs(pr.d) - Math.max(T.fwHalf, 12) - 8) / 30));
-        c.copy(COL.rough).lerp(COL.deep, deep);
+        c.copy(P.rough || COL.rough).lerp(P.deep || COL.deep, deep);
+        if (T.F) {
+          // real-ground courses: the maintained rough gives way to the land
+          // itself (an irregular edge, not a ruler line)
+          const gd = Math.hypot(x - T.green.x, z - T.green.z) - T.greenR;
+          const wob = 14 * Math.sin(x * 0.021 + z * 0.013) + 8 * Math.sin(z * 0.047 - x * 0.031);
+          const w = THREE.MathUtils.smoothstep(Math.min(Math.abs(pr.d) - Math.max(T.fwHalf, 12), gd) + wob, 10, 46);
+          if (w > 0) c.lerp(this._backColor(T, x, z, T.baseGround(x, z), 4, this._c3 || (this._c3 = new THREE.Color())), w);
+        }
       }
     }
     const n = 0.92 + 0.12 * Math.sin(x * 0.21 + z * 0.13) * Math.cos(z * 0.17);
