@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <title>Alton Range</title>
-  <meta name="description" content="A night driving range on the Mississippi bluffs above Alton, with live Garmin Approach R10 support." />
+  <title>Fairway</title>
+  <meta name="description" content="Fairway: a golf simulator on real ground. Driving range, the Confluence Course and real-terrain courses, with live Garmin Approach R10 support." />
   <meta name="theme-color" content="#06090f" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="Alton Range" />
+  <meta name="apple-mobile-web-app-title" content="Fairway" />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2306090f'/%3E%3Cpath d='M14 50 Q32 2 50 50' fill='none' stroke='%23ffb46b' stroke-width='5' stroke-linecap='round'/%3E%3Ccircle cx='32' cy='50' r='4' fill='%23fff'/%3E%3C/svg%3E" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/brand/apple-touch-icon.png" />
   <link rel="stylesheet" href="css/app.css" />
   <script type="importmap">
     {
@@ -30,9 +31,9 @@
   <div id="hud" class="hud" data-visible="false">
     <header class="topbar">
       <div class="brand">
-        <svg class="brand-mark" viewBox="0 0 48 32" aria-hidden="true"><path d="M6 30 Q24 -10 42 30" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round"/></svg>
+        <svg class="brand-mark" viewBox="0 0 64 64" aria-hidden="true"><ellipse cx="32" cy="54" rx="25" ry="7.5" fill="#4fae70"/><rect x="23.6" y="6" width="3.8" height="48.5" rx="1.9" fill="#f5f1e8"/><path d="M27.4 6.5 H 51 Q 46.5 12 51 17.5 H 27.4 Z" fill="currentColor"/><path d="M27.4 23 H 43 Q 39.5 27.5 43 32 H 27.4 Z" fill="currentColor"/></svg>
         <div class="brand-text">
-          <span class="brand-name">Alton Range</span>
+          <span class="brand-name">Fairway</span>
           <span class="brand-sub" id="brandSub">Mississippi bluffs · night</span>
         </div>
       </div>
@@ -202,10 +203,10 @@
   <div id="launch" class="launch" data-visible="true">
     <div class="launch-inner">
       <div class="launch-mark" aria-hidden="true">
-        <svg viewBox="0 0 120 70"><path d="M10 66 Q60 -26 110 66" fill="none" stroke="url(#archGrad)" stroke-width="5" stroke-linecap="round"/><defs><linearGradient id="archGrad" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#ffd7a1"/><stop offset="1" stop-color="#fff6e6"/></linearGradient></defs></svg>
+        <svg viewBox="0 0 64 64"><defs><linearGradient id="lmGreen" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7fd39a"/><stop offset="1" stop-color="#3f9c62"/></linearGradient><linearGradient id="lmFlag" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ffd7a1"/><stop offset="1" stop-color="#ffb46b"/></linearGradient></defs><ellipse cx="32" cy="54" rx="25" ry="7.5" fill="url(#lmGreen)"/><ellipse cx="25.5" cy="54.3" rx="3.2" ry="1.3" fill="#0b1a13"/><rect x="23.6" y="6" width="3.8" height="48.5" rx="1.9" fill="#fff6e6"/><path class="lm-flag" d="M27.4 6.5 H 51 Q 46.5 12 51 17.5 H 27.4 Z" fill="url(#lmFlag)"/><path class="lm-flag lm-flag2" d="M27.4 23 H 43 Q 39.5 27.5 43 32 H 27.4 Z" fill="url(#lmFlag)"/></svg>
       </div>
-      <h1 class="launch-title">Alton Range</h1>
-      <p class="launch-tag">A golf simulator on the bluffs above the Mississippi.<br />Range practice and an 18-hole course through St. Louis and Alton.</p>
+      <h1 class="launch-title">Fairway</h1>
+      <p class="launch-tag">Golf on real ground.<br />The range, the Confluence Course and courses built on real elevation.</p>
 
       <div class="launch-actions">
         <button class="btn btn-primary btn-xl" id="pairButton">
@@ -261,12 +262,17 @@
     <div class="panel glass-strong" id="panelBody"></div>
   </div>
 
-  <div id="loading" class="loading">
-    <div class="loading-arc"></div>
-    <div class="loading-text">Lighting the range…</div>
+  <!-- hole-to-hole transition -->
+  <div id="holeWipe" class="hole-wipe" data-visible="false" aria-hidden="true">
+    <div class="hw-inner"><div class="hw-course" id="hwCourse"></div><div class="hw-num" id="hwNum"></div><div class="hw-name" id="hwName"></div></div>
   </div>
 
-  <noscript><div class="noscript">Alton Range needs JavaScript and WebGL.</div></noscript>
+  <div id="loading" class="loading">
+    <div class="loading-arc"></div>
+    <div class="loading-text">Setting the pins…</div>
+  </div>
+
+  <noscript><div class="noscript">Fairway needs JavaScript and WebGL.</div></noscript>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

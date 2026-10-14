@@ -38,7 +38,7 @@ def lan_addresses() -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="r10bridge", description="Garmin Approach R10 -> WebSocket bridge for Alton Range")
+    ap = argparse.ArgumentParser(prog="r10bridge", description="Garmin Approach R10 -> WebSocket bridge for Fairway")
     ap.add_argument("--host", default=None, help="bind address (default 127.0.0.1; 0.0.0.0 with --lan)")
     ap.add_argument("--port", type=int, default=8765, help="WebSocket + HTTP port (default 8765)")
     ap.add_argument("--lan", action="store_true",
@@ -105,7 +105,7 @@ def main(argv: list[str] | None = None) -> int:
             logging.warning("no index.html in %s; serving WebSocket only", args.web_root)
 
     if web_root is not None:
-        print("\n  Alton Range is ready.")
+        print("\n  Fairway is ready.")
         print(f"    On this computer:   http://localhost:{args.port}/")
         if S.ALLOW_LAN:
             for ip in lan_addresses():

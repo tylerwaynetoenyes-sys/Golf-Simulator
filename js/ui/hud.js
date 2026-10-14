@@ -297,6 +297,18 @@ export class HUD {
 
   hideHoleCard() { const el = $('#holeCard'); if (el) el.dataset.visible = 'false'; }
 
+  /** Hole-to-hole curtain: on with the next hole's number and name, then off. */
+  holeWipe(on, h = null) {
+    const el = $('#holeWipe');
+    if (!el) return;
+    if (on && h) {
+      $('#hwCourse').textContent = h.course || '';
+      $('#hwNum').textContent = String(h.n);
+      $('#hwName').textContent = h.name || '';
+    }
+    el.dataset.visible = on ? 'true' : 'false';
+  }
+
   /** Putting UI: hide clubs, offer auto putt, relabel the swing button. */
   setPuttMode(on) {
     if (this._putt === on) return;

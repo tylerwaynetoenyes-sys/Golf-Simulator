@@ -141,7 +141,7 @@ class Store {
       s.carry.toFixed(1), s.total.toFixed(1), s.offline.toFixed(1), s.apex.toFixed(1), s.descent.toFixed(1),
       JSON.stringify(s.result || ''),
     ]);
-    return `# Alton Range session export (${unitsLabel})\n` + [head, ...rows].map((r) => r.join(',')).join('\n');
+    return `# Fairway session export (${unitsLabel})\n` + [head, ...rows].map((r) => r.join(',')).join('\n');
   }
 }
 

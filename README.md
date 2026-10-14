@@ -1,4 +1,4 @@
-# Alton Range
+# Fairway
 
 Golf on the bluffs above the Mississippi, in the browser. A night (or
 afternoon) driving range with the Gateway Arch on the horizon, an 18-hole

@@ -713,13 +713,28 @@ export class Game {
 
   _nextHole(skipIntro = false, o = null) {
     if (this.state !== 'hole') return;
-    this.state = 'ready';
     const adv = o?.advance || this._pendingAdvance;
     this._pendingAdvance = null;
-    adv?.();
     this.world.tracer.clearGhosts();
     this.hud.clearDots();
-    if (skipIntro) { this.state = 'ready'; this._prepareTurn(true); } else this._introHole();
+    if (skipIntro || !this.mode.course) {
+      this.state = 'ready';
+      adv?.();
+      this._prepareTurn(true);
+      return;
+    }
+    // close the curtain over the old hole, build the new one behind it, then
+    // open on the flyover
+    const m = this.mode;
+    const next = m.holes[m.holeIdx + 1] || m.hole;
+    this.state = 'wipe';
+    this.hud.holeWipe(true, { n: next.n, name: next.name, course: m.name });
+    setTimeout(() => {
+      this.state = 'ready';
+      adv?.();
+      this._introHole();
+      setTimeout(() => this.hud.holeWipe(false), 450);
+    }, 420);
   }
 
   /** Fly the hole from tee to green, then settle behind the first player's ball. */

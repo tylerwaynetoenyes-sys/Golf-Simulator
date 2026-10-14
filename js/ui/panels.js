@@ -135,7 +135,7 @@ export function openSession(game) {
     const blob = new Blob([store.toCSV('SI units: m, m/s, deg, rpm')], { type: 'text/csv' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `alton-range-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.csv`;
+    a.download = `fairway-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.csv`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   });

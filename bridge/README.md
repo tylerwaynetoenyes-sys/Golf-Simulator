@@ -1,6 +1,6 @@
 # r10bridge
 
-A small local bridge between a **Garmin Approach R10** and the Alton Range game.
+A small local bridge between a **Garmin Approach R10** and the Fairway game.
 It connects to the R10 over Bluetooth LE, speaks the R10's MultiLink → COBS →
 GFDI → protobuf protocol, and streams every shot as JSON over a WebSocket on
 `ws://localhost:8765`. The same port also serves the game itself over HTTP, so
