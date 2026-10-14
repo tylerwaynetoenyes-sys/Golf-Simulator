@@ -10,6 +10,7 @@ import { CLUBS, clubById } from '../data/clubs.js';
 import * as U from '../core/units.js';
 import { MPH } from '../core/physics.js';
 import { audio } from '../audio/audio.js';
+import { panelIn } from './motion.js';
 
 const panel = $('#panel');
 const body = $('#panelBody');
@@ -21,6 +22,7 @@ export function openPanel(html, { onClosed, wide = false } = {}) {
   panel.dataset.visible = 'true';
   onClose = onClosed || null;
   copyButtons(body);
+  panelIn(body);
   for (const b of body.querySelectorAll('[data-close]')) b.addEventListener('click', () => closePanel());
   return body;
 }

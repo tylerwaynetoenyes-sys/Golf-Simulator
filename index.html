@@ -220,6 +220,7 @@
   <div id="launch" class="launch" data-visible="true">
     <div class="launch-inner">
       <h1 class="launch-title"><img src="assets/brand/fairway-logo-dark.svg" alt="Fairway, a golf game" /></h1>
+      <span class="rule"></span>
       <p class="launch-tag">Real ground, real courses, every swing from your Garmin R10.</p>
 
       <div class="launch-actions">
@@ -278,7 +279,7 @@
 
   <!-- hole-to-hole transition -->
   <div id="holeWipe" class="hole-wipe" data-visible="false" aria-hidden="true">
-    <div class="hw-inner"><div class="hw-course" id="hwCourse"></div><div class="hw-num" id="hwNum"></div><div class="hw-name" id="hwName"></div></div>
+    <div class="hw-inner"><div class="hw-course" id="hwCourse"></div><div class="hw-num" id="hwNum"></div><span class="rule"></span><div class="hw-name" id="hwName"></div></div>
   </div>
 
   <div id="loading" class="loading">
@@ -287,6 +288,8 @@
   </div>
 
   <noscript><div class="noscript">Fairway needs JavaScript and WebGL.</div></noscript>
+  <script src="vendor/gsap/gsap.min.js"></script>
+  <script>if (window.gsap) document.documentElement.classList.add("motion");</script>
   <script type="module" src="js/main.js"></script>
 </body>
 </html>

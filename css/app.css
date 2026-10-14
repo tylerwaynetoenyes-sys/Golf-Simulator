@@ -1,19 +1,22 @@
 /* Fairway — UI layer
-   Dark glass over the 3D scene. One accent (tee-light amber), one success
-   green for the R10 link, serif italic for commentary. */
+   Dark glass over the 3D scene. One accent (brass, from the logo), one
+   success green for the R10 link, serif italic for commentary.
+   See docs/design-direction.md. */
+
+@font-face { font-family: "Jost"; src: url("../assets/fonts/jost-latin-wght.woff2") format("woff2"); font-weight: 100 900; font-style: normal; font-display: swap; }
 
 :root {
-  --bg: #06090f;
+  --bg: #0b0d0f;
   --glass: rgba(12, 16, 24, 0.58);
   --glass-strong: rgba(14, 18, 27, 0.86);
   --hairline: rgba(255, 255, 255, 0.08);
   --hairline-strong: rgba(255, 255, 255, 0.14);
-  --text: #f5f1e8;
+  --text: #f2efe8;
   --text-2: rgba(245, 241, 232, 0.66);
   --text-3: rgba(245, 241, 232, 0.42);
-  --amber: #ffb46b;
-  --amber-hi: #ffd29a;
-  --gold: #ffd36a;
+  --amber: #d9b26a;
+  --amber-hi: #ecd08f;
+  --gold: #e6c983;
   --green: #5fe39a;
   --green-dim: rgba(95, 227, 154, 0.16);
   --red: #ff6f61;
@@ -24,6 +27,8 @@
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --font: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --display: "Jost", "Futura", "Avenir Next", var(--font, sans-serif);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .06 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
   --gutter: clamp(16px, 2.2vw, 28px);
 }
@@ -731,3 +736,66 @@ body.day { --glass: rgba(14, 18, 26, 0.64); --glass-strong: rgba(14, 18, 26, 0.8
 @keyframes eq { 0%, 100% { height: 2px; } 50% { height: 8px; } }
 #radioButton[data-state="loading"] .radio-eq i { animation-duration: 1.8s; opacity: 0.6; }
 @media (prefers-reduced-motion: reduce) { .radio-eq i { animation: none; height: 6px; } }
+
+
+/* ───────── Design pass: the clubhouse after dark ─────────
+   Jost for display and labels, brass for the one accent, film grain so the
+   glass reads as material. Motion lives in js/ui/motion.js (GSAP). */
+.glass, .glass-strong, .toast { background-image: var(--grain); background-size: 160px 160px; }
+.glass-strong { background-color: rgba(13, 15, 18, 0.86); }
+.glass { background-color: rgba(13, 15, 18, 0.62); }
+
+/* labels: caps, tracked wide, like the tagline */
+.hc-kicker, .ho-kicker, .lb-head, .env-label, .radio-group, .summary .sum-label, .hw-course, .shot-club, .cc-place,
+.hero-label, .panel h3, table.data th, .launch-tag, .hc-skip, .mode-title {
+  font-family: var(--display); }
+.hc-kicker, .lb-head, .env-label, .radio-group, .hero-label, .panel h3, .cc-place { letter-spacing: 0.2em; font-weight: 500; }
+.launch-tag { text-transform: uppercase; letter-spacing: 0.22em; font-size: clamp(11px, 1.1vw, 13px); color: var(--text-3); }
+.mode-title { letter-spacing: 0.08em; text-transform: uppercase; font-size: 13px; font-weight: 500; }
+
+/* numbers: large and light, tabular */
+.hc-num, .hw-num, .summary .sum-score, .hero-value, .outcome-main, .ho-title, .stat-v, .lb-val, .mc-name, .hc-name, .panel h2 {
+  font-family: var(--display); font-variant-numeric: tabular-nums; }
+.hero-value { font-weight: 400; letter-spacing: -0.02em; }
+.outcome-main { font-weight: 500; letter-spacing: 0; color: var(--amber-hi); }
+.hc-num { font-weight: 300; font-size: 64px; letter-spacing: -0.02em; }
+.hc-name { font-weight: 500; letter-spacing: 0.01em; }
+.panel h2 { font-weight: 500; letter-spacing: 0.01em; font-size: 24px; }
+.hw-num { font-weight: 200; letter-spacing: -0.02em; font-size: clamp(96px, 15vw, 190px); background: linear-gradient(180deg, #fbf8f1, #e6c983); -webkit-background-clip: text; background-clip: text; }
+.summary .sum-score { font-weight: 300; letter-spacing: -0.02em; background: linear-gradient(180deg, #fbf8f1, #e6c983); -webkit-background-clip: text; background-clip: text; }
+.ho-title { font-weight: 500; letter-spacing: 0.01em; background: linear-gradient(180deg, #fffaf0 10%, #ecd08f 55%, #b88d45); -webkit-background-clip: text; background-clip: text; }
+
+/* the gold rule that marks a title */
+.rule { display: block; height: 1px; width: 64px; margin: 14px auto 12px; background: linear-gradient(90deg, transparent, var(--amber-hi), transparent); transform-origin: 50% 50%; }
+.hole-card .rule { margin: 14px 0 0; width: 100%; background: linear-gradient(90deg, var(--amber-hi), rgba(236, 208, 143, 0)); transform-origin: 0 50%; }
+.panel-head h2 + .panel-sub, .panel > h2 + .panel-sub { margin-top: 2px; }
+.panel h2::after { content: ""; display: block; width: 36px; height: 1px; margin-top: 10px; background: var(--amber-hi); opacity: 0.75; }
+.summary h2::after, .sheet h2::after { margin-left: auto; margin-right: auto; }
+
+/* masked type reveals (js/ui/motion.js splits words into these) */
+.mask { display: inline-block; overflow: hidden; vertical-align: bottom; padding-bottom: 0.08em; margin-bottom: -0.08em; }
+.mask > span { display: inline-block; will-change: transform; }
+
+/* accent states in brass, not orange */
+.club[aria-pressed="true"] { background: linear-gradient(180deg, rgba(236, 208, 143, 0.2), rgba(184, 141, 69, 0.1)); box-shadow: inset 0 0 0 1px rgba(236, 208, 143, 0.32); }
+.club[aria-pressed="true"] .c-dist { color: rgba(236, 208, 143, 0.72); }
+.club .c-id { font-family: var(--display); font-weight: 500; letter-spacing: 0.04em; }
+.mode-card[aria-current="true"] { border-color: rgba(236, 208, 143, 0.45); background: linear-gradient(160deg, rgba(236, 208, 143, 0.13), rgba(255, 255, 255, 0.03)); }
+.mode-card.wide { background: linear-gradient(135deg, rgba(236, 208, 143, 0.11), rgba(255, 255, 255, 0.03)); }
+.shot-outcome { background: linear-gradient(135deg, rgba(236, 208, 143, 0.14), rgba(236, 208, 143, 0.03)); border-color: rgba(236, 208, 143, 0.18); }
+.radio-st[aria-current="true"], table.scorecard .cur { background: rgba(236, 208, 143, 0.1); }
+.env-weather button[aria-pressed="true"] { border-color: rgba(236, 208, 143, 0.55); background: rgba(236, 208, 143, 0.1); }
+.toast { animation: toastIn 0.45s var(--ease); }
+.toast.pb .t-icon, .summary .sum-best { background: linear-gradient(180deg, #ecd08f, #c29a52); }
+
+/* the hole curtain: graphite with a brass rule */
+.hole-wipe { background: radial-gradient(70% 60% at 50% 55%, rgba(17, 19, 22, 0.94), rgba(8, 9, 11, 0.99)); background-image: var(--grain), radial-gradient(70% 60% at 50% 55%, rgba(17, 19, 22, 0.94), rgba(8, 9, 11, 0.99)); }
+.hw-course { letter-spacing: 0.32em; font-weight: 500; }
+.hw-name { font-family: var(--display); font-style: normal; text-transform: uppercase; letter-spacing: 0.24em; font-size: clamp(13px, 1.4vw, 17px); color: var(--text-2); }
+
+/* the launch screen: logo, a gold hairline, the line */
+.launch-inner .rule { width: 120px; margin: 4px auto 18px; }
+/* GSAP drives these when it is present */
+.motion .launch-inner, .motion .launch-title img { animation: none; }
+@media (prefers-reduced-motion: reduce) { .mask > span { transform: none !important; } }
+.btn-xl { font-family: var(--display); font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; font-size: 14px; }

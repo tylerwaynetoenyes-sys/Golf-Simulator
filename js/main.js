@@ -10,6 +10,7 @@ import { Game } from './game/game.js';
 import { store } from './data/store.js';
 import { audio } from './audio/audio.js';
 import { $ } from './ui/dom.js';
+import { launchIn } from './ui/motion.js';
 
 // ?maxdt=0.25 lets slow (software-rendered) test runs keep real-time playback.
 const PARAMS = new URLSearchParams(location.search);
@@ -80,7 +81,10 @@ async function boot() {
     world.update(dt, ballPos, playT);
     if (firstFrame) {
       firstFrame = false;
-      setTimeout(() => $('#loading').classList.add('done'), 250);
+      setTimeout(() => {
+        $('#loading').classList.add('done');
+        if ($('#launch').dataset.visible === 'true') launchIn($('#launch'));
+      }, 250);
     }
     requestAnimationFrame(frame);
   };

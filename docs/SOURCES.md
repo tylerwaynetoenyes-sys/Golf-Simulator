@@ -101,3 +101,10 @@ Not redistributed; listed so figures can be checked.
   Great River Road, the Alton amphitheater and riverfront, the Cathedral
   Basilica, and the Miles Davis and Robert Wadlow statues (references only;
   not included in the repository).
+
+## Interface
+
+| Asset | Source | Licence |
+|---|---|---|
+| GSAP 3.12.5 (`vendor/gsap/`) | gsap.com, via npm | GSAP Standard "no charge" licence |
+| Jost variable font (`assets/fonts/`) | Owen Earl (indestructible type*), via @fontsource-variable/jost | SIL Open Font License 1.1 (`assets/fonts/Jost-OFL.txt`) |

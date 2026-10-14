@@ -3,6 +3,7 @@
 // card, name tags over other players' balls).
 import { CLUBS } from '../data/clubs.js';
 import { $, esc, countUp } from './dom.js';
+import { holeCardIn, wipeIn } from './motion.js';
 import * as U from '../core/units.js';
 import { MPH, YD } from '../core/physics.js';
 import { GREENS, CTP_GREEN, LAYOUT } from '../scene/layout.js';
@@ -287,12 +288,14 @@ export class HUD {
     if (!el) return;
     el.innerHTML = `
       <div class="hc-top"><span class="hc-num">${h.n}</span><div><div class="hc-kicker">Hole ${h.idx} of ${h.of}</div><div class="hc-name">${escape(h.name)}</div></div></div>
+      <span class="rule"></span>
       <div class="hc-stats"><div><b>Par ${h.par}</b></div><div><b>${U.isMetric() ? Math.round(h.yards * YD) : h.yards}</b> ${U.distUnit()}</div>${h.wind ? `<div>${h.wind}</div>` : ''}</div>
       ${h.note ? `<p class="hc-note">${escape(h.note)}</p>` : ''}
       ${h.rings ? `<div class="hc-rings"><span class="ring-gold"></span><span class="ring-white"></span>${escape(h.rings)}</div>` : ''}
       ${h.rules ? `<div class="hc-rules">${escape(h.rules)}</div>` : ''}
       <div class="hc-skip">Tap or press Enter to skip</div>`;
     el.dataset.visible = 'true';
+    holeCardIn(el);
   }
 
   hideHoleCard() { const el = $('#holeCard'); if (el) el.dataset.visible = 'false'; }
@@ -307,6 +310,7 @@ export class HUD {
       $('#hwName').textContent = h.name || '';
     }
     el.dataset.visible = on ? 'true' : 'false';
+    if (on && h) wipeIn(el);
   }
 
   /** Putting UI: hide clubs, offer auto putt, relabel the swing button. */
