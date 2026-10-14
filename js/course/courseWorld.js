@@ -85,7 +85,12 @@ export class CourseWorld {
     this.day = 0;
     this.wind = 0.3;
     this.windFrom = 200;
-    this.detail = this._detailTexture();
+    // turf and sand detail from Poly Haven scans (CC0; tools/blender/detail.py
+    // turns them into luminance maps); procedural noise until they arrive
+    const tl = new THREE.TextureLoader();
+    const load = (url, tex) => { tl.load(url, (t) => { tex.image = t.image; tex.needsUpdate = true; }); return tex; };
+    this.detail = load('assets/textures/ground_detail.jpg', this._detailTexture());
+    this.sandDetail = load('assets/textures/sand_detail.jpg', this._detailTexture());
   }
 
   _detailTexture() {
@@ -136,6 +141,7 @@ export class CourseWorld {
     const uv = new Float32Array(nx * nz * 2);
     const sd = new Float32Array(nx * nz * 2); // arc length + lateral offset, for mowing patterns
     const fw = new Float32Array(nx * nz); // 1 on fairway / tee, for the stripes
+    const sandA = new Float32Array(nx * nz); // 1 in bunkers, for the sand detail
     const c = new THREE.Color(), c2 = new THREE.Color();
     const bx1 = b.minx + (nx - 1) * step, bz0 = b.maxz - (nz - 1) * step;
     this.base.visible = !T.F;
@@ -160,6 +166,7 @@ export class CourseWorld {
         const prj = T.project(x, z);
         sd.set([prj.s, prj.d], k * 2);
         fw[k] = surf === 'fairway' ? 1 : surf === 'tee' ? 0.7 : 0;
+        sandA[k] = surf === 'sand' ? 1 : 0;
         k++;
       }
     }
@@ -176,6 +183,7 @@ export class CourseWorld {
     geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
     geo.setAttribute('aSD', new THREE.BufferAttribute(sd, 2));
     geo.setAttribute('aFw', new THREE.BufferAttribute(fw, 1));
+    geo.setAttribute('aSand', new THREE.BufferAttribute(sandA, 1));
     geo.setIndex(idx);
     geo.computeVertexNormals();
     const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, map: this.detail });
@@ -183,15 +191,17 @@ export class CourseWorld {
     // the hole with a faint cross-cut, plus a second, larger grass-detail
     // scale so the turf doesn't tile.
     groundMat.onBeforeCompile = (sh) => {
+      sh.uniforms.uSand = { value: this.sandDetail };
       sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute vec2 aSD;\nattribute float aFw;\nvarying vec2 vSD;\nvarying float vFw;')
-        .replace('#include <uv_vertex>', '#include <uv_vertex>\nvSD = aSD;\nvFw = aFw;');
+        .replace('#include <common>', '#include <common>\nattribute vec2 aSD;\nattribute float aFw;\nattribute float aSand;\nvarying vec2 vSD;\nvarying float vFw;\nvarying float vSand;')
+        .replace('#include <uv_vertex>', '#include <uv_vertex>\nvSD = aSD;\nvFw = aFw;\nvSand = aSand;');
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nvarying vec2 vSD;\nvarying float vFw;')
+        .replace('#include <common>', '#include <common>\nuniform sampler2D uSand;\nvarying vec2 vSD;\nvarying float vFw;\nvarying float vSand;')
         .replace('#include <map_fragment>', `
 vec4 texelColor = texture2D(map, vMapUv);
 float big = texture2D(map, vMapUv * 0.19 + 0.37).r;
 float detail = mix(texelColor.r, big, 0.4);
+detail = mix(detail, texture2D(uSand, vMapUv * 2.2).r, vSand);
 float band = step(0.5, fract(vSD.x / 12.0));
 float cross = step(0.5, fract(vSD.y / 9.0));
 float stripes = 1.0 + vFw * ((band - 0.5) * 0.16 + (cross - 0.5) * 0.05);
@@ -429,6 +439,17 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
           scale: 0.75 + rand() * 0.5, squash: 0.85 + rand() * 0.3, hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(), far: true });
       }
     }
+    // scanned (Poly Haven) trees are ~35k triangles each: keep them to the
+    // trees that frame play, and let the procedural variant stand in beyond
+    {
+      let heroes = 0;
+      const cap = Math.round(30 * (this.treeDensity ?? 1));
+      for (const sp of treeSpots) {
+        if (sp.variant < 100) continue;
+        if (sp.far || heroes >= cap) sp.variant = 10; // procedural olive
+        else heroes++;
+      }
+    }
     const forest = plantTrees(treeSpots);
     g.add(forest.group);
     for (const t of forest.records) {
@@ -501,7 +522,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     const ds = [0];
     for (let d = 0, inc = 2.5; d < 7000; inc *= 1.17) { d += inc; ds.push(d); }
     const R = ds.length;
-    const vp = new Float32Array(R * L * 3), vc = new Float32Array(R * L * 3);
+    const vp = new Float32Array(R * L * 3), vc = new Float32Array(R * L * 3), vu = new Float32Array(R * L * 2);
     const c = new THREE.Color();
     for (let r = 0; r < R; r++) {
       const d = ds[r];
@@ -512,6 +533,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
         const x = cx + (px - cx) * sx, z = cz + (pz - cz) * sz;
         const y = r === 0 ? py : T.baseGround(x, z);
         vp.set([x, y, z], (r * L + k) * 3);
+        vu.set([x / 18, z / 18], (r * L + k) * 2);
         this._backColor(T, x, z, y, spacing, c);
         vc.set([c.r, c.g, c.b], (r * L + k) * 3);
       }
@@ -532,9 +554,19 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.BufferAttribute(vp, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(vc, 3));
+    geo.setAttribute('uv', new THREE.BufferAttribute(vu, 2));
     geo.setIndex(idx);
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }));
+    // the natural ground carries the same aerial-scan detail as the rough
+    const bmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, map: this.detail });
+    bmat.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `
+float bd = texture2D(map, vMapUv).r;
+float bd2 = texture2D(map, vMapUv * 0.13 + 0.31).r;
+diffuseColor.rgb *= 0.5 + 0.62 * mix(bd, bd2, 0.45);`);
+    };
+    bmat.customProgramCacheKey = () => 'backdropGround';
+    const mesh = new THREE.Mesh(geo, bmat);
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
     g.add(mesh);

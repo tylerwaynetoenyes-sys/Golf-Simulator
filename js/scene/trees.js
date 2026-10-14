@@ -9,6 +9,46 @@
 // camera can stay out of them.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+/**
+ * Scanned trees from Poly Haven (CC0), thinned and re-exported in Blender by
+ * tools/blender/tree.py. They join the procedural set as extra variants once
+ * loaded (index VARIANTS.length + i); until then their spots use `fallback`.
+ */
+const HERO_SOURCES = [
+  // a gnarled Mediterranean tree that reads as an old olive (Poly Haven "Island Tree 02")
+  { url: 'assets/models/island_tree_02.glb', height: 6.5, fallback: 10 },
+];
+const heroes = [];
+let heroLoad = null;
+export function loadHeroTrees() {
+  if (heroLoad) return heroLoad;
+  const loader = new GLTFLoader();
+  heroLoad = Promise.all(HERO_SOURCES.map((src, i) => new Promise((res) => {
+    loader.load(src.url, (g) => {
+      const parts = [];
+      const box = new THREE.Box3().setFromObject(g.scene);
+      const k = src.height / Math.max(0.01, box.max.y - box.min.y);
+      g.scene.updateMatrixWorld(true);
+      g.scene.traverse((o) => {
+        if (!o.isMesh) return;
+        const geo = o.geometry.clone().applyMatrix4(o.matrixWorld).scale(k, k, k);
+        geo.translate(0, -box.min.y * k, 0);
+        const m = o.material;
+        if (m.transparent || m.alphaTest > 0 || /leaves/i.test(m.name)) { m.transparent = false; m.alphaTest = 0.5; m.side = THREE.DoubleSide; }
+        geo.userData.shared = true;
+        parts.push({ geometry: geo, material: m });
+      });
+      const w = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * k;
+      heroes[i] = { parts, height: src.height, radius: w * 0.42, crownY: src.height * 0.35, kind: 'broad' };
+      res();
+    }, undefined, () => res()); // missing model: the fallback variant stands in
+  })));
+  return heroLoad;
+}
+/** Variant index of hero tree i (use in THEME_TREES lists). */
+export const HERO = (i) => 100 + i;
 
 function seeded(seed) {
   let s = seed >>> 0;
@@ -320,7 +360,7 @@ export const THEME_TREES = {
   western: { broad: [6], conifer: [7, 7, 8], density: 0.45, conifersFirst: true, scatter: 1 },
   // Provence: umbrella pines and Aleppo pines on the slopes, olives and
   // cypresses lower down
-  coastal: { broad: [9, 10, 10], conifer: [9, 8, 11], density: 0.6, conifersFirst: true, scatter: 0.8 },
+  coastal: { broad: [9, 10, HERO(0), HERO(0)], conifer: [9, 8, 11], density: 0.6, conifersFirst: true, scatter: 0.8 },
   // East St. Louis bottomland: cottonwood, silver maple, sycamore
   industrial: { broad: [6, 2, 3], conifer: [4], density: 0.55, scatter: 0.5 },
   // the Bois de Boulogne: oaks, chestnuts, planes and the odd conifer
@@ -373,9 +413,30 @@ export function plantTrees(spots) {
   const leafMat = leafMaterial();
   const barkMat = new THREE.MeshStandardMaterial({ color: 0x4e3f31, roughness: 0.95 });
   const sycBarkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
-  const by = vs.map(() => []);
-  for (const s of spots) by[s.variant % vs.length].push(s);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  const by = vs.map(() => []);
+  const byHero = HERO_SOURCES.map(() => []);
+  for (const s of spots) {
+    if (s.variant >= 100) {
+      const i = s.variant - 100;
+      if (heroes[i]) { byHero[i].push(s); continue; }
+      s.variant = HERO_SOURCES[i]?.fallback ?? 0;
+    }
+    by[s.variant % vs.length].push(s);
+  }
+  byHero.forEach((list, i) => {
+    if (!list.length) return;
+    const h = heroes[i];
+    const meshes = h.parts.map((p) => new THREE.InstancedMesh(p.geometry, p.material, list.length));
+    list.forEach((s, k) => {
+      q.setFromAxisAngle(up, s.rot);
+      sc.set(s.scale * s.squash, s.scale, s.scale * s.squash);
+      m4.compose(p.set(s.x, s.y, s.z), q, sc);
+      for (const m of meshes) m.setMatrixAt(k, m4);
+      records.push({ far: !!s.far, x: s.x, z: s.z, y0: s.y + h.crownY * s.scale, top: s.y + h.height * s.scale, r: h.radius * s.scale * s.squash, kind: h.kind });
+    });
+    for (const m of meshes) { m.castShadow = true; m.receiveShadow = true; group.add(m); }
+  });
   const tc = new THREE.Color();
   vs.forEach((v, i) => {
     const list = by[i];
