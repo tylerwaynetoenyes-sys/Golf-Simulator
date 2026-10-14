@@ -1,0 +1,17 @@
+{
+ "size": 16000,
+ "px": 1536,
+ "scenes": [
+  [
+   "S2B_13TFG_20240828_0_L2A",
+   "2024-08-28",
+   0
+  ],
+  [
+   "S2B_13TEG_20240629_0_L2A",
+   "2024-06-29",
+   0.0
+  ]
+ ],
+ "credit": "Contains modified Copernicus Sentinel data 2024"
+}

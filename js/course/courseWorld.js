@@ -371,6 +371,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
       if (Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 24) return false;
       if (Math.hypot(x, z) < 22) return false;
       if (inLandmark(x, z)) return false;
+      if (T.seaLevel != null && T.meshHeight(x, z) < T.seaLevel + 1.2) return false; // not in the sea
       const sf = T.terrain(x, z).surface;
       return sf !== 'water' && sf !== 'sand' && sf !== 'green' && sf !== 'fairway' && sf !== 'tee';
     };
@@ -456,6 +457,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
         const x = cx + (rand() * 2 - 1) * R, z = cz + (rand() * 2 - 1) * R;
         if (x > b2.minx && x < b2.maxx && z > b2.minz && z < b2.maxz) continue;
         if (inLandmark(x, z)) continue;
+        if (T.seaLevel != null && T.baseGround(x, z) < T.seaLevel + 1.5) continue; // the sea and the beach stay clear
         // clumps: keep a point only where a low-frequency field is high
         const f = 0.5 + 0.5 * Math.sin(x * 0.011 + Math.sin(z * 0.007) * 3) * Math.cos(z * 0.013 - x * 0.004);
         if (rand() > f * f) continue;
@@ -564,8 +566,14 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     const R = ds.length;
     const vp = new Float32Array(R * L * 3), vc = new Float32Array(R * L * 3), vu = new Float32Array(R * L * 2);
     const c = new THREE.Color();
+    // Sentinel-2 colour takes over from the drawn palette with distance, so the
+    // land beyond the course is the real land: fields, towns, forest, scrub
+    const sat = T.F.d?.sat || null;
+    const su = sat ? new Float32Array(R * L * 2) : null, sk = sat ? new Float32Array(R * L) : null;
+    const satSize = sat ? sat.meta.size : 1;
     for (let r = 0; r < R; r++) {
       const d = ds[r];
+      const ks = sat ? 0.9 * THREE.MathUtils.smoothstep(d, 40, 520) : 0;
       const sx = (hw + d) / hw, sz = (hd + d) / hd;
       const spacing = Math.max(4, (ds[r + 1] ?? d * 1.2) - d);
       for (let k = 0; k < L; k++) {
@@ -575,6 +583,15 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
         vp.set([x, y, z], (r * L + k) * 3);
         vu.set([x / 18, z / 18], (r * L + k) * 2);
         this._backColor(T, x, z, y, spacing, c);
+        if (sat) {
+          const [X, Z] = T.F.toDem(x, z);
+          const v = r * L + k;
+          su[v * 2] = X / satSize + 0.5; su[v * 2 + 1] = 0.5 - Z / satSize;
+          // cliffs keep their rock colour: from above, satellites see the tops, not the faces
+          const e = Math.max(4, spacing * 0.5);
+          const sl = Math.hypot(T.baseGround(x + e, z) - T.baseGround(x - e, z), T.baseGround(x, z + e) - T.baseGround(x, z - e)) / (2 * e);
+          sk[v] = sat.inside(X, Z) ? ks * (1 - THREE.MathUtils.smoothstep(sl, 0.45, 0.9)) : 0;
+        }
         vc.set([c.r, c.g, c.b], (r * L + k) * 3);
       }
     }
@@ -595,17 +612,38 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     geo.setAttribute('position', new THREE.BufferAttribute(vp, 3));
     geo.setAttribute('color', new THREE.BufferAttribute(vc, 3));
     geo.setAttribute('uv', new THREE.BufferAttribute(vu, 2));
+    if (sat) { geo.setAttribute('satUv', new THREE.BufferAttribute(su, 2)); geo.setAttribute('satK', new THREE.BufferAttribute(sk, 1)); }
     geo.setIndex(idx);
     geo.computeVertexNormals();
     // the natural ground carries the same aerial-scan detail as the rough
     const bmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, map: this.detail });
+    let satTex = null;
+    if (sat) {
+      satTex = sat.tex || (sat.tex = new THREE.Texture(sat.image));
+      satTex.colorSpace = THREE.SRGBColorSpace;
+      satTex.anisotropy = 8;
+      satTex.needsUpdate = true;
+    }
     bmat.onBeforeCompile = (sh) => {
       sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `
 float bd = texture2D(map, vMapUv).r;
 float bd2 = texture2D(map, vMapUv * 0.13 + 0.31).r;
-diffuseColor.rgb *= 0.5 + 0.62 * mix(bd, bd2, 0.45);`);
+diffuseColor.rgb *= 0.5 + 0.62 * mix(bd, bd2, 0.45);
+#ifdef SAT_GROUND
+  // Sentinel-2 true colour, lifted a touch: top-down albedo reads dark at grazing angles
+  vec3 satC = texture2D(satMap, vSatUv).rgb * (0.82 + 0.4 * bd);
+  diffuseColor.rgb = mix(diffuseColor.rgb, satC * 1.18, vSatK);
+#endif`);
+      if (satTex) {
+        sh.defines = { ...(sh.defines || {}), SAT_GROUND: '' };
+        sh.uniforms.satMap = { value: satTex };
+        sh.vertexShader = sh.vertexShader
+          .replace('#include <common>', '#include <common>\nattribute vec2 satUv; attribute float satK; varying vec2 vSatUv; varying float vSatK;')
+          .replace('#include <uv_vertex>', '#include <uv_vertex>\nvSatUv = satUv; vSatK = satK;');
+        sh.fragmentShader = '#define SAT_GROUND\nuniform sampler2D satMap; varying vec2 vSatUv; varying float vSatK;\n' + sh.fragmentShader;
+      }
     };
-    bmat.customProgramCacheKey = () => 'backdropGround';
+    bmat.customProgramCacheKey = () => (satTex ? 'backdropGroundSat' : 'backdropGround');
     const mesh = new THREE.Mesh(geo, bmat);
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
@@ -1114,6 +1152,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       const f = 0.55 + 0.45 * Math.sin(x * 0.05 + Math.sin(z * 0.04) * 2) * Math.cos(z * 0.06 - x * 0.02);
       if (rand() > k * f) continue;
       if (Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 14 || Math.hypot(x, z) < 12) continue;
+      if (T.seaLevel != null && T.meshHeight(x, z) < T.seaLevel + 1) continue;
       const sf = T.terrain(x, z).surface;
       if (sf !== 'rough' && sf !== 'oob') continue;
       const s = 0.6 + rand() * 0.7;

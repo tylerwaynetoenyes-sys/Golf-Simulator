@@ -17,6 +17,7 @@ import { CourseWorld } from '../course/courseWorld.js';
 import { PlayerMarkers } from './markers.js';
 import { Environment } from './environment.js';
 import { Ambient } from './ambient.js';
+import { Rain } from './rain.js';
 import { Club } from './club.js';
 
 export class World {
@@ -40,6 +41,7 @@ export class World {
     this.course = new CourseWorld(scene);
     this.markers = new PlayerMarkers(scene);
     this.ambient = new Ambient(scene);
+    this.rain = new Rain(scene);
     this.ambient.setCenter(0, -160);
     this.sceneMode = 'range';
     this.terrainFn = rangeTerrain;
@@ -161,6 +163,7 @@ export class World {
     if (this.sceneMode === 'course') this.course.update(t, dt, this.camera);
     this.markers.update(t);
     this.ambient.update(dt, t);
+    this.rain.update(dt, this.camera, this.env.wind(0, { gust: false }), this.env.day);
     if (render) this.r.render();
   }
 }

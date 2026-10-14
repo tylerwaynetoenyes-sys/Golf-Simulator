@@ -403,6 +403,13 @@ class AudioEngine {
   }
 
   /** Wind roar follows the weather. */
+  /** Steady rain on the grass: a soft hiss under everything (0–1). */
+  setRain(amount) {
+    this.rain = amount;
+    if (!this.ctx || !this._rainGain) return;
+    this._rainGain.gain.setTargetAtTime(amount * 0.16, this.ctx.currentTime, 1.5);
+  }
+
   setWind(mph) {
     this.windMph = mph;
     if (!this.ctx || !this._windGain) return;
@@ -507,6 +514,22 @@ class AudioEngine {
     src.connect(lp).connect(windGain).connect(this.amb);
     src.start();
     lfo.start();
+
+    // Rain: the same noise, high-passed and band-limited to a hiss
+    const rs = ctx.createBufferSource();
+    rs.buffer = this.noise;
+    rs.loop = true;
+    rs.playbackRate.value = 0.93;
+    const rhp = ctx.createBiquadFilter();
+    rhp.type = 'highpass';
+    rhp.frequency.value = 900;
+    const rlp = ctx.createBiquadFilter();
+    rlp.type = 'lowpass';
+    rlp.frequency.value = 7000;
+    this._rainGain = ctx.createGain();
+    this._rainGain.gain.value = (this.rain || 0) * 0.16;
+    rs.connect(rhp).connect(rlp).connect(this._rainGain).connect(this.amb);
+    rs.start();
 
     // Crickets: chirp trains at ~4.6 kHz from a few "individuals", panned
     const cricket = (pan, base, rate) => {

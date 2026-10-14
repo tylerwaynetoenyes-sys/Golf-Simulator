@@ -199,8 +199,16 @@ function slopeAt(terrain, x, z) {
  * @param {{x:number,y:number,z:number}} [opts.origin]  ball position (default tee at origin)
  * @param {number} [opts.heading]  target-line direction in degrees, 0 = down -Z, + = right
  * @param {{x:number,z:number,flagstick?:boolean}} [opts.cup]  hole the ball can drop into
+ * @param {number} [opts.wet]  0–1: rain-soaked turf takes the bounce and the run out of the ball
  */
 export function simulateShot(launch, opts = {}) {
+  const wet = Math.max(0, Math.min(1, opts.wet || 0));
+  const wetCache = {};
+  const surfaceOf = (id) => {
+    const g = GROUND[id];
+    if (!g || !wet) return g;
+    return wetCache[id] || (wetCache[id] = { ...g, restitution: g.restitution * (1 - 0.25 * wet), roll: g.roll * (1 + 0.5 * wet), rollDrag: g.rollDrag * (1 + 0.5 * wet), zipMax: (g.zipMax ?? 1) * (1 - 0.3 * wet) });
+  };
   const cup = opts.cup || null;
   const cupSt = { over: false };
   let holed = null;
@@ -336,7 +344,7 @@ export function simulateShot(launch, opts = {}) {
       events.push({ type: bounces === 0 ? 'land' : 'bounce', t, x: px, y: py, z: pz, surface: ground.surface, speed });
       lastSurface = ground.surface;
 
-      const surf = GROUND[ground.surface];
+      const surf = surfaceOf(ground.surface);
       if (!surf) { // water / out of bounds: ball is gone
         phase = 'gone';
         events.push({ type: 'splash', t, x: px, y: py, z: pz, surface: ground.surface });
@@ -382,7 +390,7 @@ export function simulateShot(launch, opts = {}) {
       // ── roll: 2-D, with slope ──
       const rollDt = 1 / 120;
       const ground = terrain(px, pz);
-      const surf = GROUND[ground.surface];
+      const surf = surfaceOf(ground.surface);
       if (!surf) {
         events.push({ type: 'splash', t, x: px, y: ground.height, z: pz, surface: ground.surface });
         phase = 'gone';

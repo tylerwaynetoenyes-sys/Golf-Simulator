@@ -799,3 +799,4 @@ body.day { --glass: rgba(14, 18, 26, 0.64); --glass-strong: rgba(14, 18, 26, 0.8
 .motion .launch-inner, .motion .launch-title img { animation: none; }
 @media (prefers-reduced-motion: reduce) { .mask > span { transform: none !important; } }
 .btn-xl { font-family: var(--display); font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; font-size: 14px; }
+.env-weather button[data-weather="rain"] { grid-column: 1 / -1; }

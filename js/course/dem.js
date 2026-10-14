@@ -14,6 +14,27 @@ async function loadGrid(base, name) {
   return gridFrom(meta, buf);
 }
 
+/**
+ * Sentinel-2 true colour over the backdrop (tools/fetch-sat.py), in the same
+ * frame as `far`. Browser only; resolves to null where it is missing.
+ * `image` covers the extent with north at the top.
+ */
+async function loadSat(base) {
+  if (typeof document === 'undefined') return null;
+  try {
+    const meta = await fetch(`${base}/sat.json`).then((r) => (r.ok ? r.json() : null));
+    if (!meta) return null;
+    const img = new Image();
+    img.src = `${base}/sat.jpg`;
+    await img.decode();
+    const half = meta.size / 2;
+    return { meta, image: img, inside: (x, z) => Math.abs(x) < half && Math.abs(z) < half };
+  } catch (e) {
+    console.warn('satellite colour unavailable', e);
+    return null;
+  }
+}
+
 /** A sampler over one baked grid (exported for the Node tools). */
 export function gridFrom(meta, buf) {
   const q = new Uint16Array(buf);
@@ -49,8 +70,8 @@ export function gridFrom(meta, buf) {
 export function loadDem(id) {
   if (!cache.has(id)) {
     const base = `assets/courses/${id}`;
-    cache.set(id, Promise.all([loadGrid(base, 'dem'), loadGrid(base, 'far')]).then(([dem, far]) => {
-      const out = { dem, far };
+    cache.set(id, Promise.all([loadGrid(base, 'dem'), loadGrid(base, 'far'), loadSat(base)]).then(([dem, far, sat]) => {
+      const out = { dem, far, sat };
       ready.set(id, out);
       return out;
     }).catch((e) => { cache.delete(id); throw e; }));

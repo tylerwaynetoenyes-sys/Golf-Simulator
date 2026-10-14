@@ -71,6 +71,7 @@ export class Game {
     this._syncEnvUI();
     audio.setDaytime(day);
     audio.windMph = world.env.weather.windMph;
+    audio.rain = world.env.weather.rain || 0;
     world.env.onChange(() => { this.hud.setMode(this.mode.status()); this._updateHelper(); });
     const tvParam = new URLSearchParams(location.search).get('tv');
     this.applyDisplay(tvParam != null ? (tvParam === '0' ? 'standard' : 'tv') : store.settings.display);
@@ -422,7 +423,8 @@ export class Game {
     this.world.env.setWeather(id, this.mode.course ? { windFromDeg: this.world.env.windFromDeg } : {});
     this._syncEnvUI();
     audio.setWind(this.world.env.weather.windMph);
-    toast(`${{ clear: 'Clear', cloudy: 'Cloudy', breezy: 'Light wind', windy: 'Strong wind' }[id]}`, { kind: 'info', sub: this.world.env.weather.windMph > 0.5 ? `${Math.round(this.world.env.weather.windMph)} mph with gusts` : 'Calm', ms: 1800 });
+    audio.setRain(this.world.env.weather.rain || 0);
+    toast(`${{ clear: 'Clear', cloudy: 'Cloudy', breezy: 'Light wind', windy: 'Strong wind', rain: 'Rain' }[id]}`, { kind: 'info', sub: this.world.env.weather.windMph > 0.5 ? `${Math.round(this.world.env.weather.windMph)} mph with gusts` : 'Calm', ms: 1800 });
   }
 
   applySetting(key, value, save = true) {
@@ -503,7 +505,7 @@ export class Game {
     const lie = this.mode.adjustLaunch ? this.mode.adjustLaunch(launch, s) : launch;
     const result = simulateShot(lie, {
       terrain: this.world.terrainFn, wind: this.mode.wind(), origin: s.origin, heading: s.heading, cup: this.mode.cup?.(s) || null,
-      trees: this.mode.course ? this.world.course.treeHit : null,
+      trees: this.mode.course ? this.world.course.treeHit : null, wet: this.world.env.wet,
     });
     // the club comes down and the ball leaves on the contact frame (the
     // demo swing is already at the top; a launch-monitor swing replays fast)

@@ -10,7 +10,7 @@ export default {
   theme: 'paris',
   dem: true,
   blurb: 'Nine holes through the Bois de Boulogne, with the Eiffel Tower, the Arc de Triomphe and La Défense on the skyline.',
-  credit: 'Elevation: Mapzen terrain tiles (EU-DEM, produced using Copernicus data; SRTM, USGS); landmark positions © OpenStreetMap contributors',
+  credit: 'Elevation: Mapzen terrain tiles (EU-DEM, produced using Copernicus data; SRTM, USGS); landmark positions © OpenStreetMap contributors; ground colour: contains modified Copernicus Sentinel data 2024 (via AWS Open Data)',
   // the Seine at Paris
   waterLevel: 28,
   waterTint: 0x3a5058,

@@ -10,7 +10,7 @@ export default {
   theme: 'industrial',
   dem: true,
   blurb: 'Nine holes on the Illinois riverfront: grain elevators, rail yards and the Eads Bridge, with the Arch across the Mississippi.',
-  credit: 'Elevation: USGS 3DEP via AWS Terrain Tiles; landmark positions © OpenStreetMap contributors',
+  credit: 'Elevation: USGS 3DEP via AWS Terrain Tiles; landmark positions © OpenStreetMap contributors; ground colour: contains modified Copernicus Sentinel data 2024 (via AWS Open Data)',
   // the Mississippi at St. Louis, near normal pool
   waterLevel: 119.6,
   waterTint: 0x4a4a36,

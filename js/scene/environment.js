@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { MOON_DIR, SUN_DIR } from './sky.js';
 import { waterMaterials } from './river.js';
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 
 const MPH = 0.44704;
 
@@ -14,6 +15,8 @@ export const WEATHER = {
   cloudy: { label: 'Cloudy', cloud: 0.82, windMph: 4, gust: 0.2, sun: 0.42, icon: 'cloud' },
   breezy: { label: 'Light wind', cloud: 0.35, windMph: 8, gust: 0.25, sun: 0.92, icon: 'breeze' },
   windy: { label: 'Strong wind', cloud: 0.55, windMph: 17, gust: 0.3, sun: 0.75, icon: 'wind' },
+  // steady rain: soft turf (less bounce and roll), low light, a moderate wind
+  rain: { label: 'Rain', cloud: 0.97, windMph: 7, gust: 0.25, sun: 0.28, icon: 'rain', rain: 1 },
 };
 
 const NIGHT = {
@@ -69,6 +72,55 @@ function skyEnvironment(renderer, { zenith, horizon, glow, glowDir, ground }) {
   return rt.texture;
 }
 
+// Photographed skies from Poly Haven (CC0) for image-based light: a partly
+// cloudy midday, a flat overcast, and a moonless night over a golf course.
+const HDRI = {
+  day: 'kloofendal_48d_partly_cloudy_puresky_1k.hdr',
+  overcast: 'kloofendal_overcast_puresky_1k.hdr',
+  night: 'moonless_golf_1k.hdr',
+};
+
+/**
+ * Prepare a photographed sky for lighting: turn it so its brightest point
+ * (the sun) sits at the scene's sun azimuth, clip the sun disc (the
+ * directional light already draws it), and scale it to a mean sky radiance
+ * of 1 so day, overcast and night share one intensity scale.
+ */
+function prepareHdri(tex, align) {
+  const { data, width: W, height: H } = tex.image;
+  let max = 0, mi = 0, sum = 0, n = 0;
+  for (let i = 0; i < W * H; i++) {
+    const L = data[i * 4] * 0.2126 + data[i * 4 + 1] * 0.7152 + data[i * 4 + 2] * 0.0722;
+    if (L > max) { max = L; mi = i; }
+  }
+  if (align) {
+    // three's equirect lookup: u = atan2(z, x) / 2π + 0.5
+    const uSun = ((mi % W) + 0.5) / W;
+    const uWant = Math.atan2(align.z, align.x) / (2 * Math.PI) + 0.5;
+    const shift = Math.round((uWant - uSun) * W);
+    const row = new Float32Array(W * 4);
+    for (let y = 0; y < H; y++) {
+      const o = y * W * 4;
+      for (let x = 0; x < W; x++) {
+        const t = (((x + shift) % W) + W) % W;
+        row.set(data.subarray(o + x * 4, o + x * 4 + 4), t * 4);
+      }
+      data.set(row, o);
+    }
+  }
+  const CAP = 6;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    const L = data[i] * 0.2126 + data[i + 1] * 0.7152 + data[i + 2] * 0.0722;
+    if (L > CAP) { const k = CAP / L; data[i] *= k; data[i + 1] *= k; data[i + 2] *= k; }
+    if (y < H / 2) { sum += Math.min(L, CAP); n++; }
+  }
+  const norm = n ? n / sum : 1;
+  for (let i = 0; i < W * H; i++) { data[i * 4] *= norm; data[i * 4 + 1] *= norm; data[i * 4 + 2] *= norm; }
+  tex.needsUpdate = true;
+  return tex;
+}
+
 export class Environment {
   constructor(world) {
     this.w = world;
@@ -89,7 +141,23 @@ export class Environment {
       this.envDay = skyEnvironment(r, { zenith: 0x3d74c4, horizon: 0xc9dcec, glow: 0xfff0d0, glowDir: SUN_DIR, ground: 0x4c5a35 });
       this.envNight = skyEnvironment(r, { zenith: 0x05080f, horizon: 0x1c2232, glow: 0x4a2c18, glowDir: new THREE.Vector3(0.2, 0.05, -1), ground: 0x0b0d09 });
     } catch (e) { console.warn('environment map unavailable', e); }
+    this.hdri = null;
+    this._loadHdri(world.r.renderer);
     this.apply();
+  }
+
+  async _loadHdri(renderer) {
+    if (typeof window === 'undefined') return;
+    try {
+      const loader = new HDRLoader().setDataType(THREE.FloatType);
+      const base = new URL('../../assets/hdri/', import.meta.url).href;
+      const [day, overcast, night] = await Promise.all([HDRI.day, HDRI.overcast, HDRI.night].map((f) => loader.loadAsync(base + f)));
+      const pm = new THREE.PMREMGenerator(renderer);
+      const make = (t, align) => { t.mapping = THREE.EquirectangularReflectionMapping; const rt = pm.fromEquirectangular(prepareHdri(t, align)); t.dispose(); return rt.texture; };
+      this.hdri = { day: make(day, SUN_DIR), overcast: make(overcast, null), night: make(night, MOON_DIR) };
+      pm.dispose();
+      this.apply();
+    } catch (e) { console.warn('HDRI sky lighting unavailable; using the generated sky', e); }
   }
 
   get isDay() { return this.targetDay > 0.5; }
@@ -115,6 +183,9 @@ export class Environment {
   setWindDirection(fromDeg) { this.windFromDeg = ((fromDeg % 360) + 360) % 360; this.apply(); this._emit(); }
 
   get weather() { return WEATHER[this.weatherId]; }
+
+  /** How soaked the turf is (0–1), for the bounce and roll. */
+  get wet() { return this.weather.rain || 0; }
 
   /**
    * Wind for the next shot (air velocity, m/s). Includes a gust so strong wind
@@ -203,7 +274,13 @@ export class Environment {
 
     // image-based light: the sky's colour in every material's reflections
     const scn = w.scene;
-    if (this.envDay) {
+    if (this.hdri) {
+      // photographed skies: overcast takes over as the cloud thickens
+      scn.environment = d > 0.5 ? (c > 0.6 ? this.hdri.overcast : this.hdri.day) : this.hdri.night;
+      scn.environmentIntensity = d > 0.5
+        ? THREE.MathUtils.lerp(0.16, 0.34, (d - 0.5) * 2) * (c > 0.6 ? 1.1 : 1 - c * 0.25) * (this.envScale ?? 1)
+        : THREE.MathUtils.lerp(0.025, 0.08, d * 2) * (w.sceneMode === 'course' ? 1.5 : 1) * (this.envScale ?? 1);
+    } else if (this.envDay) {
       scn.environment = d > 0.5 ? this.envDay : this.envNight;
       scn.environmentIntensity = d > 0.5 ? THREE.MathUtils.lerp(0.25, 0.55, (d - 0.5) * 2) * (1 - c * 0.3) : THREE.MathUtils.lerp(0.12, 0.25, d * 2);
     }
@@ -227,6 +304,7 @@ export class Environment {
     w.ball?.setDay?.(d);
     w.ambient?.setDay?.(d);
     w.course?.setDay?.(d);
+    w.rain?.set(this.weather.rain || 0);
     const windAmt = Math.min(1, this.weather.windMph / 18);
     w.range.setWind(windAmt, this.windFromDeg);
     w.course?.setWind?.(windAmt, this.windFromDeg);

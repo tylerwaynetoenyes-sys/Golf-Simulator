@@ -108,3 +108,13 @@ Not redistributed; listed so figures can be checked.
 |---|---|---|
 | GSAP 3.12.5 (`vendor/gsap/`) | gsap.com, via npm | GSAP Standard "no charge" licence |
 | Jost variable font (`assets/fonts/`) | Owen Earl (indestructible type*), via @fontsource-variable/jost | SIL Open Font License 1.1 (`assets/fonts/Jost-OFL.txt`) |
+
+## Lighting and ground colour
+
+| Asset | Source | Licence |
+|---|---|---|
+| HDRIs `assets/hdri/` (Kloofendal 48d Partly Cloudy Pure Sky, Kloofendal Overcast Pure Sky, Moonless Golf) | Poly Haven, by Greg Zaal (sky edits Jarod Guest) | CC0 |
+| `assets/courses/<id>/sat.jpg`: summer true colour, ~10 m/pixel over each 16 km backdrop | Copernicus Sentinel-2 L2A "visual" COGs, AWS Open Data via the Earth Search STAC API; mosaicked into each DEM frame by `tools/fetch-sat.py` (scene ids in `sat.json`) | Copernicus open data policy: "Contains modified Copernicus Sentinel data 2024" |
+
+EOX's Sentinel-2 Cloudless mosaic was considered and rejected: its current
+terms are CC BY-NC-SA, with a paid licence for commercial use.
