@@ -158,6 +158,78 @@ function cedar(seed, { height = 9 } = {}) {
   return { wood: mergeGeometries(wood), leaves: mergeGeometries(leaves), height, radius: height * 0.2, crownY: height * 0.12, kind: 'cedar' };
 }
 
+/**
+ * Ponderosa pine: tall straight trunk with cinnamon plated bark, bare for
+ * the lower half, then short upturned limbs carrying clumped needle tufts
+ * in an open, flat-topped crown.
+ */
+function ponderosa(seed, { height = 22 } = {}) {
+  const rnd = seeded(seed);
+  const wood = [];
+  const leaves = [];
+  const H = height;
+  const trunk = new THREE.CylinderGeometry(0.16, 0.42, H * 0.96, 8, 1, true).translate(0, H * 0.48 - 0.3, 0);
+  trunk.deleteAttribute('uv');
+  wood.push(trunk);
+  const crown = new THREE.Vector3(0, H * 0.72, 0);
+  const crownR = H * 0.2;
+  const tint = 0x3f5c27;
+  const whorls = 7;
+  for (let i = 0; i < whorls; i++) {
+    const u = i / (whorls - 1);
+    const y = H * (0.5 + u * 0.44);
+    const n = 3 + Math.floor(rnd() * 2);
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + rnd() * 1.2 + i;
+      const reach = crownR * (1.05 - u * 0.55) * (0.7 + rnd() * 0.4);
+      const tip = new THREE.Vector3(Math.cos(a) * reach, y + reach * 0.25, Math.sin(a) * reach);
+      wood.push(limb(new THREE.Vector3(0, y, 0), tip, 0.09, 0.03, 0.4, rnd));
+      leaves.push(cluster(tip, crownR * (0.34 + rnd() * 0.12) * (1 - u * 0.3), crown, crownR * 1.4, tint, rnd));
+    }
+  }
+  leaves.push(cluster(new THREE.Vector3(0, H * 0.97, 0), crownR * 0.34, crown, crownR * 1.4, tint, rnd));
+  const w = mergeGeometries(wood);
+  // cinnamon-orange plates on the trunk, darker toward the crown
+  const p = w.attributes.position;
+  const col = new Float32Array(p.count * 3);
+  const lo = new THREE.Color(0x9a5a33), hi = new THREE.Color(0x4a3a2c), c = new THREE.Color();
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i);
+    c.copy(lo).lerp(hi, THREE.MathUtils.smoothstep(y, H * 0.3, H * 0.8)).multiplyScalar(0.85 + 0.3 * hash3(p.getX(i) * 9, y * 3, p.getZ(i) * 9));
+    col.set([c.r, c.g, c.b], i * 3);
+  }
+  w.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return { wood: w, leaves: mergeGeometries(leaves), height: H, radius: crownR * 1.2, crownY: H * 0.46, kind: 'pine' };
+}
+
+/**
+ * Rocky Mountain juniper: a small, shaggy, blue-grey tree, often several
+ * stems from the base, irregular and rounded rather than a clean cone.
+ */
+function juniper(seed, { height = 6 } = {}) {
+  const rnd = seeded(seed);
+  const wood = [];
+  const leaves = [];
+  const H = height;
+  const crown = new THREE.Vector3(0, H * 0.5, 0);
+  const crownR = H * 0.32;
+  const tint = 0x4d6150;
+  const stems = 2 + Math.floor(rnd() * 2);
+  for (let i = 0; i < stems; i++) {
+    const a = rnd() * Math.PI * 2;
+    const top = new THREE.Vector3(Math.cos(a) * H * 0.12, H * (0.55 + rnd() * 0.2), Math.sin(a) * H * 0.12);
+    wood.push(limb(new THREE.Vector3(0, -0.2, 0), top, 0.14, 0.05, 0.5, rnd));
+  }
+  for (let i = 0; i < 9; i++) {
+    const u = i / 8;
+    const a = rnd() * Math.PI * 2, rr = crownR * (1 - u * 0.7) * (0.3 + rnd() * 0.7);
+    const c = new THREE.Vector3(Math.cos(a) * rr, H * (0.22 + u * 0.66), Math.sin(a) * rr);
+    leaves.push(cluster(c, crownR * (0.55 - u * 0.25) * (0.8 + rnd() * 0.4), crown, crownR * 1.5, tint, rnd));
+  }
+  const w = mergeGeometries(wood);
+  return { wood: w, leaves: mergeGeometries(leaves), height: H, radius: crownR * 1.1, crownY: H * 0.1, kind: 'cedar' };
+}
+
 const VARIANTS = [
   (s) => broadleaf(s, { height: 13, spread: 1.05, tint: 0x4a7330 }), // white oak
   (s) => broadleaf(s + 1, { height: 12, spread: 0.95, tint: 0x557d2c }), // oak, younger
@@ -165,7 +237,20 @@ const VARIANTS = [
   (s) => broadleaf(s + 3, { height: 16, spread: 0.9, tint: 0x5f8a3a, bark: 0x6a604f, barkHi: 0xe6e0d0 }), // sycamore
   (s) => cedar(s + 4, { height: 9 }),
   (s) => cedar(s + 5, { height: 12 }),
+  // the West: plains cottonwood (broad, pale bark, bright leaves), Rocky
+  // Mountain juniper and ponderosa pine on the bluffs
+  (s) => broadleaf(s + 6, { height: 21, spread: 1.25, tint: 0x7c9a38, bark: 0x6f675b, barkHi: 0x9c9586 }),
+  (s) => juniper(s + 7, { height: 6 }),
+  (s) => ponderosa(s + 8, { height: 22 }),
 ];
+
+/** Tree species index sets per course theme. */
+export const THEME_TREES = {
+  parkland: { broad: [0, 1, 2, 3], conifer: [4, 5], density: 1 },
+  western: { broad: [6], conifer: [7, 7, 8], density: 0.45, conifersFirst: true },
+  coastal: { broad: [2], conifer: [8, 7], density: 0.6, conifersFirst: true },
+  urban: { broad: [0, 2, 3], conifer: [4], density: 0.85 },
+};
 
 let cache = null;
 function variants() {
@@ -227,7 +312,7 @@ export function plantTrees(spots) {
       wood.setMatrixAt(k, m4);
       leaves.setMatrixAt(k, m4);
       leaves.setColorAt(k, tc.setHSL(s.hue, 0.16 + s.sat * 0.2, 0.62 + s.light * 0.22));
-      records.push({ x: s.x, z: s.z, y0: s.y + v.crownY * s.scale, top: s.y + v.height * s.scale, r: v.radius * s.scale * s.squash, kind: v.kind });
+      records.push({ far: !!s.far, x: s.x, z: s.z, y0: s.y + v.crownY * s.scale, top: s.y + v.height * s.scale, r: v.radius * s.scale * s.squash, kind: v.kind });
     });
     if (leaves.instanceColor) leaves.instanceColor.needsUpdate = true;
     wood.castShadow = leaves.castShadow = true;

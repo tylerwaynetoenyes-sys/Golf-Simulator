@@ -27,7 +27,7 @@ export default {
       green: { r: 14, slope: [-0.01, 0.006] }, pin: [-3, 2],
       bunkers: [{ t: 0.9, off: -15, rx: 9, rz: 6 }, { t: 1.08, off: 12, rx: 7, rz: 5 }],
       water: [],
-      lm: { type: 'windmill', at: [30, 30], rot: 0.4 },
+      lm: { type: 'windmill', at: [50, 58], rot: 0.4 },
     },
     {
       n: 3, name: 'Prairie Schooner', par: 5,
@@ -54,7 +54,7 @@ export default {
       green: { r: 14, slope: [0.01, 0.006] }, pin: [-3, -2],
       bunkers: [{ t: 0.55, off: 21, rx: 11, rz: 6 }, { t: 0.98, off: -15, rx: 8, rz: 6 }],
       water: [], trees: [{ t: 0.45, off: 36, r: 12, n: 6, species: 6 }],
-      lm: { type: 'sodhouse', at: [-40, 40], rot: 0.8 },
+      lm: { type: 'sodhouse', at: [-58, 52], rot: 0.8 },
     },
     {
       n: 6, name: 'Saddle Rock', par: 3,

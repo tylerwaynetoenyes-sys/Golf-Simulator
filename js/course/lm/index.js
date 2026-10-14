@@ -11,6 +11,7 @@ import cahokia from './cahokia.js';
 import basilica from './basilica.js';
 import citymuseum from './citymuseum.js';
 import altonlegends from './altonlegends.js';
+import western from './western.js';
 
-const all = { zoo, delmar, arch, riverfront, riverboat, piasa, chainofrocks, cahokia, basilica, citymuseum, altonlegends };
+const all = { zoo, delmar, arch, riverfront, riverboat, piasa, chainofrocks, cahokia, basilica, citymuseum, altonlegends, ...western };
 export const EXTRA = Object.fromEntries(Object.entries(all).filter(([, b]) => typeof b === 'function'));

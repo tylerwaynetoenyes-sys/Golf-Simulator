@@ -99,6 +99,17 @@ async function boot() {
     requestAnimationFrame(frame);
   }
 
+  // Dev / kiosk shortcut: ?play=<course>[&hole=n][&day] skips the launch
+  // screen straight into demo mode on that hole.
+  if (PARAMS.has('play')) {
+    const { loadCourse } = await import('./course/courses.js');
+    const c = await loadCourse(PARAMS.get('play'));
+    pairing.enterGame('demo');
+    if (PARAMS.has('day')) world.env.setTime('day', true);
+    const h = Math.max(1, Math.min(c.holes.length, Number(PARAMS.get('hole')) || 1));
+    game.setMode('course', { course: c, length: PARAMS.has('hole') ? 1 : Math.min(9, c.holes.length), startHole: h, rings: 'standard', mulligans: 'nine' });
+  }
+
   // Resume audio after tab switches
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && audio.ctx && audio.ctx.state === 'suspended') audio.ctx.resume();

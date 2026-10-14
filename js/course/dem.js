@@ -110,6 +110,6 @@ export function prepareDemHoles(course, d) {
   return course.holes.map((h) => {
     const f = demFrame(d, h.pts[0], h.pts[1]);
     const line = h.pts.map(([X, Z]) => { const [x, z] = f.toLocal(X, Z); return [x / YD, z / YD]; });
-    return { ...h, line, demFrame: f, course: course.id, theme: course.theme, elev: [[0, 0], [1, 0]] };
+    return { ...h, line, demFrame: f, course: course.id, theme: course.theme, far: course.far || [], elev: [[0, 0], [1, 0]] };
   });
 }

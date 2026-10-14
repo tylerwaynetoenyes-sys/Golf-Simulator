@@ -2,13 +2,14 @@
 // ground mesh (mown stripes, rough, bunkers, green), ponds and creeks, tee
 // markers, flag, tree lines, night floodlights and the hole's landmark.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HoleTerrain } from './holeTerrain.js';
 import { buildLandmark, setLandmarkDay } from './landmarks.js';
 import { createWaterMaterial, waterMaterials } from '../scene/river.js';
 import { makeFlag, lightConeMaterial } from '../scene/rangeProps.js';
 import { CUP } from '../core/physics.js';
 import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
-import { plantTrees, updateTrees } from '../scene/trees.js';
+import { plantTrees, updateTrees, THEME_TREES } from '../scene/trees.js';
 
 const C = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
 const COL = {
@@ -29,6 +30,21 @@ const PALETTES = {
   coastal: { grass: C(0.4, 0.43, 0.26), scrub: C(0.3, 0.36, 0.22), rock: C(0.84, 0.8, 0.72), rockSlope: 0.45 },
   urban: { grass: C(0.3, 0.42, 0.2), scrub: C(0.38, 0.38, 0.35), rock: C(0.55, 0.52, 0.48), rockSlope: 0.6 },
 };
+
+/** Scale the scene fog on one material (distant landmarks that should still read). */
+function hazeLess(m, k) {
+  m.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>', `#ifdef USE_FOG
+  #ifdef FOG_EXP2
+    float fogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
+  #else
+    float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );
+  #endif
+  gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor * ${k.toFixed(2)} );
+#endif`);
+  };
+  m.customProgramCacheKey = () => `haze${k}`;
+}
 
 function seeded(seed) {
   let s = seed >>> 0;
@@ -262,6 +278,26 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     holder.scale.setScalar(lmSpec.scale || 1);
     g.add(holder);
 
+    // far landmarks on their true bearing. One beyond ~2 km would be a
+    // speck lost in the haze, so it is drawn at 2 km on the same bearing
+    // at true size (and hazed less), the way the eye picks it out on the horizon.
+    this.farLms = [];
+    if (T.F) {
+      for (const f of hole.far || []) {
+        const lm = buildLandmark(f.type);
+        let [x, z] = T.F.toLocal(f.dem[0], f.dem[1]);
+        const d = Math.hypot(x, z);
+        const D = Math.min(d, 2000);
+        x *= D / d; z *= D / d;
+        const h = new THREE.Group();
+        h.add(lm.group);
+        h.position.set(x, T.baseGround(x, z), z);
+        for (const m of lm.haze || []) hazeLess(m, 0.55);
+        g.add(h);
+        this.farLms.push(lm);
+      }
+    }
+
     // keep trees and masts out of the landmark's footprint
     const lmBox = new THREE.Box3().setFromObject(holder).expandByScalar(5);
     const inLandmark = (x, z) => x > lmBox.min.x && x < lmBox.max.x && z > lmBox.min.z && z < lmBox.max.z;
@@ -286,54 +322,95 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
         hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(),
       });
     };
-    const quality = this.treeDensity ?? 1;
+    const TT = THEME_TREES[hole.theme] || THEME_TREES.parkland;
+    const quality = (this.treeDensity ?? 1) * TT.density;
+    const pickBroad = () => TT.broad[Math.floor(rand() * TT.broad.length)];
+    const pickConifer = () => TT.conifer[Math.floor(rand() * TT.conifer.length)];
+    const anySpecies = () => (rand() < 0.5 ? pickBroad() : pickConifer());
     const corridor = Math.max(T.fwHalf, 14);
+    // on real ground, conifers take the slopes and broadleaves the low,
+    // wetter ground (cottonwoods follow the draws in the West)
+    const bySite = (x, z) => {
+      if (!T.F) return rand() < 0.22 ? pickConifer() : pickBroad();
+      const e = 6;
+      const sl = Math.hypot(T.baseGround(x + e, z) - T.baseGround(x - e, z), T.baseGround(x, z + e) - T.baseGround(x, z - e)) / (2 * e);
+      const low = T.baseGround(x, z) < T.elevAt(Math.min(1, Math.max(0, T.project(x, z).s / T.length))) - 1.5;
+      if (low) return rand() < 0.75 ? pickBroad() : pickConifer();
+      return rand() < (TT.conifersFirst ? 0.75 + sl : 0.22 + sl) ? pickConifer() : pickBroad();
+    };
     // stands along both sides: species-grouped clusters at varying depth
     for (const side of [-1, 1]) {
       for (let s = -30; s < T.length + 70; s += 26 + rand() * 26) {
-        if (rand() < 0.18) continue; // glades
+        if (rand() < 0.18 + (1 - TT.density) * 0.4) continue; // glades (open country in the West)
         const pt = T.pointAt(s);
         const depth = corridor + 18 + rand() * 70;
         const cx = pt.x + pt.rx * depth * side, cz = pt.z + pt.rz * depth * side;
         const n = Math.round((3 + rand() * 8) * quality);
         const rad = 8 + rand() * 16;
-        const species = rand() < 0.22 ? 4 + Math.floor(rand() * 2) : Math.floor(rand() * 4);
+        const species = bySite(cx, cz);
         for (let i = 0; i < n; i++) {
           const a = rand() * 6.28, r = Math.sqrt(rand()) * rad;
           const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
           if (!ok(x, z, corridor + 14)) continue;
-          plant(x, z, rand() < 0.8 ? species : Math.floor(rand() * 6));
+          plant(x, z, rand() < 0.8 ? species : anySpecies());
         }
       }
-      // a dark backdrop belt toward the boundary
-      for (let s = -40; s < T.length + 90; s += 9 + rand() * 7) {
-        const pt = T.pointAt(s);
-        const depth = T.oobLateral - 8 + rand() * 40;
-        const x = pt.x + pt.rx * depth * side, z = pt.z + pt.rz * depth * side;
-        if (ok(x, z, corridor + 30)) plant(x, z, rand() < 0.3 ? 4 + Math.floor(rand() * 2) : Math.floor(rand() * 4), 1.15);
+      // a dark backdrop belt toward the boundary (parkland only: the West stays open)
+      if (TT.density >= 0.8) {
+        for (let s = -40; s < T.length + 90; s += 9 + rand() * 7) {
+          const pt = T.pointAt(s);
+          const depth = T.oobLateral - 8 + rand() * 40;
+          const x = pt.x + pt.rx * depth * side, z = pt.z + pt.rz * depth * side;
+          if (ok(x, z, corridor + 30)) plant(x, z, rand() < 0.3 ? pickConifer() : pickBroad(), 1.15);
+        }
       }
     }
-    // specimen trees that come into play: big oaks a little off the fairway
+    // specimen trees that come into play a little off the fairway
     for (let s = 150; s < T.length - 60; s += 70 + rand() * 60) {
       const side = rand() < 0.5 ? -1 : 1;
       const pt = T.pointAt(s);
       const d = corridor + 6 + rand() * 8;
       const x = pt.x + pt.rx * d * side, z = pt.z + pt.rz * d * side;
-      if (ok(x, z, corridor + 4)) plant(x, z, rand() < 0.5 ? 0 : 3, 1.25);
+      if (ok(x, z, corridor + 4)) plant(x, z, T.F ? bySite(x, z) : rand() < 0.5 ? 0 : 3, 1.25);
     }
-    // the hole's own stands (dogleg corners, framing)
+    // the hole's own stands (dogleg corners, framing); `species` indexes the
+    // theme's broadleaf list (0..) or conifers (4+, as on the Confluence)
     for (const st of hole.trees || []) {
       const pt = T.pointAt(st.t * T.length);
       const cx = pt.x + pt.rx * st.off, cz = pt.z + pt.rz * st.off;
       for (let i = 0; i < (st.n || 8); i++) {
         const a = rand() * 6.28, r = Math.sqrt(rand()) * (st.r || 12);
         const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-        if (ok(x, z, Math.max(T.fwHalf + 3, 8))) plant(x, z, st.species ?? Math.floor(rand() * 4), 1.1);
+        const sp = st.species == null ? bySite(x, z) : TT === THEME_TREES.parkland ? st.species : st.species >= 4 ? pickConifer() : pickBroad();
+        if (ok(x, z, Math.max(T.fwHalf + 3, 8))) plant(x, z, sp, 1.1);
+      }
+    }
+    // real ground: scattered trees on the land beyond the hole too, so the
+    // course doesn't end in a clearing (no collision needed out there)
+    if (T.F) {
+      const b2 = T.bounds(200);
+      const far = [];
+      const R = 900;
+      const cx = (b2.minx + b2.maxx) / 2, cz = (b2.minz + b2.maxz) / 2;
+      const N = Math.round(1400 * (this.treeDensity ?? 1) * TT.density);
+      for (let i = 0; i < N * 3 && far.length < N; i++) {
+        const x = cx + (rand() * 2 - 1) * R, z = cz + (rand() * 2 - 1) * R;
+        if (x > b2.minx && x < b2.maxx && z > b2.minz && z < b2.maxz) continue;
+        if (inLandmark(x, z)) continue;
+        // clumps: keep a point only where a low-frequency field is high
+        const f = 0.5 + 0.5 * Math.sin(x * 0.011 + Math.sin(z * 0.007) * 3) * Math.cos(z * 0.013 - x * 0.004);
+        if (rand() > f * f) continue;
+        far.push({ x, z });
+      }
+      for (const p of far) {
+        treeSpots.push({ x: p.x, z: p.z, y: T.baseGround(p.x, p.z) - 0.25, variant: bySite(p.x, p.z), rot: rand() * 6.28,
+          scale: 0.75 + rand() * 0.5, squash: 0.85 + rand() * 0.3, hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(), far: true });
       }
     }
     const forest = plantTrees(treeSpots);
     g.add(forest.group);
     for (const t of forest.records) {
+      if (t.far) continue;
       const key = `${Math.floor(t.x / 20)},${Math.floor(t.z / 20)}`;
       if (!this.treeGrid.has(key)) this.treeGrid.set(key, []);
       t.id = this.treeList.length;
@@ -343,6 +420,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
 
     // ── long grass in the rough: tufts thicken away from the fairway ──
     this._buildRoughGrass(T, g, rand, b);
+    if (hole.theme === 'western' || hole.theme === 'coastal') this._buildShrubs(T, g, rand, hole.theme);
 
     // ── yardage stakes: 100 red, 150 white, 200 blue, 250 yellow (to the green) ──
     this._buildStakes(T, g);
@@ -845,7 +923,13 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       this.tuftMat = new THREE.MeshStandardMaterial({ color: 0x5f7f34, vertexColors: true, side: THREE.DoubleSide, roughness: 0.95 });
     }
     const N = Math.round(9000 * (this.treeDensity ?? 1));
-    const tufts = new THREE.InstancedMesh(this.tuftGeo, this.tuftMat, N);
+    const tint = { western: 0xb3a05a, coastal: 0x8f9a58 }[T.hole.theme];
+    if (tint && !this.tuftMats?.[tint]) {
+      this.tuftMats ||= {};
+      this.tuftMats[tint] = this.tuftMat.clone();
+      this.tuftMats[tint].color.set(tint);
+    }
+    const tufts = new THREE.InstancedMesh(this.tuftGeo, tint ? this.tuftMats[tint] : this.tuftMat, N);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     let n = 0;
     for (let i = 0; i < N * 3 && n < N; i++) {
@@ -865,6 +949,74 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
     tufts.count = n;
     tufts.receiveShadow = true;
     g.add(tufts);
+  }
+
+  /**
+   * Low shrubs on open ground: big sagebrush on the plains (silver-grey,
+   * 0.5–1.2 m) or garrigue (kermes oak, rosemary) on the Provençal coast.
+   * Thin in the first cut, thicker out in the native ground.
+   */
+  _buildShrubs(T, g, rand, theme) {
+    const key = `shrub_${theme}`;
+    if (!this[key]) {
+      const parts = [];
+      const rnd = seeded(theme.length * 31 + 7);
+      // many small, displaced lobes: a lacy, irregular crown, silver-green
+      // on top, grey-brown woody base showing underneath
+      const top = new THREE.Color(theme === 'western' ? 0x8e9a76 : 0x5d6e42);
+      const base = new THREE.Color(theme === 'western' ? 0x5b5446 : 0x3f3a2e);
+      for (let i = 0; i < 11; i++) {
+        const r = 0.12 + rnd() * 0.12;
+        const geo = new THREE.IcosahedronGeometry(r, 0);
+        const a = rnd() * 6.28, d = Math.sqrt(rnd()) * 0.42;
+        const y = 0.12 + rnd() * 0.38 + (0.42 - d) * 0.35;
+        geo.scale(1, 0.7, 1).translate(Math.cos(a) * d, y, Math.sin(a) * d);
+        const p = geo.attributes.position;
+        const col = new Float32Array(p.count * 3);
+        const c = new THREE.Color();
+        for (let k = 0; k < p.count; k++) {
+          p.setXYZ(k, p.getX(k) * (0.8 + rnd() * 0.4), p.getY(k), p.getZ(k) * (0.8 + rnd() * 0.4));
+          c.copy(base).lerp(top, THREE.MathUtils.smoothstep(p.getY(k), 0.05, 0.45)).multiplyScalar(0.9 + rnd() * 0.2);
+          col.set([c.r, c.g, c.b], k * 3);
+        }
+        geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+        geo.deleteAttribute('uv');
+        parts.push(geo.toNonIndexed());
+      }
+      // a few dark stems under the canopy
+      const geo = mergeGeometries(parts);
+      geo.computeVertexNormals();
+      geo.userData.shared = true;
+      this[key] = { geo, mat: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }) };
+    }
+    const { geo, mat } = this[key];
+    const b = T.bounds(200);
+    const N = Math.round(11000 * (this.treeDensity ?? 1));
+    const mesh = new THREE.InstancedMesh(geo, mat, N);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    const corridor = Math.max(T.fwHalf, 12);
+    let n = 0;
+    for (let i = 0; i < N * 4 && n < N; i++) {
+      const x = b.minx + rand() * (b.maxx - b.minx), z = b.minz + rand() * (b.maxz - b.minz);
+      const pr = T.project(x, z);
+      const ad = Math.abs(pr.d);
+      // denser away from play; clumped by a low-frequency field
+      const k = THREE.MathUtils.smoothstep(ad, corridor + 6, corridor + 60);
+      const f = 0.55 + 0.45 * Math.sin(x * 0.05 + Math.sin(z * 0.04) * 2) * Math.cos(z * 0.06 - x * 0.02);
+      if (rand() > k * f) continue;
+      if (Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 14 || Math.hypot(x, z) < 12) continue;
+      const sf = T.terrain(x, z).surface;
+      if (sf !== 'rough' && sf !== 'oob') continue;
+      const s = 0.6 + rand() * 0.7;
+      q.setFromAxisAngle(up, rand() * 6.28);
+      sc.set(s * (0.9 + rand() * 0.4), s * (0.8 + rand() * 0.4), s * (0.9 + rand() * 0.4));
+      const y = this._coarseH ? this._coarseH(x, z) : T.meshHeight(x, z);
+      mesh.setMatrixAt(n++, m4.compose(p.set(x, y - 0.05, z), q, sc));
+    }
+    mesh.count = n;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    g.add(mesh);
   }
 
   _buildStakes(T, g) {

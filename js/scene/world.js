@@ -95,6 +95,9 @@ export class World {
       this.rig.setAddress(new THREE.Vector3(0, 0.1, 0), 0);
       this.markers.set([]);
       this.ambient.setCenter(0, -160);
+      this.fogScale = 1;
+      this.theme = 'parkland';
+      this.skyline.group.visible = true;
     }
     // the moon/sun key light lives in the range group; keep it lit everywhere
     this.range.group.visible = true;
@@ -107,6 +110,12 @@ export class World {
     this.setScene('course');
     // fewer trees and grass tufts on lighter quality settings (iPad)
     this.course.treeDensity = this.r.quality.trees ?? 1;
+    // dry high-plains and Mediterranean air carries much farther than
+    // Mississippi valley haze
+    this.fogScale = { western: 0.5, coastal: 0.7 }[hole.theme] ?? 1;
+    this.theme = hole.theme || 'parkland';
+    // the St. Louis skyline belongs to the Confluence Course only
+    this.skyline.group.visible = !hole.course || hole.course === 'confluence';
     const T = this.course.load(hole);
     this.terrainFn = T.terrain;
     this.groundFn = T.groundHeight;

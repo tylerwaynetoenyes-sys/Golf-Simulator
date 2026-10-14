@@ -28,6 +28,13 @@ const DAY = {
 };
 const OVERCAST_FOG = new THREE.Color(0xa7b0ba);
 
+// Per-course daylight character: the high plains in late-afternoon gold, the
+// Provençal coast in hard white light and blue haze.
+const THEME_DAY = {
+  western: { key: new THREE.Color(0xffd3a0), keyMul: 1.05, fog: new THREE.Color(0xd8cdb6), hemiGround: new THREE.Color(0x76653f) },
+  coastal: { key: new THREE.Color(0xfff4e2), keyMul: 1.1, fog: new THREE.Color(0xbfd3e6), hemiGround: new THREE.Color(0x6b6a52) },
+};
+
 /**
  * Image-based lighting: a small generated sky (zenith → horizon glow →
  * ground bounce) prefiltered for PBR, so every material picks up soft sky
@@ -178,10 +185,11 @@ export class Environment {
 
     // key light: moon at night, sun by day (dimmer through cloud)
     const key = w.range.moon;
-    key.color.copy(lerpC(NIGHT.key, DAY.key, d));
+    const TD = THEME_DAY[w.theme];
+    key.color.copy(lerpC(NIGHT.key, TD ? TD.key : DAY.key, d));
     // the course has no range floodlights over the fairways: a brighter moon there
     const nightBoost = w.sceneMode === 'course' ? 1.9 : 1;
-    key.intensity = THREE.MathUtils.lerp(NIGHT.keyIntensity * nightBoost * (1 - c * 0.6), DAY.keyIntensity * this.sunAmt, d);
+    key.intensity = THREE.MathUtils.lerp(NIGHT.keyIntensity * nightBoost * (1 - c * 0.6), DAY.keyIntensity * this.sunAmt * (TD?.keyMul ?? 1), d);
     const shadowSize = d > 0.5 ? 85 : 30;
     const cam = key.shadow.camera;
     if (cam.right !== shadowSize) {
@@ -190,7 +198,7 @@ export class Environment {
     }
     const hemi = w.range.hemi;
     hemi.color.copy(lerpC(NIGHT.hemiSky, DAY.hemiSky, d));
-    hemi.groundColor.copy(lerpC(NIGHT.hemiGround, DAY.hemiGround, d));
+    hemi.groundColor.copy(lerpC(NIGHT.hemiGround, TD ? TD.hemiGround : DAY.hemiGround, d));
     hemi.intensity = THREE.MathUtils.lerp(NIGHT.hemi * nightBoost, DAY.hemi * (1 + c * 0.35), d);
 
     // image-based light: the sky's colour in every material's reflections
@@ -203,9 +211,9 @@ export class Environment {
     // fog + post
     const fog = w.scene.fog;
     if (fog) {
-      const dayFog = this._tmpC2.copy(DAY.fog).lerp(OVERCAST_FOG, c);
+      const dayFog = this._tmpC2.copy(TD ? TD.fog : DAY.fog).lerp(OVERCAST_FOG, c);
       fog.color.copy(NIGHT.fog).lerp(dayFog, d);
-      fog.density = THREE.MathUtils.lerp(NIGHT.fogDensity * (1 + c * 0.4), DAY.fogDensity * (1 + c * 1.2), d);
+      fog.density = THREE.MathUtils.lerp(NIGHT.fogDensity * (1 + c * 0.4), DAY.fogDensity * (1 + c * 1.2), d) * (w.fogScale ?? 1);
     }
     const r = w.r;
     r.renderer.toneMappingExposure = THREE.MathUtils.lerp(NIGHT.exposure, DAY.exposure, d);
