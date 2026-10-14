@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -56 750 168" role="img" aria-label="Fairway">
+  <defs><clipPath id="fwl-band" clipPathUnits="userSpaceOnUse"><rect x="-40" y="0" width="814" height="100"/></clipPath><linearGradient id="fwl-gold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c49a52"/><stop offset="1" stop-color="#9a7231"/></linearGradient></defs>
+  <path transform="translate(0 0)" d="M7.5 -20 V120 M0 7.5 H56 M0 51 H48" fill="none" stroke="#121619" stroke-width="15" stroke-linejoin="miter" stroke-miterlimit="10" clip-path="url(#fwl-band)"/>
+  <path transform="translate(87 0)" d="M0 100 L38.45 0 H53.55 L92 100 H76.1 L46 21.9 L15.9 100 Z" fill="#121619"/>
+  <path transform="translate(261 0)" d="M7.5 -20 V120 M0 7.5 H36 A23.75 23.75 0 0 1 36 52 H0 M34 52 L70 113" fill="none" stroke="#121619" stroke-width="15" stroke-linejoin="miter" stroke-miterlimit="10" clip-path="url(#fwl-band)"/>
+  <path transform="translate(360 0)" d="M-1.5 -12 L33 100 L66 -12 L99 100 L133.5 -12" fill="none" stroke="#121619" stroke-width="15" stroke-linejoin="miter" stroke-miterlimit="10" clip-path="url(#fwl-band)"/>
+  <path transform="translate(523 0)" d="M0 100 L38.45 0 H53.55 L92 100 H76.1 L46 21.9 L15.9 100 Z" fill="#121619"/>
+  <path transform="translate(646 0)" d="M-2 -12 L44 52 L90 -12 M44 52 V120" fill="none" stroke="#121619" stroke-width="15" stroke-linejoin="miter" stroke-miterlimit="10" clip-path="url(#fwl-band)"/>
+  <rect x="216.21052631578948" y="-19.193569166074255" width="7.578947368421052" height="119.19356916607425" fill="url(#fwl-gold)"/>
+  <circle cx="220" cy="-30" r="10.806430833925743" fill="url(#fwl-gold)"/>
+  <path d="M223.78947368421052 -33 L260 -24 L223.78947368421052 -14 Z" fill="url(#fwl-gold)"/>
+  
+</svg>

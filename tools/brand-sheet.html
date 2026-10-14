@@ -5,30 +5,31 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Fairway brand</title>
 <style>
-  body { margin: 0; font: 14px -apple-system, "Inter", "Helvetica Neue", Arial, sans-serif; background: #e9e6dd; color: #10261d; }
+  body { margin: 0; font: 13px -apple-system, "Inter", "Helvetica Neue", Arial, sans-serif; color: #8b8a85; background: #0b0d0f; }
+  .cell { padding: 56px 48px; display: grid; gap: 22px; justify-items: center; }
+  .dark { background: #121518; }
+  .light { background: #f4f1ea; }
   .row { display: grid; grid-template-columns: 1fr 1fr; }
-  .cell { padding: 40px; display: grid; gap: 18px; justify-items: start; }
-  .dark { background: #06090f; color: #f5f1e8; }
-  .light { background: #f7f4ec; }
-  .sizes { display: flex; align-items: end; gap: 22px; }
-  .sizes figure { margin: 0; display: grid; justify-items: center; gap: 6px; font-size: 11px; opacity: .7; }
-  h2 { margin: 0; font-size: 12px; letter-spacing: .14em; text-transform: uppercase; opacity: .6; }
-  .px16 { width: 16px; height: 16px; image-rendering: auto; }
+  h2 { margin: 0; justify-self: start; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; font-weight: 600; opacity: .7; }
+  .sizes { display: flex; align-items: end; gap: 26px; }
+  .sizes figure { margin: 0; display: grid; justify-items: center; gap: 6px; font-size: 11px; }
 </style>
 </head>
 <body>
+  <div class="cell dark"><h2>Logo · dark backgrounds</h2><img src="../assets/brand/fairway-logo-dark.svg" width="640" alt="Fairway, a golf game" /></div>
+  <div class="cell light"><h2>Logo · light backgrounds</h2><img src="../assets/brand/fairway-logo-light.svg" width="640" alt="Fairway, a golf game" /></div>
   <div class="row">
-    <div class="cell dark"><h2>On dark</h2><img src="../assets/brand/fairway-logo-dark.svg" width="300" alt="Fairway logo for dark backgrounds" /></div>
-    <div class="cell light"><h2>On light</h2><img src="../assets/brand/fairway-logo-light.svg" width="300" alt="Fairway logo for light backgrounds" /></div>
+    <div class="cell dark"><h2>Wordmark · small</h2><img src="../assets/brand/fairway-wordmark-dark.svg" width="150" alt="" /><img src="../assets/brand/fairway-wordmark-dark.svg" width="96" alt="" /></div>
+    <div class="cell light"><h2>Wordmark · small</h2><img src="../assets/brand/fairway-wordmark-light.svg" width="150" alt="" /><img src="../assets/brand/fairway-wordmark-light.svg" width="96" alt="" /></div>
   </div>
   <div class="row">
-    <div class="cell dark"><h2>Mark</h2><img src="../assets/brand/fairway-mark.svg" width="96" alt="Fairway mark" /></div>
-    <div class="cell light"><h2>App icon and favicon</h2>
+    <div class="cell dark"><h2>Mark</h2><img src="../assets/brand/fairway-mark.svg" width="96" alt="" /></div>
+    <div class="cell light"><h2>App icon · favicon</h2>
       <div class="sizes">
         <figure><img src="../icon.svg" width="180" alt="" /><figcaption>180</figcaption></figure>
         <figure><img src="../icon.svg" width="64" alt="" /><figcaption>64</figcaption></figure>
         <figure><img src="../icon.svg" width="32" alt="" /><figcaption>32</figcaption></figure>
-        <figure><img src="../icon.svg" class="px16" alt="" /><figcaption>16</figcaption></figure>
+        <figure><img src="../icon.svg" width="16" alt="" /><figcaption>16</figcaption></figure>
       </div>
     </div>
   </div>

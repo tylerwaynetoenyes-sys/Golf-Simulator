@@ -342,6 +342,7 @@ tools/import-course.mjs      import a course from OpenStreetMap + OpenGolfAPI
 tools/bounce-audit.mjs       landing, bounce and roll per surface
 tools/perspective-check.mjs  on-screen size of ball, cup and flag at every distance
 tools/blender/               Blender scripts for the Poly Haven assets
+tools/brand/build-brand.mjs  builds every logo and icon (geometry, no font needed)
 tools/brand-sheet.html       the logos and icons together
 bridge/                      Python R10 bridge (port of 10over) + tests
 vendor/three/                three.js r186, vendored so the game works offline
