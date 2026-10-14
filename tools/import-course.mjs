@@ -10,6 +10,8 @@
 //   --q "<name>"         find the course with OpenGolfAPI (US courses): location + scorecard
 //   --lat/--lon          or give the location directly (anywhere OSM has golf=hole ways)
 //   --radius <m>         search radius for OSM features (default 1600)
+//   --course "<name>"    keep only hole lines inside the OSM golf course of this
+//                        name (needed where courses touch, e.g. Monterey Peninsula)
 //   --holes 1-9          which holes to keep (default: all mapped)
 //   --name, --place      display name and place (default from OpenGolfAPI / OSM)
 //   --theme <t>          parkland | western | coastal | urban (default parkland)
@@ -52,7 +54,11 @@ let lat = Number(args.lat), lon = Number(args.lon), card = null, ogName = null, 
 if (args.q) {
   const q = new URLSearchParams({ q: args.q, ...(args.state ? { state: args.state } : {}) });
   const s = await getJSON(`https://api.opengolfapi.org/v1/courses/search?${q}`);
-  const c = s?.courses?.[0];
+  // prefer the course whose name matches the query, not just the first hit
+  const norm = (t) => String(t || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const list = s?.courses || [];
+  const c = list.find((x) => norm(x.course_name || x.name) === norm(args.q) || norm(x.name) === norm(args.q))
+    || list.find((x) => norm(x.name).includes(norm(args.q))) || list[0];
   if (!c) { console.error(`OpenGolfAPI found no course for "${args.q}"`); process.exit(1); }
   console.log(`OpenGolfAPI: ${c.name}, ${c.city} ${c.state} (par ${c.par})`);
   if (!args.lat) { lat = c.latitude; lon = c.longitude; }
@@ -69,7 +75,8 @@ const dLat = R / 111320, dLon = R / (111320 * Math.cos((lat * Math.PI) / 180));
 const bbox = `${lat - dLat},${lon - dLon},${lat + dLat},${lon + dLon}`;
 const query = `[out:json][timeout:90];
 (
-  way["golf"="hole"](${bbox});
+  ${args.course ? `area["leisure"="golf_course"]["name"="${String(args.course).replace(/"/g, '')}"]->.c;
+  way["golf"="hole"](area.c);` : `way["golf"="hole"](${bbox});`}
   way["golf"~"^(green|fairway|bunker|tee|water_hazard|lateral_water_hazard)$"](${bbox});
   way["natural"="water"](${bbox});
   way["leisure"="golf_course"](${bbox});
@@ -87,7 +94,7 @@ if (!osm) { console.error('Overpass unavailable; try again shortly.'); process.e
 const els = osm.elements || [];
 const holesOsm = els.filter((e) => e.tags?.golf === 'hole' && e.geometry?.length >= 2);
 if (!holesOsm.length) { console.error('No golf=hole ways mapped here. Map them on openstreetmap.org, or route the holes by hand.'); process.exit(1); }
-const courseTag = els.find((e) => e.tags?.leisure === 'golf_course' && e.tags?.name);
+const courseTag = els.find((e) => e.tags?.leisure === 'golf_course' && e.tags?.name && (!args.course || e.tags.name === args.course)) || els.find((e) => e.tags?.leisure === 'golf_course' && e.tags?.name);
 
 // ── 3. local metres: +x east, +z south, centred on the holes ──
 let minLa = Infinity, maxLa = -Infinity, minLo = Infinity, maxLo = -Infinity;
@@ -198,7 +205,7 @@ const holes = holesOsm
     const wt = near(waters, waterOwner).filter((o) => area(o.p) > 150).slice(0, 2).map((o) => ({ t: +(o.q.s / o.q.len).toFixed(2), off: Math.round(o.q.off), ...ext(o.p, o.q), level: -0.8 }));
     const yards = sc?.yardages ? Math.max(...Object.values(sc.yardages).filter(Number.isFinite)) : Math.round(pr.len / YD);
     return {
-      n: ref - h0 + 1, name: e.tags.name || `Hole ${ref}`, par,
+      n: ref, name: e.tags.name || `Hole ${ref}`, par,
       note: `${par === 3 ? 'Par 3' : `Par ${par}`}, ${yards} yards from the back tees.${sc?.handicap_index ? ` Stroke index ${sc.handicap_index}.` : ''}`,
       pts, fw, ...(fw && Number.isFinite(fwS) ? { fwStart: Math.round(Math.max(60, fwS) / YD) } : {}),
       green: { r: Math.round(greenR), slope: [0.006, -0.008] }, pin: [0, -2],

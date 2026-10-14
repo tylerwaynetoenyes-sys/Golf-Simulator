@@ -477,7 +477,7 @@ export class CourseMode {
     const env = this.game.world.env;
     const done = !this._alive().length;
     return {
-      title: `Hole ${h.n} · ${h.name} · Par ${h.par}`,
+      title: /^Hole \d+$/.test(h.name) ? `Hole ${h.n} · Par ${h.par}` : `Hole ${h.n} · ${h.name} · Par ${h.par}`,
       detail: done ? 'Hole complete' : s.putting ? `${proximity(s.toPin)} putt` : `${dist(s.toPin)} ${distUnit()} to the pin${this._playsText(s)}`,
       chips: [{ kind: 'wind', mph: env.weather.windMph, fromDeg: env.windFromDeg - s.heading }, { kind: 'score', label: 'Thru', value: `${this.holeIdx}/${this.holes.length}` }],
     };
@@ -559,15 +559,17 @@ export class CourseMode {
     const par = coursePar(this.holes);
     const winner = lb.teams?.length ? lb.teams[0] : lb.rows[0];
     return {
-      title: `${this.holes.length} holes complete`,
+      title: this.holes.length === 1 ? 'Hole complete' : `${this.holes.length} holes complete`,
       score: solo ? me.strokes : winner.display,
-      scoreLabel: solo ? `strokes · ${fmtToPar(me.toPar)} · par ${par}` : `${winner.name}`,
+      scoreLabel: solo ? `strokes · ${fmtToPar(me.toPar)} · par ${par}` : (lb.teams?.length > 1 ? lb.teams[1] : lb.rows[1])?.value === winner.value ? 'All square' : `${winner.name}`,
       isBest,
       rows: lb.rows.map((r, i) => ({ label: `${i + 1}. ${r.name}`, value: r.display, extra: `${this.toPar(r.id).strokes} strokes`, color: r.color })),
       teams: lb.teams,
       verdict: solo
         ? me.toPar < 0 ? 'Under par on the Confluence Course.' : me.toPar === 0 ? 'Level par. A complete round.' : me.toPar <= 9 ? 'A solid round.' : 'Round complete.'
-        : lb.teams?.length > 1 ? `${lb.teams[0].name} takes it.` : `${lb.rows[0].name} wins.`,
+        : lb.teams?.length > 1
+          ? lb.teams[0].value === lb.teams[1].value ? 'All square between the top teams.' : `${lb.teams[0].name} takes it.`
+          : lb.rows.length > 1 && lb.rows[0].value === lb.rows[1].value ? 'A tie at the top.' : `${lb.rows[0].name} wins.`,
       scorecard: true,
     };
   }
