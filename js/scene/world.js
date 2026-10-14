@@ -17,6 +17,7 @@ import { CourseWorld } from '../course/courseWorld.js';
 import { PlayerMarkers } from './markers.js';
 import { Environment } from './environment.js';
 import { Ambient } from './ambient.js';
+import { Club } from './club.js';
 
 export class World {
   constructor(canvas, quality = 'high') {
@@ -35,6 +36,7 @@ export class World {
     this.effects = new Effects(scene);
     this.rig = new CameraRig(camera);
     this.characters = new Characters(scene);
+    this.club = new Club(scene);
     this.course = new CourseWorld(scene);
     this.markers = new PlayerMarkers(scene);
     this.ambient = new Ambient(scene);
@@ -155,6 +157,7 @@ export class World {
     this.tracer.update(dt);
     this.effects.update(dt);
     this.characters.update(dt);
+    this.club.update(dt, t);
     if (this.sceneMode === 'course') this.course.update(t, dt, this.camera);
     this.markers.update(t);
     this.ambient.update(dt, t);

@@ -1106,6 +1106,12 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       if (camera && u.beacon) {
         const d = camera.position.distanceTo(f.position);
         u.beacon.material.opacity = THREE.MathUtils.smoothstep(d, 40, 120) * (1 - u.out);
+        // a 0.9 m glow in world terms, so it shrinks with distance like the
+        // flag itself (a fixed-size dot reads closer than the pin really is),
+        // with a floor of ~6 px at 1080p so it never disappears
+        const view = 2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+        const k = Math.max(0.0056, 0.9 / Math.max(1e-3, d * view));
+        u.beacon.scale.set(k, k, 1);
       }
     }
     if (this.ring) this.ring.userData.update(dt, t);

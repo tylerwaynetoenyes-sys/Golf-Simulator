@@ -168,11 +168,22 @@ export class Ball {
     for (const m of this._mats) m.emissiveIntensity = 0.55 * (1 - d);
   }
 
+  /**
+   * Contact: the ball flattens against the face (by ~20% at tour speeds) for
+   * a frame or two, then springs back round as it leaves.
+   */
+  squash(amount = 1) { this._squash = 1; this._squashAmt = Math.min(1, amount); }
+
   /** Bigger on-screen glow for TV / projector viewing. */
   setScale(s) { this.glowScale = s; }
 
   update(dt, camera) {
     if (this.spinRate) this.mesh.rotateOnWorldAxis(this.spinAxis, this.spinRate * dt);
+    if (this._squash > 0) {
+      this._squash = Math.max(0, this._squash - dt / 0.07);
+      const k = Math.sin(this._squash * Math.PI) * 0.2 * this._squashAmt;
+      this.mesh.scale.set(1 + k * 0.5, 1 + k * 0.5, 1 - k);
+    } else if (this.mesh.scale.z !== 1) this.mesh.scale.set(1, 1, 1);
     const d = camera.position.distanceTo(this.mesh.position);
     // Halo: a fixed 30 cm of light around the ball in world terms, so it
     // shrinks with distance like a real object (a constant-size blob makes a

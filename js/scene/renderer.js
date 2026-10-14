@@ -36,7 +36,10 @@ export const QUALITY = {
 export class Renderer {
   constructor(canvas, quality = 'high') {
     this.canvas = canvas;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false });
+    // reversed-Z (float depth, where EXT_clip_control exists) keeps depth
+    // precise from the ball at your feet to real terrain on the horizon;
+    // three.js falls back to a standard buffer elsewhere
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance', stencil: false, reversedDepthBuffer: true });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;

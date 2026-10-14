@@ -184,6 +184,7 @@ export class Game {
     w.rig.toAddress(immediate);
     this.aimLine.position.set(s.origin.x, w.ball.mesh.position.y - 0.02, s.origin.z);
     this.aimLine.visible = !s.putting;
+    this._addressClub();
     if (m.course) { w.course.setPutting(false); w.course.setRings(true, m.ringRadii); }
     this._buildPuttLine();
     w.markers.set(m.markers());
@@ -256,8 +257,17 @@ export class Game {
   selectClub(id, quiet = false) {
     this.club = clubById(id);
     this.hud.setClub(this.club.id);
+    if (this.state === 'ready') this._addressClub();
     if (!quiet) audio.tick();
     this._updateHelper();
+  }
+
+  /** Stand the selected club behind the ball, square to the aim line. */
+  _addressClub() {
+    const s = this.setup;
+    const w = this.world;
+    if (!s || s.putting || !this.club) { w.club.hide(); return; }
+    w.club.setAddress(s.origin, s.heading + this.aimDeg, this.club.id, w.groundFn(s.origin.x, s.origin.z));
   }
 
   /** Where the current mode wants the ball to finish (metres), if anywhere. */
@@ -425,7 +435,7 @@ export class Game {
   }
 
   handleLaunch(launch, source = 'demo') {
-    if (this.state === 'idle') return;
+    if (this.state === 'idle' || this.state === 'swinging') return;
     audio.init();
     this._ensureReady();
     if (this.state === 'intro') this._endIntro();
@@ -441,7 +451,16 @@ export class Game {
       terrain: this.world.terrainFn, wind: this.mode.wind(), origin: s.origin, heading: s.heading, cup: this.mode.cup?.(s) || null,
       trees: this.mode.course ? this.world.course.treeHit : null,
     });
-    this._play(result, lie, source);
+    // the club comes down and the ball leaves on the contact frame (the
+    // demo swing is already at the top; a launch-monitor swing replays fast)
+    const club = this.world.club;
+    if (club.root.visible && club.phase !== 'hidden') {
+      this.state = 'swinging';
+      this.hud.setPrompt('');
+      club.strike(() => { this.state = 'ready'; this._play(result, lie, source); }, { fromTop: source !== 'demo' });
+    } else {
+      this._play(result, lie, source);
+    }
   }
 
   /** Auto or manual putt for the current player (course only). */
@@ -484,6 +503,7 @@ export class Game {
       w.ball.spinAxis.set(Math.cos(sa), -Math.sin(sa), 0).normalize();
       w.ball.spinRate = launch.totalSpin * RPM * 0.12;
       w.characters.swing(0);
+      w.ball.squash(Math.min(1, launch.ballSpeed / 75));
       w.effects.burst(o.x, o.y + 0.05, o.z, { n: 16, color: 0xfff0d0, speed: 1.4, up: 1.2, life: 0.32, gravity: 2 });
       if (this.setup.lie === 'sand') {
         // explosion: a heavy spray of sand and a lingering haze of dust
@@ -837,6 +857,7 @@ export class Game {
       sw.t = (performance.now() - sw.start) / 1000;
       sw.power = swingPower(sw.t);
       this.hud.meter(true, sw.power);
+      if (!this.setup.putting) w.club.setBackswing(sw.power);
       if (sw.t - sw.lastTick > 0.12) { sw.lastTick = sw.t; audio.swingMeterTick(sw.power); }
     }
 
@@ -862,7 +883,7 @@ export class Game {
     sw.holding = false;
     sw.power = swingPower((performance.now() - sw.start) / 1000);
     document.getElementById('swingButton').classList.remove('holding');
-    if (sw.power < 0.05) { this.hud.meter(false, 0); return; }
+    if (sw.power < 0.05) { this.hud.meter(false, 0); this.world.club.setBackswing(0); return; }
     const p = sw.power;
     setTimeout(() => this.hud.meter(false, 0), 400);
     if (this.setup.putting && this.mode.course) { this.putt('manual', p); return; }
@@ -926,6 +947,7 @@ export class Game {
     const q = this.setup.putting ? 4 : 2; // quarter-degree steps on the green
     this.aimDeg = Math.max(-25, Math.min(25, Math.round(deg * q) / q));
     this.world.rig.setAim(this.aimDeg);
+    if (this.state === 'ready' && this.world.club.phase === 'address') this._addressClub();
     if (this.setup.putting && this.mode.course && this.state === 'ready') {
       this._buildPuttLine();
       clearTimeout(this._aimT);

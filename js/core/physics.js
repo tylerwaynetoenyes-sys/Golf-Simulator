@@ -26,24 +26,26 @@ const RPM = (2 * Math.PI) / 60;
 
 export const AERO = {
   airDensity: 1.19, // kg/m^3 — Alton bluff top (~190 m) on a mild night
-  cd0: 0.2492, // base drag (supercritical regime)
-  cdSpin: 0.1708, // added drag per unit spin factor
-  cdFast: 0.08, // drag relief at high Reynolds number
-  clA: 0.5129, // lift = clA * S^clP (capped at clMax)
-  clP: 0.4534,
-  clMax: 0.3045,
-  spinDecay: 0.035, // fraction of spin lost per second in flight
+  cd0: 0.2563, // base drag (supercritical regime)
+  cdSpin: 0.1638, // added drag per unit spin factor
+  cdFast: 0.0996, // drag relief at high Reynolds number
+  clA: 0.5269, // lift = clA * S^clP (capped at clMax)
+  clP: 0.4575,
+  clMax: 0.3229,
+  spinDecay: 0.0198, // fraction of spin lost per second in flight
   kinViscosity: 1.5e-5,
 };
 
 export const GROUND = {
   // Fairway fitted so rollout ≈ Tour norms: DR ~20 yd, 7i ~7, PW ~3, SW ~1.5
-  fairway: { restitution: 0.354, friction: 0.546, roll: 4.0, rollDrag: 0.50 },
-  rough: { restitution: 0.25, friction: 0.9, roll: 6.5, rollDrag: 1.1 },
-  green: { restitution: 0.3, friction: 0.62, roll: 1.1, rollDrag: 0.16 },
+  fairway: { restitution: 0.354, friction: 0.58, roll: 4.0, rollDrag: 0.50, zipMax: 0.9 },
+  // rough: the grass takes the spin and about half the run (no zip back)
+  rough: { restitution: 0.22, friction: 0.62, roll: 4.6, rollDrag: 0.8, zipMax: 0 },
+  // greens: softer at impact than fairways (they hold), putting pace once rolling
+  green: { restitution: 0.24, friction: 0.9, roll: 1.1, rollDrag: 0.16, zipMax: 1.4, spinGrip: 0.8 },
   fringe: { restitution: 0.3, friction: 0.7, roll: 2.4, rollDrag: 0.35 },
   tee: { restitution: 0.3, friction: 0.6, roll: 4.0, rollDrag: 0.5 },
-  sand: { restitution: 0.06, friction: 1.6, roll: 11, rollDrag: 2.5 },
+  sand: { restitution: 0.06, friction: 1.6, roll: 11, rollDrag: 2.5, zipMax: 0 },
   path: { restitution: 0.55, friction: 0.3, roll: 1.2, rollDrag: 0.1 },
   water: null,
   oob: null,
@@ -356,19 +358,24 @@ export function simulateShot(launch, opts = {}) {
       const thl = Math.hypot(tx, tz) || 1;
       const rightDot = -ax * (tz / thl) + az * (tx / thl);
       const backOmega = omega * Math.max(-1, Math.min(1, rightDot));
-      const rw = BALL.radius * backOmega;
+      const rw = BALL.radius * backOmega * (surf.spinGrip ?? 1);
       // Steeper landings (relative to the surface) bite harder.
       const impact = (Math.atan2(vn, ts) * 180) / Math.PI;
       const bite = Math.min(1, Math.max(0.25, Math.sin((impact * Math.PI) / 180) * 1.25));
       let hNew = ts - surf.friction * bite * (ts + rw) * (2 / 7) * 2.2;
-      hNew = Math.max(hNew, -0.12 * ts); // a little zip back at most
+      // a little zip back at most: none out of rough or sand (the grass
+      // between ball and face takes the spin off), most on a receptive green
+      hNew = Math.max(hNew, -Math.min(0.12 * ts, surf.zipMax ?? 1));
       if (ts > 1e-6 && hNew < ts * 0.04 && rw < ts) hNew = Math.max(hNew, ts * 0.04);
       if (ground.surface === 'sand') hNew = Math.min(hNew, ts * 0.08); // plugs / dies in the bunker
+      hNew = Math.min(hNew, ts); // turf never adds speed along the ground
       const up = vn * e;
       vx = tx * hNew + nx * up;
       vy = ty * hNew + ny * up;
       vz = tz * hNew + nz * up;
-      omega *= 0.45;
+      // the impact takes most of the spin: what survives can't exceed the
+      // spin of a ball rolling at the new ground speed (no energy from nowhere)
+      omega = Math.min(omega * 0.45, (Math.abs(hNew) / BALL.radius) * 1.15);
       bounces++;
       if (up < 1.1 || bounces > 6) { phase = 'roll'; vy = 0; }
     } else {
