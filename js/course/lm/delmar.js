@@ -6,7 +6,15 @@
 // storefronts face +X, toward the golf hole.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, box, cyl, sphere, seeded, canvasTex, facadeMaterial, person } from './kit.js';
+import { mat as baseMat, lit, box, cyl, sphere, seeded, canvasTex, facadeMaterial, person } from './kit.js';
+
+// share one material per colour/options so the block stays cheap to draw
+const matCache = new Map();
+const mat = (color, opts = {}) => {
+  const k = `${color}|${JSON.stringify(opts)}`;
+  if (!matCache.has(k)) matCache.set(k, baseMat(color, opts));
+  return matCache.get(k);
+};
 
 const STREET_X = 4; // centre line of Delmar Blvd (local x)
 const FRONT_X = -6; // building fronts
@@ -27,12 +35,15 @@ function building(g, z0, width, storeys, brick, rnd, glow, { awning = null, lamp
   const depth = 18;
   const facade = facadeMaterial(brick, { cols: Math.max(3, Math.round(width / 3)), rows: storeys, win: '#28313b', lamp, frame: '#d8cbb4', seed: Math.floor(rnd() * 1e6) });
   glow.push(facade);
-  const body = new THREE.Mesh(new THREE.BoxGeometry(depth, h - 4.6, width), [mat(brick), facade, mat(brick), mat(brick), mat(brick), mat(brick)]);
-  // face +X carries the windows (material index 0 is +X for BoxGeometry)
-  body.material = [facade, mat(brick), mat(brick), mat(brick), mat(brick), mat(brick)];
+  // brick mass, with the window facade as a plane on the street (+X) side
+  const body = new THREE.Mesh(new THREE.BoxGeometry(depth, h - 4.6, width), mat(brick));
   body.position.set(FRONT_X - depth / 2, 4.6 + (h - 4.6) / 2, z0 + width / 2);
   body.castShadow = body.receiveShadow = true;
   g.add(body);
+  const front = new THREE.Mesh(new THREE.PlaneGeometry(width, h - 4.6), facade);
+  front.rotation.y = Math.PI / 2;
+  front.position.set(FRONT_X + 0.02, 4.6 + (h - 4.6) / 2, z0 + width / 2);
+  g.add(front);
   // ground floor: dark base with a lit shopfront
   const shop = lit(0x2a3036, 0xffd29a, { night: 1.3, roughness: 0.2, metalness: 0.3 });
   glow.push(shop);

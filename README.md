@@ -14,6 +14,9 @@ glowing tracer, a cinematic camera and the full set of numbers.
 | ![Landing camera](docs/screenshots/03-landing-cam.jpg) | ![Four players, two teams](docs/screenshots/12-multiplayer.jpg) |
 | ![Cup camera](docs/screenshots/15-cup-cam.jpg) | ![Holed out](docs/screenshots/14-holed-out.jpg) |
 | ![Approach into the putting rings](docs/screenshots/18-approach-rings.jpg) | ![Finished inside the outer ring](docs/screenshots/19-ring-finish.jpg) |
+| ![The Gateway, elevated tee](docs/screenshots/21-gateway-day.jpg) | ![Piasa bluff](docs/screenshots/22-piasa-bluff.jpg) |
+| ![Uphill to the Basilica](docs/screenshots/23-basilica-uphill.jpg) | ![The Delmar Loop at night](docs/screenshots/24-delmar-night.jpg) |
+| ![Water decision](docs/screenshots/25-water-decision.jpg) | ![Landmark models](docs/screenshots/26-landmarks.jpg) |
 | ![Landing camera](docs/screenshots/20-landing-cam.jpg) | ![R10 help](docs/screenshots/13-r10-help.jpg) |
 
 ## Quick start

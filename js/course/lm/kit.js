@@ -132,10 +132,17 @@ export function facadeMaterial(base, { cols = 8, rows = 4, win = '#2b3440', lamp
 export function person(shirt, rnd = Math.random) {
   const g = new THREE.Group();
   const skin = PERSON_SKIN[Math.floor(rnd() * PERSON_SKIN.length)];
-  const legs = mat(rnd() < 0.5 ? 0x2c3442 : 0x5a5348);
+  const legs = shared(rnd() < 0.5 ? 0x2c3442 : 0x5a5348);
   g.add(box(0.32, 0.85, 0.2, legs, 0, 0, 0));
-  g.add(box(0.42, 0.6, 0.24, mat(shirt), 0, 0.85, 0));
-  g.add(sphere(0.12, mat(skin, { roughness: 0.6 }), 0, 1.6, 0, 10));
+  g.add(box(0.42, 0.6, 0.24, shared(shirt), 0, 0.85, 0));
+  g.add(sphere(0.12, shared(skin, 0.6), 0, 1.6, 0, 10));
+  g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
   return g;
+}
+const personMats = new Map();
+function shared(color, roughness = 0.75) {
+  const k = `${color}|${roughness}`;
+  if (!personMats.has(k)) personMats.set(k, mat(color, { roughness }));
+  return personMats.get(k);
 }
 const PERSON_SKIN = [0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0x5c3a21];

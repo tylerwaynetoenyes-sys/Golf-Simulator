@@ -105,6 +105,8 @@ export class World {
   /** Build a course hole and point physics/camera/ball at its terrain. */
   loadHole(hole) {
     this.setScene('course');
+    // fewer trees and grass tufts on lighter quality settings (iPad)
+    this.course.treeDensity = this.r.quality.trees ?? 1;
     const T = this.course.load(hole);
     this.terrainFn = T.terrain;
     this.groundFn = T.groundHeight;
