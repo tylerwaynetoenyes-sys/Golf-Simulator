@@ -69,8 +69,9 @@ export class CourseMode {
     this.game = game;
     this.id = 'course';
     this.def = loadedCourse('confluence');
-    this.name = this.def.name;
-    this.blurb = '9 or 18 holes past the Arch, Chain of Rocks, Cahokia and more.';
+    // the picker shows the mode; a round shows its course
+    this.name = 'Courses';
+    this.blurb = 'The Confluence, East St. Louis, the Oregon Trail, Paris, Cassis and the Statue of Liberty.';
     this.course = true;
     this.roundOver = false;
     this.length = 9;

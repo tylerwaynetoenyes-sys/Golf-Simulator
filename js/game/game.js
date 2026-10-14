@@ -172,7 +172,9 @@ export class Game {
     document.querySelectorAll('#envTime [data-time]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.time === 'day') === day)));
     document.querySelectorAll('#envWeather [data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.weather === env.weatherId)));
     const sub = document.getElementById('brandSub');
-    if (sub) sub.textContent = `Mississippi bluffs · ${day ? 'afternoon' : 'night'}`;
+    // where you're playing: the course's place on a course, the bluffs on the range
+    const where = this.mode?.course && this.mode.def?.place ? this.mode.def.place.split(' · ').pop() : 'Mississippi bluffs';
+    if (sub) sub.textContent = `${where} · ${day ? 'afternoon' : 'night'}`;
   }
 
   // ── lifecycle ──
@@ -197,6 +199,7 @@ export class Game {
     this.hud.clearDots();
     if (id !== 'course') this.world.setScene('range');
     this.mode.start(opts);
+    this._syncEnvUI();
     this.shot = null;
     if (this.mode.course) {
       this._introHole();
@@ -1108,7 +1111,7 @@ export class Game {
         case 'm': case 'M': openModePicker(this); break;
         case 's': case 'S': if (this.mode.course) openScorecard(this); break;
         case 'p': case 'P': openPlayers(this); break;
-        case 'b': case 'B': radio.toggle(); break;
+        case 'o': case 'O': radio.toggle(); break;
         case 'n': case 'N': this.setTimeOfDay(this.world.env.isDay ? 'night' : 'day'); break;
         case 'h': case 'H': case '?': openHelp(this, 'pairing'); break;
         case 'r': case 'R': if (this.state === 'ready') this.setAim(0); break;

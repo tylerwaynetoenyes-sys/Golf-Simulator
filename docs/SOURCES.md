@@ -1,0 +1,103 @@
+# Sources and attribution
+
+Everything Fairway ships that came from somewhere else, with its licence and
+the credit it needs. Keep this file current when adding data or assets.
+
+## Elevation (every real-terrain course)
+
+Baked by `tools/fetch-dem.mjs` from the AWS Terrain Tiles (Terrarium format),
+the open elevation dataset built by Mapzen / Tilezen and hosted on the
+Registry of Open Data on AWS (https://registry.opendata.aws/terrain-tiles/).
+Required credit:
+
+> Elevation: Mapzen terrain tiles. United States 3DEP (formerly NED) and
+> global GMTED2010 and SRTM terrain data courtesy of the U.S. Geological
+> Survey. Europe terrain data produced using Copernicus data and information
+> funded by the European Union - EU-DEM layers. Global ETOPO1 terrain data
+> U.S. National Oceanic and Atmospheric Administration.
+
+| Course | Files | Principal source |
+|---|---|---|
+| Oregon Trail (Scotts Bluff, NE) | `assets/courses/oregon/` | USGS 3DEP |
+| East St. Louis (IL) | `assets/courses/eaststl/` | USGS 3DEP |
+| Statue of Liberty (Jersey City, NJ) | `assets/courses/liberty/` | USGS 3DEP |
+| Paris (Bois de Boulogne) | `assets/courses/paris/` | EU-DEM / SRTM |
+| Cassis (Provence) | `assets/courses/cassis/` | EU-DEM / SRTM |
+
+## Map data
+
+- **OpenStreetMap** (© OpenStreetMap contributors, ODbL 1.0,
+  https://www.openstreetmap.org/copyright): the Statue of Liberty course's
+  hole lines, greens, fairways, bunkers and water (Liberty National's front
+  nine, imported with `tools/import-course.mjs` through the Overpass API), and
+  the positions of landmarks on the East St. Louis, Paris and Cassis courses
+  (Eads Bridge, grain elevators, Gateway Arch, harbour and château).
+- **OpenGolfAPI** (https://opengolfapi.org, ODbL 1.0; course data
+  © OpenStreetMap contributors): course search and the Liberty National
+  scorecard (pars, yardages, stroke indexes). Credit: "© OpenStreetMap
+  contributors (ODbL 1.0) via OpenGolfAPI".
+
+Data under the ODbL can be used and adapted, including commercially, as long
+as it is credited and any adapted *database* shared under the same licence.
+The course files in `js/course/courses/` carry the credit in their headers
+and in the in-game course card.
+
+## Artwork and models
+
+- **The Piasa engraving**: John Wright, 1898 ("from a drawing in Mr. Eagles'
+  U.S.A."), public domain; vector tracing published on OpenClipart and
+  redistributed CC0 1.0 by freepngimg.com and freesvg.org. Supplied by Tyler.
+  `assets/art/piasa-wright-1898.svg`, coloured in `js/ui/piasa.js`.
+- **Poly Haven** (https://polyhaven.com), CC0 1.0, no credit required
+  (credited anyway):
+  - `island_tree_02` scanned tree, processed in Blender
+    (`tools/blender/tree.py`) to `assets/models/island_tree_02.glb`
+  - `aerial_grass_rock` and `dense_sand` textures, processed in Blender
+    (`tools/blender/detail.py`) to `assets/textures/ground_detail.jpg` and
+    `sand_detail.jpg`
+- **Fairway logo, icons and every other model** (landmarks, trees, the club,
+  the course scenery): made for Fairway, in code, in this repository.
+
+## Sound and music
+
+- **Recorded sound effects** in `assets/audio/` were generated with the
+  ElevenLabs Sound Effects API (`tools/elevenlabs.mjs`); use is governed by
+  the ElevenLabs terms of the account that generated them.
+- **Radio** (`js/data/stations.js`): live streams from listener-supported
+  stations, played as-is and credited in the radio panel. None are
+  redistributed; please support them:
+  - SomaFM, San Francisco: https://somafm.com/support/
+  - Radio Paradise, Paradise, California: https://radioparadise.com
+  - KEXP 90.3 FM, Seattle: https://www.kexp.org/donate/
+
+## Code
+
+- **three.js** r186 (`vendor/three/`), MIT, © three.js authors.
+- **Howler.js** 2.2.4 (`vendor/howler/`), MIT, © 2013–2020 James Simpson of
+  GoldFire Studios.
+- **R10 bridge protocol**: a port of 10over (see `bridge/README.md`).
+
+## References used for facts and dimensions
+
+Not redistributed; listed so figures can be checked.
+
+- Ball flight: Trackman PGA Tour averages (carry, apex, landing angle).
+- Bounce and roll: A. R. Penner, "The run of a golf ball", *Canadian Journal
+  of Physics* 80(8):931–940 (2002).
+- Chimney Rock: History Nebraska (marker text; 120 ft spire, ~470–480 ft
+  above the North Platte valley).
+- Aermotor windmills: Gas Engine Magazine and manufacturer histories (8 ft
+  A702 wheel on 30–40 ft towers).
+- Eads Bridge: National Register of Historic Places nomination (502–520–502 ft
+  spans, opened July 4, 1874).
+- Gateway Geyser: St. Louis Public Radio; The Clio; Historical Marker
+  Database (630 ft design height; shut off in 2023).
+- Statue of Liberty, Ellis Island: National Park Service.
+- Eiffel Tower, Arc de Triomphe, Grande Arche, Bois de Boulogne: the
+  operators' published figures (330 m; 50 m; 110 m).
+- Cap Canaille, Calanques National Park (2012), Cassis AOC (1936): Parc
+  national des Calanques and INAO.
+- Confluence Course landmarks: Tyler's photographs of the Piasa bluff, the
+  Great River Road, the Alton amphitheater and riverfront, the Cathedral
+  Basilica, and the Miles Davis and Robert Wadlow statues (references only;
+  not included in the repository).

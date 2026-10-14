@@ -1,6 +1,6 @@
 // Cassis, Provence. Nine holes through the vineyards of the Cassis
 // appellation and down toward the port (elevation from the Terrarium tiles:
-// IGN / SRTM), between the Calanques to the west and the red cliffs of Cap
+// EU-DEM / SRTM), between the Calanques to the west and the red cliffs of Cap
 // Canaille to the east. Hole points are DEM-frame metres (+x east, +z south,
 // origin 43.219°N 5.540°E); landmark positions from OpenStreetMap.
 export default {
@@ -10,7 +10,7 @@ export default {
   theme: 'coastal',
   dem: true,
   blurb: 'Nine holes across the vineyard plateau and down to the old town, with Cap Canaille, the Calanques and the Mediterranean below.',
-  credit: 'Elevation: AWS Terrain Tiles (IGN / SRTM); landmark positions © OpenStreetMap contributors',
+  credit: 'Elevation: Mapzen terrain tiles (EU-DEM, produced using Copernicus data; SRTM, USGS); landmark positions © OpenStreetMap contributors',
   waterLevel: 0.3,
   waterTint: 0x1d5b6e,
   // the cliffs of Cap Canaille are a red-ochre conglomerate and sandstone;

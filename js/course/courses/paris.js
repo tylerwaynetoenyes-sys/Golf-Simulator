@@ -1,5 +1,5 @@
 // Bois de Boulogne, Paris. Nine holes through the woods and lawns of the
-// Bois (IGN / SRTM elevation via the Terrarium tiles), with the Eiffel Tower
+// Bois (EU-DEM / SRTM elevation via the Terrarium tiles), with the Eiffel Tower
 // 3.3 km to the east, the Arc de Triomphe and La Défense on the skyline, and
 // the Seine along the western edge. Hole points are DEM-frame metres (+x
 // east, +z south, origin 48.862°N 2.250°E).
@@ -10,7 +10,7 @@ export default {
   theme: 'paris',
   dem: true,
   blurb: 'Nine holes through the Bois de Boulogne, with the Eiffel Tower, the Arc de Triomphe and La Défense on the skyline.',
-  credit: 'Elevation: AWS Terrain Tiles (SRTM and national DEMs); landmark positions © OpenStreetMap contributors',
+  credit: 'Elevation: Mapzen terrain tiles (EU-DEM, produced using Copernicus data; SRTM, USGS); landmark positions © OpenStreetMap contributors',
   // the Seine at Paris
   waterLevel: 28,
   waterTint: 0x3a5058,

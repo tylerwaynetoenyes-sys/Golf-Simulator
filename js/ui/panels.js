@@ -577,6 +577,7 @@ export function openCourseSetup(game) {
     ${saved ? `<div class="callout" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><span>Round in progress: ${esc(savedCourse.name)}, hole ${savedCourse.holes[saved.first - 1 + saved.holeIdx]?.n ?? saved.holeIdx + 1}, ${saved.length} holes</span><button class="btn btn-primary" id="csResume">Resume round</button></div>` : ''}
     <h3>Course</h3>
     <div class="course-cards" id="csCourse">${courseCards()}</div>
+    <p class="hint" id="csCredit" style="margin:8px 2px 0">${esc(course.credit || '')}</p>
     <h3>Holes</h3>
     <div class="seg" id="csLen">${lengthSeg()}</div>
     <div id="csHoles" style="margin-top:12px">${holeList()}</div>
@@ -604,6 +605,7 @@ export function openCourseSetup(game) {
     fix();
     el.querySelectorAll('#csCourse [data-course]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     el.querySelector('#csBlurb').textContent = course.blurb;
+    el.querySelector('#csCredit').textContent = course.credit || '';
     el.querySelector('#csLen').innerHTML = lengthSeg();
     bindLen();
     el.querySelector('#csHoles').innerHTML = holeList();

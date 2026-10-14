@@ -1,10 +1,14 @@
 # Fairway
 
-Golf on the bluffs above the Mississippi, in the browser. A night (or
-afternoon) driving range with the Gateway Arch on the horizon, an 18-hole
-course built around St. Louis and Alton landmarks, up to six players with
-teams, and every swing from a **Garmin Approach R10** landing live with a
-glowing tracer, a cinematic camera and the full set of numbers.
+A golf simulator on real ground, in the browser. A night (or afternoon)
+driving range on the bluffs above the Mississippi, the 18-hole Confluence
+Course through St. Louis and Alton, and five nine-hole courses built on real
+elevation: the Oregon Trail at Scotts Bluff, the East St. Louis riverfront,
+the Bois de Boulogne in Paris, the vineyards of Cassis, and Liberty National
+beside the Statue of Liberty, imported from OpenStreetMap. Up to six players
+with teams, a visible club that strikes the ball, an in-game radio, and every
+swing from a **Garmin Approach R10** landing live with a glowing tracer, a
+cinematic camera and the full set of numbers.
 
 ![Ball flight down the range at night](docs/screenshots/02-ball-flight.jpg)
 
@@ -49,6 +53,10 @@ python -m http.server 8000          # then open http://localhost:8000
 ```
 
 Requires a WebGL 2 browser: current Chrome, Edge, Safari or Firefox.
+
+To open a course hole directly in demo mode (handy on a kiosk or for
+testing): `http://localhost:8765/?play=paris&hole=9&day`. Course ids:
+`confluence`, `eaststl`, `oregon`, `paris`, `cassis`, `liberty`.
 
 ## Running the bridge alongside the game
 
@@ -130,9 +138,35 @@ bridge. Use it on your home Wi-Fi, not on a network you don't trust.
 | **C** | Camera: Cinematic → Follow → Tee |
 | **U** | Mulligan (course, when the rule allows) |
 | **D** / **B** | After a ball in the water: drop, or re-hit from the previous spot |
+| **O** | Radio on / off (the radio button picks the station) |
 | **Tab** | Session stats and personal bests |
 | **H** or **?** | R10 help |
 | **Custom shot** | Type in launch numbers from any monitor |
+
+### Courses
+
+Pick a course in **Play a course** (M → Course). Every course but the
+Confluence is built on real elevation baked from USGS and EU-DEM data, with a
+backdrop of the real land out to the horizon and its landmarks at their true
+positions:
+
+| Course | Where | Holes | Character |
+|---|---|---|---|
+| The Confluence Course | St. Louis & Alton | 18, par 70 | Landmark holes, designed terrain (below) |
+| East St. Louis | Illinois riverfront | 9, par 36 | Grain elevators, rail yards, the Eads Bridge and the Arch across the Mississippi; the Gateway Geyser fires for a hole-out |
+| Oregon Trail | Scotts Bluff, Nebraska | 9, par 36 | Golden prairie, sagebrush, junipers and ponderosa, wagon trains, bison, a windmill, a sod house, a trading post, Chimney Rock |
+| Paris | Bois de Boulogne | 9, par 36 | Parkland under oak and chestnut, home hole at the Eiffel Tower (gold at night), the Arc de Triomphe, La Défense |
+| Cassis | Provence | 9, par 36 | Vineyard plateau down to the old port, umbrella pines, olives and cypresses, Cap Canaille's red cliffs |
+| Statue of Liberty | Liberty National, Jersey City | 9, par 36 | Liberty National's real front nine from OpenStreetMap, the harbor, the Statue, Ellis Island, Lower Manhattan |
+
+Real courses can be imported from OpenStreetMap (hole lines, greens,
+fairways, bunkers, water) with their scorecards from OpenGolfAPI:
+
+```bash
+npm i pngjs                                            # once, for the elevation bake
+node tools/import-course.mjs --id mycourse --q "Course Name" --state NJ --holes 1-9
+node tools/holes-check.mjs mycourse
+```
 
 ### Games
 
@@ -265,9 +299,18 @@ averages (`node tools/calibrate.mjs` prints the check):
 | 7-iron | 123 mph · 16.3° · 7124 rpm | 178 yd | 176 yd |
 | PW | 102 mph · 24.2° · 9304 rpm | 134 yd | 136 yd |
 
-Every club is within 4% on carry and close on apex and descent angle.
-Landing uses spin-aware bounce (wedges check up, drivers release about 20 yd)
-and surface-specific roll on fairway, rough and green. A ball can run off the
+Every club is within 4% on carry and close on apex and landing angle.
+Landing uses spin-aware bounce off the real surface normal (wedges check up,
+drivers release about 18 yd), audited per surface against Tour launches:
+fairway, green, rough and sand all fall inside their target bands
+(`node tools/bounce-audit.mjs`). On-screen sizes of the ball, cup, flag and
+their aids are checked at every distance (`node tools/perspective-check.mjs`).
+The model, the numbers and why a general physics engine wasn't used are in
+[docs/physics.md](docs/physics.md).
+
+The club is visible at address: the demo meter takes it back, the downswing
+takes 0.26 s, and the launch, strike sound, ball compression and turf spray
+happen on the contact frame. A ball can run off the
 bluff and fall into the river. The whole flight is simulated the moment a shot
 arrives, so the camera and commentary know the outcome before the ball lands.
 
@@ -285,7 +328,21 @@ js/course/                   hole data, analytic hole terrain, landmarks, course
 js/net/bridgeClient.js       WebSocket client for the bridge
 js/ui/                       pairing flow, HUD, panels (help, players, scorecard), Piasa
 js/audio/audio.js            procedural WebAudio sound (impacts, flight, splash, ambience, UI)
-js/data/                     clubs, session store, personal bests
+js/audio/radio.js            in-game radio (Howler.js), stations in js/data/stations.js
+js/data/                     clubs, session store, personal bests, radio stations
+js/course/courses.js         course registry; js/course/courses/*.js real-terrain courses
+js/course/dem.js             elevation loading, hole frames on the DEM
+js/scene/club.js             the club at address and its swing
+assets/courses/<id>/         baked elevation (dem + far grids)
+assets/brand/                Fairway logos (dark, light), app icons
+assets/models, textures, art Poly Haven tree and detail maps, the Piasa engraving
+vendor/howler/               Howler.js 2.2.4
+tools/fetch-dem.mjs          bake real elevation for a course
+tools/import-course.mjs      import a course from OpenStreetMap + OpenGolfAPI
+tools/bounce-audit.mjs       landing, bounce and roll per surface
+tools/perspective-check.mjs  on-screen size of ball, cup and flag at every distance
+tools/blender/               Blender scripts for the Poly Haven assets
+tools/brand-sheet.html       the logos and icons together
 bridge/                      Python R10 bridge (port of 10over) + tests
 vendor/three/                three.js r186, vendored so the game works offline
 tools/calibrate.mjs          physics calibration check
@@ -338,9 +395,16 @@ swapping a procedural group for an imported one stays local to one file.
 ```bash
 cd bridge && python -m pytest       # protocol, handshake, WebSocket, static serving
 node tools/calibrate.mjs            # physics vs Trackman tour averages
+node tools/bounce-audit.mjs         # bounce and roll per surface
+node tools/perspective-check.mjs    # sizes on screen at every distance
+node tools/holes-check.mjs          # every course: tees, greens, pins
 ```
 
 ## Credits
+
+Full sources, licences and required credits (elevation, OpenStreetMap,
+OpenGolfAPI, Poly Haven, the Piasa engraving, radio stations) are in
+[docs/SOURCES.md](docs/SOURCES.md).
 
 - R10 protocol: [divotmaker/10over](https://github.com/divotmaker/10over) (MIT OR Apache-2.0); this repo's bridge is a Python port.
 - 3D: [three.js](https://threejs.org) (MIT), vendored in `vendor/three`.
