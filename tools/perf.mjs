@@ -4,8 +4,9 @@
 //
 //   node tools/perf.mjs [--base http://localhost:8765] [--quality medium] rollinghills:1 cassis:2 ...
 //
-// For each hole it measures the flyover, then the address view: median and
-// 95th-percentile frame time (rAF, capped at the display's 60 Hz), GPU time
+// For each hole it measures the intro (under the hole card, then the orbit)
+// and the address view: median and 95th-percentile frame time (rAF, capped
+// at the display's 60 Hz), GPU time
 // per frame (timer query; absolute values swing with the GPU's power state,
 // compare runs made back to back), draw calls and triangles per frame with
 // the shadow pass, and how many trees are models versus impostor cards.
@@ -72,9 +73,10 @@ try {
     for (let i = 0; i < 160 && !ok; i++) { await sleep(500); ok = await ev(`!!(window.__game?.world?.sceneMode === 'course' && window.__game.world.course?.treeList)`); }
     if (!ok) { console.log(`${h.padEnd(15)} did not load`); continue; }
     await sleep(1500);
-    row(h, await ev(MEASURE));
-    await sleep(16000);
-    row(h, await ev(MEASURE));
+    row(h, await ev(MEASURE)); // under the hole card
+    row(h, await ev(MEASURE)); // the orbit of the hole
+    await sleep(9000);
+    row(h, await ev(MEASURE)); // address
   }
   ws.close();
 } finally {

@@ -13,6 +13,7 @@ import { radio, STATIONS } from '../audio/radio.js';
 import { createModes } from './modes.js';
 import { CourseMode, LIES, MULLIGANS } from './courseMode.js';
 import { Roster } from './roster.js';
+import { holeIntroPath } from '../scene/introPath.js';
 import { commentFor, line } from './commentary.js';
 import { toast } from '../ui/dom.js';
 import { piasaSVG } from '../ui/piasa.js';
@@ -890,7 +891,11 @@ export class Game {
     }, 420);
   }
 
-  /** Fly the hole from tee to green, then settle behind the first player's ball. */
+  /**
+   * Hole intro: the card over a slow establishing drift behind the tee, then
+   * (card gone) a drone orbit of the whole hole and the land around it that
+   * spirals down onto the first player's address view.
+   */
   _introHole() {
     const m = this.mode;
     const T = m.T;
@@ -898,18 +903,23 @@ export class Game {
     this.state = 'intro';
     this._prepareTurn(true);
     this.hud.setTurn(null, false);
-    const gy = (x, z) => this.world.groundFn(x, z);
-    const V = (x, y, z) => new THREE.Vector3(x, y, z);
-    const mid = T.pointAt(T.length * 0.5);
-    const g = T.green, f = T.finalDir;
-    const keys = [
-      { pos: V(0 - mid.dx * 30, gy(0, 0) + 30, 0 - mid.dz * 30 + 20), look: V(mid.x, gy(mid.x, mid.z), mid.z) },
-      { pos: V(mid.x - mid.dx * 40 + mid.rx * 25, gy(mid.x, mid.z) + 42, mid.z - mid.dz * 40 + mid.rz * 25), look: V(g.x, gy(g.x, g.z) + 2, g.z) },
-      { pos: V(g.x - f.x * 55 - T.finalRight.x * 20, gy(g.x, g.z) + 16, g.z - f.z * 55 - T.finalRight.z * 20), look: V(g.x + f.x * 40, gy(g.x, g.z) + 14, g.z + f.z * 40) },
-    ];
+    const rig = this.world.rig;
+    const lmg = this.world.course?.landmark?.group;
+    const lm = lmg ? lmg.getWorldPosition(new THREE.Vector3()) : null;
+    const path = holeIntroPath(T, (x, z) => this.world.groundFn(x, z), rig, rig.addressPose(), lm);
     const rr = m.ringRadii;
     this.hud.showHoleCard({ n: h.n, name: h.name, par: h.par, yards: Math.round(T.length / YD), note: h.note, idx: m.holeIdx + 1, of: m.holes.length, rings: `Gold ring ${Math.round(rr.one / 0.3048)} ft = 1-putt · white ${Math.round(rr.two / 0.3048)} ft = 2-putt`, rules: `${MULLIGANS[m.mulligans]?.short || ''} · water: drop or re-hit, +1 stroke` });
-    this.world.rig.flyover(keys, 6.5, () => this._endIntro());
+    const orbit = () => {
+      this.hud.hideHoleCard();
+      this._orbiting = true;
+      document.body.classList.add('flyover');
+      // ~30°/s at full pace: slow enough to read the land, short enough to sit through
+      rig.flyover(path.orbit, 13, () => this._endIntro(), { easeIn: 1.8, easeOut: 3, fov: 48, occludeAfter: 0.85 });
+    };
+    rig.flyover(path.establish, 4.2, (skipped) => {
+      if (skipped || this.state !== 'intro') this._endIntro();
+      else orbit();
+    }, { easeIn: 1.2, easeOut: 1.6, fov: 46, toAddress: false });
   }
 
   _endIntro() {
@@ -935,6 +945,11 @@ export class Game {
   update(dt) {
     const w = this.world;
     const s = this.shot;
+    // the orbit hides the play HUD; whatever ends the intro brings it back
+    if (this._orbiting && (this.state !== 'intro' || w.rig.mode !== 'flyover')) {
+      this._orbiting = false;
+      document.body.classList.remove('flyover');
+    }
     if (this.state === 'flight' && s) {
       const prevT = s.t;
       const r = s.result;

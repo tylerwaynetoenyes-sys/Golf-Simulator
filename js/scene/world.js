@@ -195,10 +195,13 @@ export class World {
     this.skyline.update(t, dt, this.camera, this.r.renderer.domElement.height);
     this.range.update(t, dt);
     this.rig.update(dt, ballPos, playT);
-    // keep the corridor from the camera to the ball clear (not in flyovers)
     // keep the view clear along what the camera is aiming at (the ball, or
-    // the landing area the spotter frames), not in flyovers
-    setOcclusion(this.camera.position, this.rig.mode === 'address' ? ballPos : this.rig.look, this.sceneMode === 'course' && this.rig.mode !== 'flyover' && this.rig.mode !== 'showcase');
+    // the landing area the spotter frames). In a flyover only what passes
+    // right by the lens fades (a focus on the camera itself has no corridor),
+    // until the landing onto the ball (rig.flyOcclude)
+    const fly = this.rig.mode === 'flyover';
+    const focus = this.rig.mode === 'address' ? ballPos : fly && !this.rig.flyOcclude ? this.camera.position : this.rig.look;
+    setOcclusion(this.camera.position, focus, this.sceneMode === 'course' && this.rig.mode !== 'showcase');
     this.env.focus(this._focusV.lerpVectors(this.camera.position, this.rig.look, 0.3));
     this.env.update(dt);
     this.ball.update(dt, this.camera);

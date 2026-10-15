@@ -92,19 +92,50 @@ export class CameraRig {
     this.look.set(260, -20, -1400);
   }
 
+  /** The address view for the current ball and aim, without moving there. */
+  addressPose() {
+    const p = this.desiredPos.clone(), l = this.desiredLook.clone();
+    this._addressTargets();
+    const out = { pos: this.desiredPos.clone(), look: this.desiredLook.clone() };
+    this.desiredPos.copy(p);
+    this.desiredLook.copy(l);
+    return out;
+  }
+
   /**
-   * Fly along a path of {pos, look} keys over `seconds`, then call `done`.
-   * Used to introduce each course hole (green → tee).
+   * Fly a smooth spline through {pos, look} keys over `seconds`, then call
+   * `done`. Keys are evenly spaced in time (an orbit keyed by angle turns at
+   * an even rate); the pace eases up over `easeIn` s, holds, and eases off
+   * over `easeOut` s. With `toAddress` the flight hands over to the address
+   * view when it ends.
+   * `occludeAfter` (0..1): from that point on, trees between the camera and
+   * what it looks at fade out (js/scene/occlusion.js).
    */
-  flyover(keys, seconds, done) {
+  flyover(keys, seconds, done, { easeIn = seconds * 0.3, easeOut = seconds * 0.3, fov = 44, toAddress = true, occludeAfter = 2 } = {}) {
     this.mode = 'flyover';
-    this.fly = { keys, seconds, t: 0, done };
+    const pc = new THREE.CatmullRomCurve3(keys.map((k) => k.pos), false, 'centripetal');
+    const lc = new THREE.CatmullRomCurve3(keys.map((k) => k.look), false, 'centripetal');
+    const a = Math.min(easeIn, seconds * 0.5), b = Math.min(easeOut, seconds * 0.5);
+    this.fly = { pc, lc, seconds, t: 0, done, a, b, vmax: 1 / (seconds - a / 2 - b / 2), toAddress, occludeAfter, fov };
+    this.flyOcclude = false;
+    this.baseFov = fov;
     this.pos.copy(keys[0].pos);
     this.look.copy(keys[0].look);
   }
 
   skipFlyover() {
-    if (this.mode === 'flyover' && this.fly) this.fly.t = this.fly.seconds;
+    if (this.mode === 'flyover' && this.fly) { this.fly.t = this.fly.seconds; this.fly.skipped = true; }
+  }
+
+  /** Share of the path covered after t s on a trapezoid speed profile. */
+  _flyS(f) {
+    const { a, b, seconds: T, vmax: v } = f;
+    const t = Math.min(f.t, T);
+    let s;
+    if (t < a) s = v * t * t / (2 * a);
+    else if (t <= T - b) s = v * (a / 2 + (t - a));
+    else { const r = T - t; s = 1 - v * r * r / (2 * b); }
+    return Math.min(1, Math.max(0, s));
   }
 
   /** Begin following a precomputed shot. */
@@ -314,21 +345,23 @@ export class CameraRig {
     } else if (this.mode === 'flyover' && this.fly) {
       const f = this.fly;
       f.t += dt;
-      const u = Math.min(1, f.t / f.seconds);
-      const e = u * u * (3 - 2 * u);
-      const n = f.keys.length - 1;
-      const seg = Math.min(n - 1, Math.floor(e * n));
-      const lu = e * n - seg;
-      const A = f.keys[seg], Bk = f.keys[seg + 1];
-      this.pos.lerpVectors(A.pos, Bk.pos, lu);
-      this.look.lerpVectors(A.look, Bk.look, lu);
+      const s = this._flyS(f);
+      f.pc.getPoint(s, this.pos);
+      f.lc.getPoint(s, this.look);
+      // never under the ground, whatever the spline does between keys
+      this.pos.y = Math.max(this.pos.y, g(this.pos.x, this.pos.z) + 1.2);
       this.desiredPos.copy(this.pos);
       this.desiredLook.copy(this.look);
-      if (u >= 1) {
+      this.flyOcclude = s >= f.occludeAfter;
+      // settle the lens back to the address view's as the flight lands there
+      if (f.toAddress) this.baseFov = THREE.MathUtils.lerp(f.fov, 44, THREE.MathUtils.smoothstep(s, 0.75, 1));
+      if (f.t >= f.seconds) {
         const done = f.done;
         this.fly = null;
-        this.toAddress();
-        done?.();
+        this.flyOcclude = false;
+        // a skip cuts straight to the ball
+        if (f.toAddress || f.skipped) this.toAddress(!!f.skipped);
+        done?.(f.skipped);
       }
     } else if (this.mode === 'shot' && this.result && this.cupShot && playT >= this.cupShot.at - this.cupShot.lead) {
       const c = this.cupShot;
