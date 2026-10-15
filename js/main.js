@@ -114,6 +114,13 @@ async function boot() {
     game.setMode('course', { course: c, length: PARAMS.has('hole') ? 1 : Math.min(9, c.holes.length), startHole: h, rings: store.settings.rings || 'putt', gimme: store.settings.gimme, mulligans: 'nine' });
   }
 
+  // ?range[&day]: straight onto the driving range in demo mode
+  if (PARAMS.has('range')) {
+    pairing.enterGame('demo');
+    if (PARAMS.has('day')) world.env.setTime('day', true);
+    game.setMode('range');
+  }
+
   // Resume audio after tab switches
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden && audio.ctx && audio.ctx.state === 'suspended') audio.ctx.resume();

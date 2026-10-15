@@ -404,40 +404,58 @@ export class HUD {
     this._courseKey = null;
     const c = this.mapCtx, W = this.mapW, H = this.mapH;
     c.setTransform(this.mapDpr, 0, 0, this.mapDpr, 0, 0);
-    const zMax = 360 * YD;
-    const xr = 75;
-    const px = (x) => W / 2 + (x / xr) * (W / 2 - 8);
-    const py = (z) => H - 16 - (-z / zMax) * (H - 30);
+    // the range drawn like the course maps: mown turf, the nets, the targets as they
+    // are on the ground (concentric rings), yardage arcs from the bay, the bluff and river
+    const zMax = 345 * YD;
+    const xr = LAYOUT.fairwayHalfWidth + 60;
+    const px = (x) => W / 2 + (x / xr) * (W / 2 - 6);
+    const py = (z) => H - 22 - (-z / zMax) * (H - 40);
     c.clearRect(0, 0, W, H);
-    // rough + fairway
-    c.fillStyle = 'rgba(70,100,50,0.18)';
-    c.fillRect(0, py(LAYOUT.plateauEnd), W, H);
-    c.fillStyle = 'rgba(120,170,90,0.22)';
-    c.fillRect(px(-LAYOUT.fairwayHalfWidth), py(LAYOUT.plateauEnd), px(LAYOUT.fairwayHalfWidth) - px(-LAYOUT.fairwayHalfWidth), H);
-    // river
-    c.fillStyle = 'rgba(90,130,200,0.18)';
-    c.fillRect(0, 0, W, py(LAYOUT.plateauEnd));
-    // yardage lines
-    c.strokeStyle = 'rgba(255,255,255,0.07)';
-    c.fillStyle = 'rgba(255,255,255,0.32)';
-    c.font = '600 10px Jost, -apple-system, system-ui, sans-serif';
-    for (const yd of [100, 200, 300]) {
-      const y = py(-yd * YD);
-      c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke();
-      c.fillText(String(yd), 4, y - 3);
+    c.fillStyle = '#16251a'; c.fillRect(0, 0, W, H);
+    // rough, then the mown outfield in stripes
+    c.fillStyle = '#2a4529'; c.fillRect(px(-LAYOUT.fairwayHalfWidth - 52), py(LAYOUT.plateauEnd), px(LAYOUT.fairwayHalfWidth + 52) - px(-LAYOUT.fairwayHalfWidth - 52), H);
+    for (let k = 0; k < 24; k++) {
+      const z0 = -k * 14, z1 = z0 - 14;
+      if (z1 < LAYOUT.plateauEnd) break;
+      c.fillStyle = k % 2 ? '#3d6b37' : '#46773f';
+      c.fillRect(px(-LAYOUT.fairwayHalfWidth), py(z0), px(LAYOUT.fairwayHalfWidth) - px(-LAYOUT.fairwayHalfWidth), py(z1) - py(z0));
     }
+    // the bluff and the river beyond it
+    const rg = c.createLinearGradient(0, 0, 0, py(LAYOUT.plateauEnd));
+    rg.addColorStop(0, '#1d4f7e'); rg.addColorStop(1, '#2b6aa0');
+    c.fillStyle = rg; c.fillRect(0, 0, W, py(LAYOUT.plateauEnd));
+    c.fillStyle = 'rgba(200,190,160,0.5)'; c.fillRect(0, py(LAYOUT.plateauEnd) - 2, W, 3);
+    // the nets down the sides
+    c.strokeStyle = 'rgba(230,236,240,0.45)'; c.setLineDash([2, 3]);
+    for (const sx of [-1, 1]) { c.beginPath(); c.moveTo(px(sx * (LAYOUT.fairwayHalfWidth + 52)), py(4)); c.lineTo(px(sx * (LAYOUT.fairwayHalfWidth + 52)), py(LAYOUT.plateauEnd + 10)); c.stroke(); }
+    c.setLineDash([]);
+    // yardage arcs from the bay
+    const sx0 = (W / 2 - 6) / xr, sz0 = (H - 40) / zMax;
+    c.font = '600 9px Jost, -apple-system, system-ui, sans-serif'; c.textAlign = 'left'; c.textBaseline = 'middle';
+    for (const yd of [50, 100, 150, 200, 250, 300]) {
+      const r = yd * YD;
+      c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 1;
+      c.beginPath(); c.ellipse(px(0), py(0), r * sx0, r * sz0, 0, Math.PI * 1.08, Math.PI * 1.92); c.stroke();
+      c.lineWidth = 2.5; c.strokeStyle = 'rgba(8,12,10,0.7)'; c.strokeText(String(yd), px(0) + 4, py(-r) - 5);
+      c.fillStyle = 'rgba(255,255,255,0.75)'; c.fillText(String(yd), px(0) + 4, py(-r) - 5);
+    }
+    c.lineWidth = 1;
     // long drive grid
     if (mode === 'ld') {
-      c.strokeStyle = 'rgba(255,210,154,0.35)';
+      c.strokeStyle = 'rgba(255,255,255,0.4)';
       c.setLineDash([4, 4]);
       c.strokeRect(px(-25 * YD), py(LAYOUT.plateauEnd), px(25 * YD) - px(-25 * YD), py(-150 * YD) - py(LAYOUT.plateauEnd));
       c.setLineDash([]);
     }
-    // greens
-    const sx = (W / 2 - 8) / xr, sz = (H - 30) / zMax;
+    // the targets, rings as they lie on the turf
+    const sx = sx0, sz = sz0;
     for (const g of GREENS) {
-      c.fillStyle = `#${g.color.toString(16).padStart(6, '0')}55`;
-      c.beginPath(); c.ellipse(px(g.x), py(g.z), Math.max(2.5, g.r * sx), Math.max(2.5, g.r * sz), 0, 0, Math.PI * 2); c.fill();
+      const col = `#${g.color.toString(16).padStart(6, '0')}`;
+      for (const [k, cc] of [[1, '#ffffff'], [0.8, col], [0.56, '#ffffff'], [0.32, col]]) {
+        c.fillStyle = cc; c.globalAlpha = cc === '#ffffff' ? 0.75 : 0.95;
+        c.beginPath(); c.ellipse(px(g.x), py(g.z), Math.max(2, g.r * k * sx), Math.max(2, g.r * k * sz), 0, 0, Math.PI * 2); c.fill();
+      }
+      c.globalAlpha = 1;
     }
     if (CTP_GREEN.active) {
       c.fillStyle = 'rgba(255,213,74,0.35)';
@@ -445,6 +463,10 @@ export class HUD {
       c.fillStyle = '#ffd54a';
       c.beginPath(); c.arc(px(CTP_GREEN.x), py(CTP_GREEN.z), 3.5, 0, Math.PI * 2); c.fill();
     }
+    // the bays along the bottom
+    c.fillStyle = 'rgba(30,34,40,0.95)'; c.fillRect(0, py(0) + 3, W, H - py(0) - 3);
+    c.fillStyle = 'rgba(143,211,255,0.7)';
+    for (let b = -9; b <= 9; b++) c.fillRect(px(b * 4.2) - 1.5, py(0) + 4, 3, 1.5);
     // aim line
     const a = (aimDeg * Math.PI) / 180;
     c.strokeStyle = 'rgba(255,255,255,0.18)';

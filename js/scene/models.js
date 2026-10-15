@@ -33,6 +33,7 @@ const FILES = {
 export const COURSE_MODELS = {
   paris: ['eiffel', 'peopleLo', 'statue'],
   liberty: ['statue'],
+  range: ['peopleLo'], // the bays' crowds
   centralpark: ['peopleLo'],
   eaststl: ['lowrider', 'wreck', 'people', 'peopleLo', 'rubble'],
   sawgrass: ['people', 'peopleLo'],

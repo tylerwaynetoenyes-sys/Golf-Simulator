@@ -6,6 +6,7 @@ import { CUP } from '../core/physics.js';
 import { buildCup } from './cup.js';
 import { YD } from '../core/physics.js';
 import { LAYOUT, GREENS, CTP_GREEN, groundHeight } from './layout.js';
+import { buildVenue } from './venue.js';
 import { surroundHeight } from './terrain.js';
 import { MOON_DIR } from './sky.js';
 
@@ -125,63 +126,22 @@ export function createRange(scene, river, quality) {
   moon.shadow.normalBias = 0.02;
   group.add(moon, moon.target);
 
-  // ── Hitting bays + canopy ──
-  const bayMat = new THREE.MeshStandardMaterial({ color: 0x1f4a2a, roughness: 0.95 });
-  const matEdge = new THREE.MeshStandardMaterial({ color: 0x0f1210, roughness: 0.9 });
+  // ── The hitting venue: three tiers of bays round the player (js/scene/venue.js) ──
   const wood = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 0.8 });
   const steel = new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.5, metalness: 0.6 });
-  const roofUnder = new THREE.MeshStandardMaterial({ color: 0x3b2c21, roughness: 0.85 });
-  for (let i = -4; i <= 4; i++) {
-    const x = i * 4.2;
-    const base = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.04, 2.2), matEdge);
-    base.position.set(x, 0.02, 0.7);
-    base.receiveShadow = true;
-    const turf = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.05, 1.5), bayMat);
-    turf.position.set(x, 0.035, 0.6);
-    turf.receiveShadow = true;
-    group.add(base, turf);
-    if (i !== 0) {
-      // bucket of range balls
-      const bucket = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.13, 0.28, 16), new THREE.MeshStandardMaterial({ color: 0x15233a, roughness: 0.6 }));
-      bucket.position.set(x - 0.9, 0.16, 1.4);
-      bucket.castShadow = true;
-      group.add(bucket);
-    }
-    if (i < 4) {
-      const divider = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.1, 2.4), wood);
-      divider.position.set(x + 2.1, 0.55, 2.0);
-      divider.castShadow = true;
-      group.add(divider);
-    }
-  }
+  const dayHooks = [];
+  buildVenue(group, { quality, updaters, dayHooks });
   // tee peg in the player's bay
   const tee = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.002, 0.04, 8), new THREE.MeshStandardMaterial({ color: 0xf5d07a }));
   tee.position.set(0, 0.07, 0);
   group.add(tee);
-
-  const canopy = new THREE.Group();
+  const canopy = new THREE.Group(); // (kept for the authored-asset slot)
   group.add(canopy);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(40, 0.35, 7.2), roofUnder);
-  roof.position.set(0, 3.9, 4.6);
-  roof.castShadow = true;
-  roof.receiveShadow = true;
-  canopy.add(roof);
-  const fascia = new THREE.Mesh(new THREE.BoxGeometry(40, 0.6, 0.12), steel);
-  fascia.position.set(0, 3.75, 1.0);
-  canopy.add(fascia);
-  for (let i = -5; i <= 5; i++) {
-    for (const z of [1.15, 7.9]) {
-      const post = new THREE.Mesh(new THREE.BoxGeometry(0.16, 3.9, 0.16), steel);
-      post.position.set(i * 4.2 - 2.1, 1.95, z);
-      post.castShadow = true;
-      canopy.add(post);
-    }
-  }
   // Under-canopy amber lights, one per bay (glow strips) + three real lights
   const stripMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(AMBER).multiplyScalar(3.2) });
   for (let i = -4; i <= 4; i++) {
     const strip = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.04, 0.12), stripMat);
-    strip.position.set(i * 4.2, 3.7, 2.2);
+    strip.position.set(i * 4.2, 3.98, 2.2);
     group.add(strip);
   }
   const bayLight = new THREE.SpotLight(AMBER, 16, 14, 0.95, 0.65, 1.6);
@@ -496,6 +456,7 @@ export function createRange(scene, river, quality) {
       signLightBase = 30 * n;
       pinLight.intensity = 14 * n;
       for (const f of flags) f.userData.flagMat.emissiveIntensity = f.userData.baseEmissive * (0.25 + 0.75 * n);
+      for (const h of dayHooks) h(d);
     },
     update(t, dt) {
       for (const f of flags) {
