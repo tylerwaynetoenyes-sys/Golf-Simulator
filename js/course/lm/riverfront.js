@@ -649,7 +649,7 @@ function sternwheeler(B, glow) {
 }
 
 // ── a Mississippi towboat pushing four covered hopper barges (moves along Z) ──
-function tow(glow) {
+export function tow(glow) {
   const g = new THREE.Group();
   const B = new Batch();
   const rust = pbr('metal_plate', { scale: 2, tint: 0x8a5a40, metal: 0.3 });

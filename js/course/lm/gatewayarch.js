@@ -28,7 +28,7 @@ function column(r, h) {
 }
 
 // the Old Courthouse, its east portico toward the Arch (+x)
-function courthouse(m) {
+export function courthouse(m) {
   const B = new Batch();
   const H = 17;
   // the cross: two wings each way from the rotunda

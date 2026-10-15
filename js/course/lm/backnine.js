@@ -20,16 +20,12 @@
 //                 balustraded terrace above its grand stair and fountain
 // Local axes as in kit.js: +Z toward the tee (the faces you see), y = 0 grade.
 import * as THREE from 'three';
-import { lit, tree, SLOT, FT } from './kit.js';
+import { lit, tree, SLOT, FT, landmarkWater as water } from './kit.js';
 import { pbr } from '../../scene/pbr.js';
-import { createWaterMaterial } from '../../scene/river.js';
 import { place, bx, cy, rod, Batch } from './riverfront.js';
 import { confluenceTower, materials as confluenceMaterials } from './confluencepoint.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
-
-let _water = null;
-const water = () => (_water ||= createWaterMaterial({ y: 0, tint: 0x1f3236, flow: 0.15 }));
 
 /** Window glass that lights up warm at night. */
 function windowGlass(night = 0.9) {
@@ -92,9 +88,9 @@ function archRing(w, h, band, depth, x, y, z, ry = 0) {
 }
 
 /** A row of short balusters with a handrail and base, from (x0, z0) to (x1, z1) at height y. */
-function balustrade(B, stone, x0, z0, x1, z1, y, h = 1.0, pitch = 0.42) {
+function balustrade(B, stone, x0, z0, x1, z1, y, h = 1.0, pitch = 0.5) {
   const L = Math.hypot(x1 - x0, z1 - z0), n = Math.max(2, Math.floor(L / pitch)), ry = -Math.atan2(z1 - z0, x1 - x0);
-  const bal = new THREE.LatheGeometry([[0.001, 0], [0.09, 0], [0.09, 0.08], [0.06, 0.16], [0.11, 0.42], [0.06, 0.66], [0.07, 0.74], [0.001, 0.74]].map(([r, yy]) => new THREE.Vector2(r, yy * (h - 0.2) / 0.74)), 6);
+  const bal = new THREE.LatheGeometry([[0.08, 0], [0.06, 0.16], [0.11, 0.42], [0.06, 0.66], [0.07, 0.74]].map(([r, yy]) => new THREE.Vector2(r, yy * (h - 0.2) / 0.74)), 5);
   for (let i = 0; i <= n; i++) {
     const t = i / n;
     B.add(stone, bal.clone().translate(x0 + (x1 - x0) * t, y + 0.1, z0 + (z1 - z0) * t));
@@ -210,7 +206,7 @@ function climatron() {
   const g = new THREE.Group();
   const glow = [];
   const alu = pbr('metal_plate', { scale: 1.2, tint: 0xd9dee2, metal: 0.85, rough: 0.55 });
-  const conc = pbr('concrete_wall_008', { scale: 3, tint: 0xe2ddd2 });
+  const conc = pbr('concrete_wall_008', { scale: 3, tint: 0xd2dcf2, bright: 1.3 });
   const paving = pbr('brushed_concrete', { scale: 3, tint: 0xd8d2c6 });
   const glass = new THREE.MeshStandardMaterial({ color: 0xd4e6e8, roughness: 0.04, metalness: 0.2, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide, emissive: 0x9bd6a8, emissiveIntensity: 0 });
   glass.userData.night = 0.35;
@@ -341,7 +337,7 @@ function confluence() {
 function locks() {
   const g = new THREE.Group();
   const glow = [];
-  const conc = pbr('concrete_wall_008', { scale: 4, tint: 0xd6d2c8, glow: 0xfff0d0, night: 0.25 });
+  const conc = pbr('concrete_wall_008', { scale: 4, tint: 0xccd6f0, bright: 1.3, glow: 0xfff0d0, night: 0.25 });
   const deck = pbr('brushed_concrete', { scale: 3, tint: 0xcfcac0 });
   const gate = pbr('metal_plate', { scale: 2, tint: 0x6f7b84, metal: 0.55, side: THREE.DoubleSide });
   const steel = pbr('metal_plate', { scale: 1.5, tint: 0x4d565e, metal: 0.55 });

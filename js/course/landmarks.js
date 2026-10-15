@@ -10,7 +10,8 @@ export function buildLandmark(type) {
   const b = EXTRA[type];
   if (!b) return { group: new THREE.Group(), glow: [] };
   const out = b();
-  out.group.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
+  // everything casts a shadow but what a builder marks userData.noShadow
+  out.group.traverse((o) => { if (o.isMesh) o.castShadow = !o.userData.noShadow; });
   return out;
 }
 

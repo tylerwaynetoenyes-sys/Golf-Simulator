@@ -246,7 +246,10 @@ in map axes): the park's lakes, drives, lots and footprints.
 recompressed): white_sandstone_bricks, sandstone_blocks_08,
 concrete_wall_008, brushed_concrete, clay_roof_tiles_02, metal_plate,
 corrugated_iron, asphalt_02, granite_wall, red_bricks_02, white_plaster_02,
-roof_slates_02. Laid on in world space by `js/scene/pbr.js`.
+roof_slates_02, and for the landmark pass cobblestone_floor_08,
+gravel_stones, rock_face_03, rusty_metal_02, box_profile_metal_sheet,
+thatch_roof_angled, white_stucco, wood_planks_grey (1K colour, 512 px
+roughness and normal). Laid on in world space by `js/scene/pbr.js`.
 
 ## Cars and boats
 

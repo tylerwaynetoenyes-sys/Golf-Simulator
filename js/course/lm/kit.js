@@ -10,6 +10,7 @@
 // `trees` are planted by the course with its real tree models (impostors at
 // range, collision where in play) rather than modelled into the group.
 import * as THREE from 'three';
+import { createWaterMaterial } from '../../scene/river.js';
 
 export const FT = 0.3048;
 
@@ -21,6 +22,12 @@ export const SLOT = { oak: 0, youngOak: 1, maple: 2, sycamore: 3, cedar: 4, spru
  * else the course's own broadleaf, or a conifer with `conifer`.
  */
 export const tree = (x, y, z, h, crown, { slot = null, conifer = false } = {}) => ({ x, y, z, h, crown, slot, conifer });
+
+/** Still water for a landmark's pools and basins: the course's water shader, one shared material. */
+let _water = null;
+export function landmarkWater() {
+  return (_water ||= createWaterMaterial({ y: 0, tint: 0x1f3236, flow: 0.15 }));
+}
 
 export function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0, ...opts });

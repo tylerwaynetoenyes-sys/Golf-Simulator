@@ -64,7 +64,12 @@ function fescueDepth(T, x, z) {
 
 /** Scale the scene fog on one material (distant landmarks that should still read). */
 function hazeLess(m, k) {
-  m.onBeforeCompile = (sh) => {
+  // chained onto any shader edit the material already has (pbr.js surfaces)
+  if (m.userData.hazeLess) return;
+  m.userData.hazeLess = k;
+  const prev = m.onBeforeCompile, prevKey = m.customProgramCacheKey.call(m);
+  m.onBeforeCompile = (sh, r) => {
+    prev.call(m, sh, r);
     sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>', `#ifdef USE_FOG
   #ifdef FOG_EXP2
     float fogFactor = 1.0 - exp( - fogDensity * fogDensity * vFogDepth * vFogDepth );
@@ -74,7 +79,7 @@ function hazeLess(m, k) {
   gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor * ${k.toFixed(2)} );
 #endif`);
   };
-  m.customProgramCacheKey = () => `haze${k}`;
+  m.customProgramCacheKey = () => `${prevKey}|haze${k}`;
 }
 
 function seeded(seed) {
