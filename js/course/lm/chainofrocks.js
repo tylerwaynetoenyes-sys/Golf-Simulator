@@ -6,7 +6,8 @@
 // +X/-Z. Footprint x -120..520, z -300..60.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, seeded, canvasTex, tree as mkTree, SLOT } from './kit.js';
+import { mat, lit, seeded, canvasTex, tree as mkTree, SLOT, boulderGeometry } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
 
 const DEG = Math.PI / 180;
 const XMIN = -120, XMAX = 520, ZMIN = -300, ZMAX = 60;
@@ -128,21 +129,21 @@ export default function build() {
     for (const [bx, bz] of strip) {
       for (let k = 0; k < 4; k++) {
         const s = 0.6 + r() * 1.4;
-        const geo = new THREE.DodecahedronGeometry(s, 0).scale(1.3, 0.6, 1);
+        const geo = boulderGeometry(s, r, { detail: 1, flat: 0.6 }).scale(1.3, 1, 1);
         geo.rotateY(r() * 6);
         const o = (r() - 0.3) * 10;
         geo.translate(bx + RN.x * o + (r() - 0.5) * 5, 0.2, bz + RN.y * o + (r() - 0.5) * 5);
         parts.push(geo);
       }
     }
-    const rip = new THREE.Mesh(mergeGeometries(parts.map((x) => x.index ? x.toNonIndexed() : x)), mat(0x8b8577, { roughness: 1, flatShading: true }));
+    const rip = new THREE.Mesh(mergeGeometries(parts.map((x) => x.index ? x.toNonIndexed() : x)), pbr('rock_face_03', { scale: 2, tint: 0xc0c4cc }));
     rip.receiveShadow = true;
     g.add(rip);
     void v;
   }
 
   // ---- piers -----------------------------------------------------------
-  const concrete = lit(0xbdb5a5, 0xffe6c4, { roughness: 0.92, night: 0.12 });
+  const concrete = pbr('concrete_wall_008', { scale: 3.5, tint: 0xccd6ee, bright: 1.25, glow: 0xffe6c4, night: 0.12 });
   glow.push(concrete);
   const trussSpans = [[74, 152], [152, 242], [242, L1], [L1, 420], [420, 508], [508, 592]];
   {
@@ -207,10 +208,10 @@ export default function build() {
     const girder = sweep(chain(0, 74, 6), [[-3.8, -1], [-3.0, -1], [-3.0, -2.6], [-3.8, -2.6]], deckY);
     const girder2 = sweep(chain(0, 74, 6), [[3.0, -1], [3.8, -1], [3.8, -2.6], [3.0, -2.6]], deckY);
     const curbs = [sweep(ss, [[-4.4, 0.25], [-3.6, 0.25], [-3.6, 0], [-4.4, 0]], deckY), sweep(ss, [[3.6, 0.25], [4.4, 0.25], [4.4, 0], [3.6, 0]], deckY)];
-    const dg = new THREE.Mesh(mergeGeometries([deck, girder, girder2, ...curbs]), mat(0x8f8a82, { roughness: 0.95 }));
+    const dg = new THREE.Mesh(mergeGeometries([deck, girder, girder2, ...curbs]), pbr('concrete_wall_008', { scale: 3, tint: 0xb8c0d4, bright: 1.1 }));
     dg.receiveShadow = true;
     g.add(dg);
-    const railMat = mat(0x6c7068, { metalness: 0.5, roughness: 0.6 });
+    const railMat = pbr('rusty_metal_02', { scale: 1.5, tint: 0xa8b0a0, metal: 0.5 });
     const rails = [];
     for (const t of [-4.85, 4.85]) {
       rails.push(sweep(ss, [[t - 0.06, 1.15], [t + 0.06, 1.15], [t + 0.06, 1.0], [t - 0.06, 1.0]], deckY));
@@ -220,7 +221,7 @@ export default function build() {
   }
 
   // ---- trusses (instanced thin boxes) -------------------------------------------------
-  const steel = lit(0x80867d, 0xcfd8e6, { metalness: 0.45, roughness: 0.55, night: 0.18 });
+  const steel = pbr('metal_plate', { scale: 1.5, tint: 0x8a9488, metal: 0.45, glow: 0xcfd8e6, night: 0.18 }); // the truss's weathered green-grey paint
   glow.push(steel);
   {
     const mats = [];
@@ -296,7 +297,7 @@ export default function build() {
   {
     const lamps = [];
     for (let s = 20; s < LEN - 10; s += 34) for (const t of [-4.6, 4.6]) lamps.push([s + (t > 0 ? 17 : 0), t]);
-    const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.1, 4.2, 6).translate(0, 2.1, 0), mat(0x3d403c, { metalness: 0.5 }), lamps.length);
+    const poles = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.07, 0.1, 4.2, 6).translate(0, 2.1, 0), pbr('metal_plate', { scale: 1, tint: 0x3d403c, metal: 0.5 }), lamps.length);
     const heads = new THREE.InstancedMesh(new THREE.SphereGeometry(0.28, 8, 6), lampMat, lamps.length);
     const m4 = new THREE.Matrix4(), v = new THREE.Vector3();
     lamps.forEach(([s, t], i) => {
@@ -325,8 +326,8 @@ export default function build() {
         rocks.push({ x: v.x, z: v.z, s: sz, ry: r() * 6, sy: 0.35 + r() * 0.35, sx: 1 + r() * 0.8 });
       }
     }
-    const rockGeo = new THREE.DodecahedronGeometry(1, 0);
-    const inst = new THREE.InstancedMesh(rockGeo, mat(0x6e675a, { roughness: 0.9, flatShading: true }), rocks.length);
+    const rockGeo = boulderGeometry(1, seeded(29), { detail: 1, flat: 1 });
+    const inst = new THREE.InstancedMesh(rockGeo, pbr('rock_face_03', { scale: 1.5, tint: 0xd0d4dc }), rocks.length);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler();
     const col = new THREE.Color();
     rocks.forEach((k, i) => {
@@ -381,9 +382,9 @@ export default function build() {
   }
 
   // ---- water intake towers ----------------------------------------------------
-  const stone = lit(0xd3c8b2, 0xffd9a8, { roughness: 0.85, night: 0.55 });
+  const stone = pbr('sandstone_blocks_08', { scale: 1.6, tint: 0xf0e4d0, bright: 1.15, glow: 0xffd9a8, night: 0.55 });
   glow.push(stone);
-  const slate = mat(0x4b4f55, { roughness: 0.6, metalness: 0.1 });
+  const slate = pbr('roof_slates_02', { scale: 1.2, tint: 0x9aa0aa });
   const dark = mat(0x1d1f22, { roughness: 0.6 });
   const winLit = new THREE.MeshStandardMaterial({ color: 0x23282c, emissive: 0xffc982, emissiveIntensity: 0, roughness: 0.4 });
   winLit.userData.night = 0.9;

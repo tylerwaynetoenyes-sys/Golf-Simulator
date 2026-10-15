@@ -5,7 +5,8 @@
 // Front faces +Z (toward the golfer). Footprint x -140..140, z -50..12.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, seeded, canvasTex, tree, SLOT } from './kit.js';
+import { mat, seeded, canvasTex, tree, SLOT, boulderGeometry } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
 import { piasaCanvas, piasaEngravedCanvas } from '../../ui/piasa.js';
 
 // ---- small deterministic noise --------------------------------------------
@@ -227,7 +228,10 @@ export default function build() {
       c.fillStyle = gr; c.fillRect(x, y, 1.5 + r() * 4, len);
     }
   }, [1, 1]);
-  const rockMat = new THREE.MeshStandardMaterial({ map: grain, bumpMap: grain, bumpScale: 1.4, vertexColors: true, roughness: 0.96, color: 0xffffff });
+  // the bluff's face: photographed rock, laid on from three sides, shaded by its beds in the vertices
+  void grain;
+  const rockMat = pbr('rock_face_03', { scale: 4, tint: 0xc4d2ee, bright: 1.45 });
+  rockMat.vertexColors = true;
   const face = new THREE.Mesh(faceGeo, rockMat);
   face.receiveShadow = true;
   g.add(face);
@@ -276,7 +280,7 @@ export default function build() {
       if (r() < 0.5) { const j = joints[Math.floor(r() * joints.length)]; x = Math.min(X1 - 16, Math.max(X0 + 16, j.x + (r() - 0.5) * 6)); }
       const t = r() ** 1.7;
       const s = (0.35 + r() * r() * 2.6) * (1 - t * 0.5);
-      const geo = new THREE.DodecahedronGeometry(s, 0);
+      const geo = boulderGeometry(s, r, { detail: 1, flat: 1 });
       geo.scale(1 + r() * 0.8, 0.45 + r() * 0.4, 0.8 + r() * 0.6);
       geo.rotateY(r() * 6.28); geo.rotateZ((r() - 0.5) * 0.5);
       const z = planZ(x) + 0.8 + t * 7.5;
@@ -284,7 +288,9 @@ export default function build() {
       geo.translate(x, yb + s * 0.25, Math.min(-6.4, z));
       parts.push(paint(geo, rockCols[Math.floor(r() * rockCols.length)], 0.15));
     }
-    const talus = new THREE.Mesh(mergeGeometries(parts), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, map: grain }));
+    const talusM = pbr('rock_face_03', { scale: 2, tint: 0xc4d2ec, bright: 1.3 }); // the fallen limestone, its blocks' own shades in the vertices
+    talusM.vertexColors = true;
+    const talus = new THREE.Mesh(mergeGeometries(parts), talusM);
     talus.receiveShadow = true;
     g.add(talus);
   }
@@ -394,7 +400,7 @@ export default function build() {
   wash.renderOrder = 2;
   g.add(wash);
   // the flood fixtures at the foot of the bluff
-  const fixMat = mat(0x2a2b2d, { metalness: 0.6, roughness: 0.4 });
+  const fixMat = pbr('metal_plate', { scale: 0.6, tint: 0x2a2b2d, metal: 0.6 });
   const lensMat = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xffe2b0, emissiveIntensity: 0 });
   lensMat.userData.night = 2.5;
   glow.push(lensMat);
@@ -418,7 +424,7 @@ export default function build() {
   // River Road between the bluff and the river.
   {
     const dark = new THREE.MeshBasicMaterial({ color: 0x0d0b09 });
-    const lip = mat(0xbfb39a, { roughness: 1 });
+    const lip = pbr('sandstone_blocks_08', { scale: 1.2, tint: 0xf0e6d4, bright: 1.15 });
     for (const cx of [-31, 31]) {
       const W = 9.5, H = 13.5;
       const sh = new THREE.Shape();
@@ -450,7 +456,7 @@ export default function build() {
     wall.position.set(0, 0.55, -5.2);
     wall.receiveShadow = true; wall.castShadow = true;
     g.add(wall);
-    const black = mat(0x1c1d1f, { metalness: 0.5, roughness: 0.45 });
+    const black = pbr('metal_plate', { scale: 0.8, tint: 0x24262a, metal: 0.55 });
     for (const y of [1.55, 2.05]) g.add(new THREE.Mesh(new THREE.BoxGeometry(150, 0.05, 0.05), black).translateY(y).translateZ(-5.2));
     const nPost = 76;
     const posts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.05, 1.0, 0.05), black, nPost);
@@ -465,12 +471,12 @@ export default function build() {
       g.add(new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.5, 0.35), lampGlass).translateX(x).translateY(6.55).translateZ(-5.6));
     }
     // the paved walk between the wall and the rock
-    const walk = new THREE.Mesh(new THREE.PlaneGeometry(150, 4).rotateX(-Math.PI / 2), mat(0x8f897e, { roughness: 1 }));
+    const walk = new THREE.Mesh(new THREE.PlaneGeometry(150, 4).rotateX(-Math.PI / 2), pbr('brushed_concrete', { scale: 3, tint: 0xd8d2c8, offset: -1 }));
     walk.position.set(0, 1.1, -7.4);
     g.add(walk);
 
     // bike trail (the Sam Vadalabene trail) and four lanes of the Great River Road
-    const trail = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, 3).rotateX(-Math.PI / 2), mat(0x45464a, { roughness: 0.95 }));
+    const trail = new THREE.Mesh(new THREE.PlaneGeometry(X1 - X0, 3).rotateX(-Math.PI / 2), pbr('asphalt_02', { scale: 4, tint: 0xa0a4a8, offset: -1 }));
     trail.position.set(0, 0.05, -2.9);
     trail.receiveShadow = true;
     g.add(trail);
@@ -494,11 +500,11 @@ export default function build() {
     road.receiveShadow = true;
     g.add(road);
     // W-beam guard rail on the river side
-    const steel = mat(0xa9adb0, { metalness: 0.7, roughness: 0.38 });
+    const steel = pbr('metal_plate', { scale: 1, tint: 0xb8bcc0, metal: 0.75 });
     const railZ = -1.4 + RW + 0.9;
     g.add(new THREE.Mesh(new THREE.BoxGeometry(LEN - 20, 0.32, 0.06), steel).translateY(0.62).translateZ(railZ));
     g.add(new THREE.Mesh(new THREE.BoxGeometry(LEN - 20, 0.05, 0.14), steel).translateY(0.62).translateZ(railZ));
-    const postMat = mat(0x7d8084, { metalness: 0.5, roughness: 0.5 });
+    const postMat = pbr('metal_plate', { scale: 0.8, tint: 0x8a8e92, metal: 0.55 });
     const nP = Math.floor((LEN - 20) / 1.9);
     const rposts = new THREE.InstancedMesh(new THREE.BoxGeometry(0.15, 0.78, 0.15), postMat, nP);
     const m4 = new THREE.Matrix4();
