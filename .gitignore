@@ -6,3 +6,6 @@ venv/
 node_modules/
 .DS_Store
 *.log
+
+# reference photos dropped in the project folder (personal; the repo is public)
+IMG_*
