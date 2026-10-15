@@ -101,7 +101,7 @@ App Store listing.
 
 ## Pilot built: Rolling Hills (October 2026)
 
-`?play=rollinghills`. Steps 1–3 and 5 above are done for this course:
+`?play=rollinghills`. All five steps above are done for this course:
 
 - **Terrain**: `tools/fetch-lidar.py` (rasterio) asks TNM Access for the 1 m
   tiles, ranks them (IL_10CountyNRCS_D23, then IL_SouthCentral_2021_D21, then
@@ -124,5 +124,30 @@ App Store listing.
   The OSM hole lines measure within 1–15 yards of the blue tees on most
   holes; 17 (156 vs 173) and 18 (272 vs 301) start from forward tees.
 
-Still to do: trees from the point cloud (step 4), more bunkers in OSM, and
+- **Trees from the point cloud** (step 4): `tools/fetch-trees.py` downloads
+  the 16 IL_10CountyNRCS_D23 LAZ tiles over the course from TNM Access
+  (2.7 GB, cached in `~/.cache/fairway/lpc`; about 60 points per m²,
+  classified, Illinois State Plane West in US feet). It grids the highest
+  vegetation return (classes 4 and 5, so roofs and wires drop out) over the
+  1 m bare-earth DEM at 0.5 m, finds tree tops (local maxima, at least 4 m,
+  window widening with height) and measures each crown along eight rays.
+  Result: 16,784 trees, median 14.4 m, tallest 32.7 m, in
+  `assets/courses/rollinghills/trees.json`. About 1,000 are drawn as conifers:
+  narrow crowns, or compact ones that stop nearly every pulse in the leaf-off
+  flight. (Canopy density alone didn't separate them: bare oak woods stop
+  about 80% of pulses too.) Against Esri World Imagery the tree tops sit on
+  the crowns in the photo and the OSM hole lines run between the tree rows.
+  Watch out: an ArcGIS `export` in EPSG:4326 must be requested at the box's
+  metre aspect ratio. A square request stretches it north–south by about
+  20%, and it then looks as if holes 3 and 4 run through a cornfield.
+- **In the game**: `CourseWorld` plants every surveyed tree within 80 m of
+  the hole corridor at its real spot, height and crown, with ball collision.
+  Trunks that land on a mapped fairway, green, tee, bunker or pond are
+  skipped (outline mismatch). Beyond that, the tallest tree of each 14 m
+  cell (36 m past 150 m out) stands for its clump. About 3,500 trees
+  (3.3M triangles) per hole at high quality, against about 1,500 procedural;
+  the quality setting thins the far cells. The procedural scatter fills in
+  only beyond the surveyed square.
+
+Still to do: more bunkers in OSM, and
 the same import for Spencer T. Olin and The Woodlands.

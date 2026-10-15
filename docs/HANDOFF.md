@@ -164,6 +164,20 @@ add `&manual` to drive frames with `window.__advance(seconds)`.
 - Waiting on Tyler: a Sketchfab API token in the Blender add-on, to import
   detailed models (Eiffel Tower, Statue of Liberty, cars, people).
 
+## Real trees: Rolling Hills (October 15)
+
+- `tools/fetch-trees.py <course>`: tree tops from the USGS 3DEP point cloud
+  (canopy height model over the course's 1 m DEM) into
+  `assets/courses/<id>/trees.json`. It runs with numpy, scipy,
+  `laspy[lazrs]` and pyproj (`uv venv` + `uv pip install`; the system
+  Pythons have none of them).
+- `js/course/dem.js` loads `trees.json` with the DEM. When a course has
+  one, `CourseWorld` plants the surveyed trees instead of the procedural
+  stands (details in `docs/alton-courses.md`). `plantTrees` takes `height`
+  and `crown` per spot. Collision files each crown in every 20 m cell it
+  reaches, which also fixes crowns that hung into a neighbouring cell on the
+  other courses.
+
 ## Next steps
 
 - Long and middle irons land 2–4° flatter than Trackman; closing that needs

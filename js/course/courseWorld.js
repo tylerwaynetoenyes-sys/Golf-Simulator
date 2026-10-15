@@ -423,52 +423,95 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
       if (low) return rand() < 0.75 ? pickBroad() : pickConifer();
       return rand() < (TT.conifersFirst ? 0.75 + sl : 0.22 + sl) ? pickConifer() : pickBroad();
     };
-    // stands along both sides: species-grouped clusters at varying depth
-    for (const side of [-1, 1]) {
-      for (let s = -30; s < T.length + 70; s += 15 + rand() * 16) {
-        if (rand() < 0.1 + (1 - TT.density) * 0.35) continue; // glades (open country in the West)
-        const pt = T.pointAt(s);
-        // a front row at the edge of the rough, deeper woods behind it
-        const depth = corridor + (rand() < 0.55 ? 12 + rand() * 22 : 34 + rand() * 60);
-        const cx = pt.x + pt.rx * depth * side, cz = pt.z + pt.rz * depth * side;
-        const n = Math.round((5 + rand() * 10) * quality);
-        const rad = 8 + rand() * 16;
-        const species = bySite(cx, cz);
-        for (let i = 0; i < n; i++) {
-          const a = rand() * 6.28, r = Math.sqrt(rand()) * rad;
-          const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-          if (!ok(x, z, corridor + 14)) continue;
-          plant(x, z, rand() < 0.8 ? species : anySpecies());
+    // surveyed trees (tools/fetch-trees.py: LiDAR tree tops) replace the
+    // made-up stands where a course has them: every tree near the hole at its
+    // real spot, height and crown; beyond play the tallest of each clump
+    const surveyed = T.F?.d?.trees?.trees || null;
+    const surveyHalf = surveyed ? T.F.d.dem.half - 4 : 0;
+    const inSurvey = (x, z) => {
+      const [X, Z] = T.F.toDem(x, z);
+      return Math.abs(X) < surveyHalf && Math.abs(Z) < surveyHalf;
+    };
+    if (surveyed) {
+      // one tree per cell stands in for its clump: finer near the hole, coarse
+      // out toward the boundary (keeps the forest near the procedural count)
+      const cell = 14 / Math.sqrt(this.treeDensity ?? 1);
+      const clumps = new Map();
+      const spot = (x, z, y, h, crown, conifer, far) => ({
+        x, z, y, variant: conifer ? pickConifer() : pickBroad(), rot: rand() * 6.28, height: h, crown,
+        scale: 1, squash: 1, hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(), far,
+      });
+      for (const [X, Z, h, crown, conifer] of surveyed) {
+        const [x, z] = T.F.toLocal(X, Z);
+        if (inLandmark(x, z)) continue;
+        const pr = T.project(x, z);
+        const out = Math.max(Math.abs(pr.d) - corridor - 80, -70 - pr.s, pr.s - T.length - 70);
+        if (out < 0) {
+          // in play: keep the trunk off the short grass and out of hazards
+          // (a trunk there is an outline that doesn't quite match the survey)
+          const sf = T.terrain(x, z).surface;
+          if (sf === 'water' || sf === 'sand' || sf === 'green' || sf === 'fairway' || sf === 'tee') continue;
+          if (Math.hypot(x, z) < 8 || T.greenEdge(x, z) < 3) continue;
+          treeSpots.push(spot(x, z, T.meshHeight(x, z) - 0.25, h, crown, conifer, false));
+        } else {
+          const k = out < 150 ? cell : cell * 2.6;
+          const key = `${k},${Math.floor(x / k)},${Math.floor(z / k)}`;
+          const c = clumps.get(key);
+          if (!c || h > c.h) clumps.set(key, { x, z, h, crown: Math.max(crown, k * 0.45), conifer });
         }
       }
-      // a dark backdrop belt toward the boundary (parkland only: the West stays open)
-      if (TT.density >= 0.8) {
-        for (let s = -40; s < T.length + 90; s += 9 + rand() * 7) {
+      for (const c of clumps.values()) {
+        if (T.seaLevel != null && T.baseGround(c.x, c.z) < T.seaLevel + 1.5) continue;
+        treeSpots.push(spot(c.x, c.z, T.baseGround(c.x, c.z) - 0.25, c.h, c.crown, c.conifer, true));
+      }
+    } else {
+      // stands along both sides: species-grouped clusters at varying depth
+      for (const side of [-1, 1]) {
+        for (let s = -30; s < T.length + 70; s += 15 + rand() * 16) {
+          if (rand() < 0.1 + (1 - TT.density) * 0.35) continue; // glades (open country in the West)
           const pt = T.pointAt(s);
-          const depth = T.oobLateral - 8 + rand() * 40;
-          const x = pt.x + pt.rx * depth * side, z = pt.z + pt.rz * depth * side;
-          if (ok(x, z, corridor + 30)) plant(x, z, rand() < 0.3 ? pickConifer() : pickBroad(), 1.15);
+          // a front row at the edge of the rough, deeper woods behind it
+          const depth = corridor + (rand() < 0.55 ? 12 + rand() * 22 : 34 + rand() * 60);
+          const cx = pt.x + pt.rx * depth * side, cz = pt.z + pt.rz * depth * side;
+          const n = Math.round((5 + rand() * 10) * quality);
+          const rad = 8 + rand() * 16;
+          const species = bySite(cx, cz);
+          for (let i = 0; i < n; i++) {
+            const a = rand() * 6.28, r = Math.sqrt(rand()) * rad;
+            const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+            if (!ok(x, z, corridor + 14)) continue;
+            plant(x, z, rand() < 0.8 ? species : anySpecies());
+          }
+        }
+        // a dark backdrop belt toward the boundary (parkland only: the West stays open)
+        if (TT.density >= 0.8) {
+          for (let s = -40; s < T.length + 90; s += 9 + rand() * 7) {
+            const pt = T.pointAt(s);
+            const depth = T.oobLateral - 8 + rand() * 40;
+            const x = pt.x + pt.rx * depth * side, z = pt.z + pt.rz * depth * side;
+            if (ok(x, z, corridor + 30)) plant(x, z, rand() < 0.3 ? pickConifer() : pickBroad(), 1.15);
+          }
         }
       }
-    }
-    // specimen trees that come into play a little off the fairway
-    for (let s = 150; s < T.length - 60; s += 70 + rand() * 60) {
-      const side = rand() < 0.5 ? -1 : 1;
-      const pt = T.pointAt(s);
-      const d = corridor + 6 + rand() * 8;
-      const x = pt.x + pt.rx * d * side, z = pt.z + pt.rz * d * side;
-      if (ok(x, z, corridor + 4)) plant(x, z, T.F ? bySite(x, z) : rand() < 0.5 ? 0 : 3, 1.25);
-    }
-    // the hole's own stands (dogleg corners, framing); `species` indexes the
-    // theme's broadleaf list (0..) or conifers (4+, as on the Confluence)
-    for (const st of hole.trees || []) {
-      const pt = T.pointAt(st.t * T.length);
-      const cx = pt.x + pt.rx * st.off, cz = pt.z + pt.rz * st.off;
-      for (let i = 0; i < (st.n || 8); i++) {
-        const a = rand() * 6.28, r = Math.sqrt(rand()) * (st.r || 12);
-        const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
-        const sp = st.species == null ? bySite(x, z) : TT === THEME_TREES.parkland ? st.species : st.species >= 4 ? pickConifer() : pickBroad();
-        if (ok(x, z, Math.max(T.fwHalf + 3, 8))) plant(x, z, sp, 1.1);
+      // specimen trees that come into play a little off the fairway
+      for (let s = 150; s < T.length - 60; s += 70 + rand() * 60) {
+        const side = rand() < 0.5 ? -1 : 1;
+        const pt = T.pointAt(s);
+        const d = corridor + 6 + rand() * 8;
+        const x = pt.x + pt.rx * d * side, z = pt.z + pt.rz * d * side;
+        if (ok(x, z, corridor + 4)) plant(x, z, T.F ? bySite(x, z) : rand() < 0.5 ? 0 : 3, 1.25);
+      }
+      // the hole's own stands (dogleg corners, framing); `species` indexes the
+      // theme's broadleaf list (0..) or conifers (4+, as on the Confluence)
+      for (const st of hole.trees || []) {
+        const pt = T.pointAt(st.t * T.length);
+        const cx = pt.x + pt.rx * st.off, cz = pt.z + pt.rz * st.off;
+        for (let i = 0; i < (st.n || 8); i++) {
+          const a = rand() * 6.28, r = Math.sqrt(rand()) * (st.r || 12);
+          const x = cx + Math.cos(a) * r, z = cz + Math.sin(a) * r;
+          const sp = st.species == null ? bySite(x, z) : TT === THEME_TREES.parkland ? st.species : st.species >= 4 ? pickConifer() : pickBroad();
+          if (ok(x, z, Math.max(T.fwHalf + 3, 8))) plant(x, z, sp, 1.1);
+        }
       }
     }
     // real ground: scattered trees on the land beyond the hole too, so the
@@ -483,6 +526,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
         const x = cx + (rand() * 2 - 1) * R, z = cz + (rand() * 2 - 1) * R;
         if (x > b2.minx && x < b2.maxx && z > b2.minz && z < b2.maxz) continue;
         if (inLandmark(x, z)) continue;
+        if (surveyed && inSurvey(x, z)) continue; // the survey has the real ones
         if (T.seaLevel != null && T.baseGround(x, z) < T.seaLevel + 1.5) continue; // the sea and the beach stay clear
         // clumps: keep a point only where a low-frequency field is high
         const f = 0.5 + 0.5 * Math.sin(x * 0.011 + Math.sin(z * 0.007) * 3) * Math.cos(z * 0.013 - x * 0.004);
@@ -509,11 +553,16 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     g.add(forest.group);
     for (const t of forest.records) {
       if (t.far) continue;
-      const key = `${Math.floor(t.x / 20)},${Math.floor(t.z / 20)}`;
-      if (!this.treeGrid.has(key)) this.treeGrid.set(key, []);
       t.id = this.treeList.length;
       this.treeList.push(t);
-      this.treeGrid.get(key).push(t);
+      // a crown can reach into the neighbouring 20 m cells: file it in each
+      for (let gx = Math.floor((t.x - t.r) / 20); gx <= Math.floor((t.x + t.r) / 20); gx++) {
+        for (let gz = Math.floor((t.z - t.r) / 20); gz <= Math.floor((t.z + t.r) / 20); gz++) {
+          const key = `${gx},${gz}`;
+          if (!this.treeGrid.has(key)) this.treeGrid.set(key, []);
+          this.treeGrid.get(key).push(t);
+        }
+      }
     }
 
     // ── East St. Louis: the decay beyond the boundary (never in play) ──

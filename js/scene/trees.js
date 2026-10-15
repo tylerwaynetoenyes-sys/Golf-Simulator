@@ -408,6 +408,12 @@ function leafMaterial() {
  */
 export function plantTrees(spots) {
   const vs = variants();
+  // surveyed trees (LiDAR) give a height and crown radius: size the model to them
+  const fit = (s, height, radius) => {
+    if (!s.height) return;
+    s.scale = s.height / height;
+    if (s.crown) s.squash = Math.min(1.8, Math.max(0.55, s.crown / (radius * s.scale)));
+  };
   const group = new THREE.Group();
   const records = [];
   const leafMat = leafMaterial();
@@ -429,6 +435,7 @@ export function plantTrees(spots) {
     const h = heroes[i];
     const meshes = h.parts.map((p) => new THREE.InstancedMesh(p.geometry, p.material, list.length));
     list.forEach((s, k) => {
+      fit(s, h.height, h.radius);
       q.setFromAxisAngle(up, s.rot);
       sc.set(s.scale * s.squash, s.scale, s.scale * s.squash);
       m4.compose(p.set(s.x, s.y, s.z), q, sc);
@@ -444,6 +451,7 @@ export function plantTrees(spots) {
     const wood = new THREE.InstancedMesh(v.wood, v.wood.attributes.color ? sycBarkMat : barkMat, list.length);
     const leaves = new THREE.InstancedMesh(v.leaves, leafMat, list.length);
     list.forEach((s, k) => {
+      fit(s, v.height, v.radius);
       q.setFromAxisAngle(up, s.rot);
       sc.set(s.scale * s.squash, s.scale, s.scale * s.squash);
       m4.compose(p.set(s.x, s.y, s.z), q, sc);

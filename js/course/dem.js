@@ -44,6 +44,18 @@ async function loadCity(base) {
   } catch { return null; }
 }
 
+/**
+ * Surveyed trees (tools/fetch-trees.py, from the LiDAR point cloud), if baked:
+ * [x, z, height, crownRadius, conifer] in DEM-frame metres. Browser only.
+ */
+async function loadTrees(base) {
+  if (typeof document === 'undefined') return null;
+  try {
+    const r = await fetch(`${base}/trees.json`);
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+
 /** A sampler over one baked grid (exported for the Node tools). */
 export function gridFrom(meta, buf) {
   const q = new Uint16Array(buf);
@@ -79,8 +91,8 @@ export function gridFrom(meta, buf) {
 export function loadDem(id) {
   if (!cache.has(id)) {
     const base = `assets/courses/${id}`;
-    cache.set(id, Promise.all([loadGrid(base, 'dem'), loadGrid(base, 'far'), loadSat(base), loadCity(base)]).then(([dem, far, sat, city]) => {
-      const out = { dem, far, sat, city };
+    cache.set(id, Promise.all([loadGrid(base, 'dem'), loadGrid(base, 'far'), loadSat(base), loadCity(base), loadTrees(base)]).then(([dem, far, sat, city, trees]) => {
+      const out = { dem, far, sat, city, trees };
       ready.set(id, out);
       return out;
     }).catch((e) => { cache.delete(id); throw e; }));
