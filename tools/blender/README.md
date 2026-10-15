@@ -39,3 +39,9 @@ The ten trees in `assets/models/trees/` (evolveduk's set; credits in
 with `fairway_export`, then removed again with `fairway_remove`, which only
 touches the import's own objects and data. Each is 150–320 KB and 2.6–6.6 k
 triangles.
+
+The rubble heap on the East St. Louis lots (`assets/models/rubble_concrete.glb`,
+albentan2012's "A Pile Of Concrete Debris" scan, CC BY) went through the same
+export after its parts were joined and their split vertices welded (Merge by
+Distance, 0.5 mm), then decimated from 48.7 k to 4.5 k triangles with the
+4K colour map cut to 1K. Without the weld the decimation shatters the scan.

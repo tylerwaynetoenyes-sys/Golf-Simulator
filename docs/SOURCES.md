@@ -86,6 +86,9 @@ and in the in-game course card.
   - `aerial_grass_rock` and `dense_sand` textures, processed in Blender
     (`tools/blender/detail.py`) to `assets/textures/ground_detail.jpg` and
     `sand_detail.jpg`
+  - `road_damaged` texture (diffuse, 1k, MD5 checked against the API),
+    converted to greyscale for `assets/textures/asphalt_damaged.jpg` (the
+    East St. Louis lots)
 - **Sketchfab models**, Creative Commons Attribution 4.0 (CC BY 4.0,
   https://creativecommons.org/licenses/by/4.0/). Each was decimated, its
   textures resized to 2K or less and exported Draco-compressed in Blender;
@@ -109,6 +112,7 @@ and in the in-game course card.
   | `assets/models/abandoned_sedan.glb` | [Crashed Abandoned Car - Game Ready](https://sketchfab.com/3d-models/66ef51a84c9843dda53bf0b4b9020011) | rashad-brahimli |
   | `assets/models/people_real.glb` | [Dennis Posed 004](https://sketchfab.com/3d-models/e211ffd52a96416e89c0cc415a388d61), [Mei Posed 001](https://sketchfab.com/3d-models/07f308b81bc045c8917104a72ce2ffe4), [Fabienne & Percy 001](https://sketchfab.com/3d-models/8c9bfd4fb8a444b3a42a4fc31935a2fb) | Renderpeople |
   | `assets/models/people_real.glb` | an athletic man walking (scan) | deep3dstudio |
+  | `assets/models/rubble_concrete.glb` | [A Pile Of Concrete Debris - 3D Scan](https://sketchfab.com/3d-models/194bec2429da4b74b3926ac981616da8) | albentan2012 |
 
   The tree set is drawn by `js/scene/treeModels.js`: models near the camera,
   impostor cards baked from eight views of each model beyond 150 m.

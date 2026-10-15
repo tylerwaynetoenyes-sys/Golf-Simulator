@@ -157,6 +157,8 @@ export class CourseWorld {
     const sd = new Float32Array(nx * nz * 2); // arc length + lateral offset, for mowing patterns
     const fw = new Float32Array(nx * nz); // 1 on fairway / tee, for the stripes
     const sandA = new Float32Array(nx * nz); // 1 in bunkers, for the sand detail
+    const rough = new Float32Array(nx * nz); // rough and native ground: coarser, patchier turf
+    const dir = new Float32Array(nx * nz * 2); // the hole's direction, for the way the mowers lay the grass
     const c = new THREE.Color(), c2 = new THREE.Color();
     const bx1 = b.minx + (nx - 1) * step, bz0 = b.maxz - (nz - 1) * step;
     this.base.visible = !T.F;
@@ -182,6 +184,9 @@ export class CourseWorld {
         sd.set([prj.s, prj.d], k * 2);
         fw[k] = surf === 'fairway' ? 1 : surf === 'tee' ? 0.7 : 0;
         sandA[k] = surf === 'sand' ? 1 : 0;
+        rough[k] = surf === 'oob' ? 1 : surf === 'rough' ? (T.roughDepth(x, z) === 'deep' ? 0.85 : 0.45) : 0;
+        const pt = T.pointAt(Math.max(0, Math.min(T.length, prj.s)));
+        dir.set([pt.dx, pt.dz], k * 2);
         k++;
       }
     }
@@ -199,28 +204,45 @@ export class CourseWorld {
     geo.setAttribute('aSD', new THREE.BufferAttribute(sd, 2));
     geo.setAttribute('aFw', new THREE.BufferAttribute(fw, 1));
     geo.setAttribute('aSand', new THREE.BufferAttribute(sandA, 1));
+    geo.setAttribute('aRough', new THREE.BufferAttribute(rough, 1));
+    geo.setAttribute('aDir', new THREE.BufferAttribute(dir, 2));
     geo.setIndex(idx);
     geo.computeVertexNormals();
     const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, map: this.detail });
-    // Mowing pattern drawn per pixel (crisp at any distance): 12 m bands down
-    // the hole with a faint cross-cut, plus a second, larger grass-detail
-    // scale so the turf doesn't tile.
+    // Drawn per pixel: the mowing pattern (lengthwise passes with a faint
+    // cross-cut; each pass lays the grass one way, so it reads light looking
+    // with the lay and dark against it, and fades side-on, as real turf does),
+    // the turf detail at two scales plus a slow patchiness, coarser in the
+    // rough, and the sand grain in bunkers.
     groundMat.onBeforeCompile = (sh) => {
       sh.uniforms.uSand = { value: this.sandDetail };
       sh.vertexShader = sh.vertexShader
-        .replace('#include <common>', '#include <common>\nattribute vec2 aSD;\nattribute float aFw;\nattribute float aSand;\nvarying vec2 vSD;\nvarying float vFw;\nvarying float vSand;')
-        .replace('#include <uv_vertex>', '#include <uv_vertex>\nvSD = aSD;\nvFw = aFw;\nvSand = aSand;');
+        .replace('#include <common>', '#include <common>\nattribute vec2 aSD;\nattribute float aFw;\nattribute float aSand;\nattribute float aRough;\nattribute vec2 aDir;\nvarying vec2 vSD;\nvarying float vFw;\nvarying float vSand;\nvarying float vRough;\nvarying vec2 vDir;\nvarying vec3 vWPos;')
+        .replace('#include <uv_vertex>', '#include <uv_vertex>\nvSD = aSD;\nvFw = aFw;\nvSand = aSand;\nvRough = aRough;\nvDir = aDir;')
+        .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
       sh.fragmentShader = sh.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform sampler2D uSand;\nvarying vec2 vSD;\nvarying float vFw;\nvarying float vSand;')
+        .replace('#include <common>', '#include <common>\nuniform sampler2D uSand;\nvarying vec2 vSD;\nvarying float vFw;\nvarying float vSand;\nvarying float vRough;\nvarying vec2 vDir;\nvarying vec3 vWPos;')
         .replace('#include <map_fragment>', `
 vec4 texelColor = texture2D(map, vMapUv);
 float big = texture2D(map, vMapUv * 0.19 + 0.37).r;
+float mottle = texture2D(map, vMapUv * 0.027 + 0.61).r; // ~250 m: wear, moisture, clover
 float detail = mix(texelColor.r, big, 0.4);
 detail = mix(detail, texture2D(uSand, vMapUv * 2.2).r, vSand);
-float band = step(0.5, fract(vSD.x / 12.0));
-float cross = step(0.5, fract(vSD.y / 9.0));
-float stripes = 1.0 + vFw * ((band - 0.5) * 0.16 + (cross - 0.5) * 0.05);
-diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
+// mowing: 6 m passes down and back the hole, 12 m cross-cut passes
+vec2 look = vWPos.xz - cameraPosition.xz;
+look /= max(length(look), 1e-3);
+vec2 t = normalize(vDir + 1e-5);
+float lay = dot(look, t), layX = dot(look, vec2(-t.y, t.x));
+float u = vSD.y / 6.0, w = vSD.x / 12.0;
+float au = fwidth(u) * 0.75 + 1e-4, aw = fwidth(w) * 0.75 + 1e-4;
+float passA = smoothstep(0.5 - au, 0.5 + au, abs(fract(u) - 0.5) * 2.0) * 2.0 - 1.0;
+float passB = smoothstep(0.5 - aw, 0.5 + aw, abs(fract(w) - 0.5) * 2.0) * 2.0 - 1.0;
+// stripes fade out where they'd shimmer (far away, grazing)
+float keep = 1.0 - smoothstep(0.25, 0.6, au);
+float stripes = 1.0 + vFw * keep * (passA * lay * 0.12 + passB * layX * 0.045);
+float turf = mix(0.78 + 0.44 * detail, 0.66 + 0.62 * detail, vRough);
+turf *= mix(0.95 + 0.1 * mottle, 0.86 + 0.26 * mottle, vRough);
+diffuseColor.rgb *= stripes * turf;`);
     };
     groundMat.customProgramCacheKey = () => 'courseGround';
     const ground = new THREE.Mesh(geo, groundMat);

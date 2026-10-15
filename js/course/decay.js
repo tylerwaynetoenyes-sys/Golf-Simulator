@@ -5,11 +5,14 @@
 //   chain-link fencing with razor wire along the out-of-bounds lines, gaps
 //   and sagging panels; leaning creosote utility poles with sagging wires;
 //   rusted shipping containers; derelict brick warehouses with broken and
-//   boarded windows and graffiti; cracked asphalt pads with rubble; tall
-//   weeds pushing through.
+//   boarded windows and graffiti; cracked asphalt pads (Poly Haven's
+//   "Road Damaged" scan) with heaps of broken concrete (a scanned model);
+//   tall weeds pushing through (the course's own grass tufts, gone to seed).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { canvasTex, seeded } from './lm/kit.js';
+import { model } from '../scene/models.js';
+import { tuftGeometry, grassMaterial } from './grass.js';
 
 let shared = null;
 function materials() {
@@ -63,14 +66,13 @@ function materials() {
     for (let x = 0; x < w; x += 8) { c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(x, 0, 2, h); }
     for (let i = 0; i < 90; i++) { c.fillStyle = `rgba(${150 + r() * 60},${70 + r() * 40},${30 + r() * 20},${0.2 + r() * 0.4})`; c.fillRect(r() * w, r() * h, 2 + r() * 10, 2 + r() * 16); }
   }, [1, 1]);
-  const asphalt = canvasTex(128, 128, (c, w, h) => {
-    const r = seeded(29);
-    c.fillStyle = '#3c3b39'; c.fillRect(0, 0, w, h);
-    for (let i = 0; i < 1600; i++) { const v = 40 + r() * 50; c.fillStyle = `rgba(${v},${v},${v - 3},0.7)`; c.fillRect(r() * w, r() * h, 1, 1); }
-    c.strokeStyle = 'rgba(18,18,16,0.9)'; c.lineWidth = 1.2;
-    for (let i = 0; i < 9; i++) { c.beginPath(); let x = r() * w, y = r() * h; c.moveTo(x, y); for (let k = 0; k < 6; k++) { x += (r() - 0.5) * 30; y += (r() - 0.5) * 30; c.lineTo(x, y); } c.stroke(); }
-    for (let i = 0; i < 5; i++) { c.fillStyle = 'rgba(90,110,50,0.5)'; c.fillRect(r() * w, r() * h, 3 + r() * 8, 1 + r() * 2); }
-  }, [3, 3]);
+  // a 2.2 m scan of broken, patched asphalt (CC0) as luminance, the grey
+  // coming from the material; one repeat per 4.4 m
+  const asphalt = typeof document !== 'undefined'
+    ? new THREE.TextureLoader().load(new URL('../../assets/textures/asphalt_damaged.jpg', import.meta.url).href)
+    : new THREE.Texture();
+  asphalt.colorSpace = THREE.SRGBColorSpace;
+  asphalt.anisotropy = 4;
   asphalt.wrapS = asphalt.wrapT = THREE.RepeatWrapping;
   shared = {
     chain: new THREE.MeshStandardMaterial({ color: 0xb8bcbf, alphaMap: chain, alphaTest: 0.35, side: THREE.DoubleSide, metalness: 0.6, roughness: 0.5 }),
@@ -82,9 +84,10 @@ function materials() {
     roof: new THREE.MeshStandardMaterial({ color: 0x2b2a28, roughness: 1 }),
     rust: new THREE.MeshStandardMaterial({ map: rust, roughness: 0.85, metalness: 0.3 }),
     containerCols: [0x2f4f6f, 0x6f2a24, 0x3e5a3a, 0x8a6a2a, 0x555555].map((c) => new THREE.MeshStandardMaterial({ color: c, map: rust, roughness: 0.8, metalness: 0.35 })),
-    asphalt: new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2 }),
+    asphalt: new THREE.MeshStandardMaterial({ map: asphalt, color: new THREE.Color(2.3, 2.25, 2.15), roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2 }),
     rubble: new THREE.MeshStandardMaterial({ color: 0x7a706a, roughness: 1, flatShading: true }),
-    weed: new THREE.MeshStandardMaterial({ color: 0x8a8a4a, roughness: 1, side: THREE.DoubleSide }),
+    weedGeo: Object.assign(tuftGeometry(9, 31), { userData: { shared: true } }),
+    weed: grassMaterial(0x9c9a55), // dry, gone to seed
   };
   return shared;
 }
@@ -213,8 +216,18 @@ export function buildDecay(T, rand, ground, clear) {
     }
   }
   // cracked asphalt lots with rubble heaps and weeds through the cracks
-  const rubbleGeos = [], weedGeos = [];
+  const rubbleGeos = [];
   const lots = [];
+  // the scan, re-centred on its footprint and set on the ground
+  let heap = model('rubble');
+  if (heap) {
+    const box = new THREE.Box3().setFromObject(heap);
+    const c = box.getCenter(new THREE.Vector3());
+    heap.position.set(-c.x, -box.min.y, -c.z);
+    // the scan's own light is baked in brighter and bluer than the scene's
+    heap.traverse((o) => { if (o.isMesh) { o.material.color.setRGB(0.66, 0.64, 0.6); o.material.roughness = 1; o.castShadow = true; } });
+    heap = new THREE.Group().add(heap);
+  }
   for (let i = 0; i < 5; i++) {
     const at = placeOut(T.oobLateral + 4, T.oobLateral + 60);
     if (!at) continue;
@@ -222,29 +235,56 @@ export function buildDecay(T, rand, ground, clear) {
     const w = 24 + rand() * 30, d = 18 + rand() * 24;
     const lot = new THREE.Mesh(new THREE.PlaneGeometry(w, d, 8, 8).rotateX(-Math.PI / 2), M.asphalt);
     const p = lot.geometry.attributes.position;
+    const uv = lot.geometry.attributes.uv;
     const cs = Math.cos(at.rot), sn = Math.sin(at.rot);
     for (let k = 0; k < p.count; k++) {
       const lx = p.getX(k), lz = p.getZ(k);
       const wx = at.x + lx * cs + lz * sn, wz = at.z - lx * sn + lz * cs;
       p.setY(k, ground(wx, wz) + 0.05 - at.y);
+      uv.setXY(k, lx / 4.4, lz / 4.4);
     }
     lot.geometry.computeVertexNormals();
     lot.position.set(at.x, at.y, at.z);
     lot.rotation.y = at.rot;
     lot.receiveShadow = true;
     g.add(lot);
-    for (let k = 0; k < 5; k++) {
-      const rx = at.x + (rand() - 0.5) * w * 0.8, rz = at.z + (rand() - 0.5) * d * 0.8;
-      rubbleGeos.push(new THREE.DodecahedronGeometry(0.4 + rand() * 1.2, 0).scale(1, 0.5, 1).translate(rx, ground(rx, rz) + 0.2, rz));
+    const nHeaps = 1 + Math.floor(rand() * 3);
+    for (let k = 0; k < nHeaps; k++) {
+      const rx = at.x + (rand() - 0.5) * w * 0.7, rz = at.z + (rand() - 0.5) * d * 0.7;
+      if (heap) {
+        const h = heap.clone();
+        const s = 0.6 + rand() * 0.7;
+        h.scale.set(s, s * (0.8 + rand() * 0.4), s);
+        h.rotation.y = rand() * 6.28;
+        h.position.set(rx, ground(rx, rz) - 0.05, rz);
+        g.add(h);
+      } else {
+        for (let q = 0; q < 3; q++) rubbleGeos.push(new THREE.DodecahedronGeometry(0.4 + rand() * 1.2, 0).scale(1, 0.5, 1).translate(rx + (rand() - 0.5) * 3, ground(rx, rz) + 0.2, rz + (rand() - 0.5) * 3));
+      }
     }
-    for (let k = 0; k < 40; k++) {
-      const wx = at.x + (rand() - 0.5) * w, wz = at.z + (rand() - 0.5) * d, hgt = 0.6 + rand() * 1.1;
-      weedGeos.push(new THREE.ConeGeometry(0.25, hgt, 4, 1, true).translate(wx, ground(wx, wz) + hgt / 2, wz));
+    // weeds: clumps along the edges and through the cracks
+    const weeds = [];
+    for (let k = 0; k < 46; k++) {
+      let lx = (rand() - 0.5) * w, lz = (rand() - 0.5) * d;
+      if (rand() < 0.55) { if (rand() < 0.5) lx = Math.sign(lx || 1) * (w / 2 - rand() * 1.2); else lz = Math.sign(lz || 1) * (d / 2 - rand() * 1.2); }
+      const n = 4 + Math.floor(rand() * 9), R = 0.4 + rand() * 1.1, tall = 0.5 + rand() * 0.9;
+      for (let q = 0; q < n; q++) {
+        const a = rand() * 6.28, r = Math.sqrt(rand()) * R;
+        const px = lx + Math.cos(a) * r, pz = lz + Math.sin(a) * r;
+        const wx = at.x + px * cs + pz * sn, wz = at.z - px * sn + pz * cs;
+        weeds.push([wx, ground(wx, wz) + 0.03, wz, tall * (0.6 + rand() * 0.6), 0.7 + rand() * 0.6, rand() * 6.28]);
+      }
     }
+    // one mesh per lot, so lots out of view aren't drawn
+    const im = new THREE.InstancedMesh(M.weedGeo, M.weed, weeds.length);
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0);
+    weeds.forEach(([x, y, z, h, sp, r], k) => im.setMatrixAt(k, m4.compose(new THREE.Vector3(x, y, z), q.setFromAxisAngle(up, r), new THREE.Vector3(sp, h, sp))));
+    im.computeBoundingSphere();
+    im.receiveShadow = true;
+    g.add(im);
   }
   const strip = (q) => { const n = q.index ? q.toNonIndexed() : q; for (const k of Object.keys(n.attributes)) if (k !== 'position' && k !== 'normal') n.deleteAttribute(k); return n; };
   if (rubbleGeos.length) g.add(new THREE.Mesh(mergeGeometries(rubbleGeos.map(strip)), M.rubble));
-  if (weedGeos.length) g.add(new THREE.Mesh(mergeGeometries(weedGeos.map(strip)), M.weed));
   void corridor;
   g.userData.lots = lots;
   return g;

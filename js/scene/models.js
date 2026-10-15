@@ -20,12 +20,13 @@ const FILES = {
   lowrider: 'lowrider_impala.glb',
   wreck: 'abandoned_sedan.glb',
   people: 'people_real.glb', // Renderpeople and deep3dstudio scans
+  rubble: 'rubble_concrete.glb', // a scanned heap of broken concrete (albentan2012)
 };
 /** Which models each course uses. */
 export const COURSE_MODELS = {
   paris: ['eiffel'],
   liberty: ['statue'],
-  eaststl: ['lowrider', 'wreck', 'people'],
+  eaststl: ['lowrider', 'wreck', 'people', 'rubble'],
   sawgrass: ['people'],
 };
 
