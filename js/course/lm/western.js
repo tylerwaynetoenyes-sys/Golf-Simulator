@@ -11,90 +11,63 @@
 //     the cone's base and ~146 m above the North Platte valley
 // See kit.js for the builder contract (-Z = direction of play).
 import * as THREE from 'three';
-import { mat, lit, box, cyl, sphere, gable, seeded, canvasTex, FT } from './kit.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { lit, box, cyl, gable, seeded, canvasTex, FT, landmarkWater } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
+import { animalsAt } from '../../scene/animals.js';
 
 // ── shared pieces ──
 
-function wheel(r, m, spokes = 12) {
-  const g = new THREE.Group();
-  const rim = new THREE.Mesh(new THREE.TorusGeometry(r, 0.035, 6, 28), m);
-  g.add(rim);
-  const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.22, 10).rotateX(Math.PI / 2), m);
-  g.add(hub);
-  for (let i = 0; i < spokes; i++) {
-    const s = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, r, 5), m);
-    s.position.y = r / 2;
-    const h = new THREE.Group();
-    h.add(s);
-    h.rotation.z = (i / spokes) * Math.PI * 2;
-    g.add(h);
+/** A spoked wagon wheel: felloe, iron tyre, hub and spokes, one geometry. */
+function wheelGeo(r, spokes = 12) {
+  const parts = [new THREE.TorusGeometry(r - 0.03, 0.035, 6, 32), new THREE.CylinderGeometry(0.09, 0.11, 0.24, 12).rotateX(Math.PI / 2)];
+  for (let i = 0; i < spokes; i++) parts.push(new THREE.CylinderGeometry(0.018, 0.024, r, 6).translate(0, r / 2, 0).rotateZ((i / spokes) * Math.PI * 2));
+  return mergeGeometries(parts.map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => { for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k); return g; }));
+}
+
+/** A clump of prairie grass: a dozen tapering blades arching out from the root. */
+function tuftGeo(seed = 7, size = 1) {
+  const blades = [], r = seeded(seed);
+  for (let i = 0; i < 12; i++) {
+    const a = r() * Math.PI * 2, lean = 0.25 + r() * 0.45, h = (0.35 + r() * 0.3) * size;
+    const b = new THREE.PlaneGeometry(0.05 * size, h, 1, 3).translate(0, h / 2, 0);
+    const p = b.attributes.position;
+    for (let k = 0; k < p.count; k++) { const u = p.getY(k) / h; p.setX(k, p.getX(k) * (1 - u * 0.9)); p.setZ(k, lean * u * u * h); }
+    blades.push(b.rotateY(a));
   }
-  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  const g = mergeGeometries(blades); g.computeVertexNormals();
   return g;
 }
 
-/** A quadruped on capsules: body length L, shoulder height H. */
-function beast({ L, H, coat, dark, hump = 0, rnd, headDown = 0, horns = null }) {
-  const g = new THREE.Group();
-  const cm = mat(coat, { roughness: 0.95 });
-  const dm = mat(dark, { roughness: 0.95 });
-  const bodyR = H * 0.27;
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(bodyR, L * 0.55, 6, 12).rotateX(Math.PI / 2), cm);
-  body.position.set(0, H * 0.62, 0);
-  g.add(body);
-  if (hump) {
-    // the bison's shaggy forequarters and hump
-    const fore = new THREE.Mesh(new THREE.SphereGeometry(bodyR * 1.45, 14, 10), dm);
-    fore.scale.set(1, 1.15 + hump * 0.2, 1.05);
-    fore.position.set(0, H * 0.7, -L * 0.24);
-    g.add(fore);
-  }
-  const legH = H * 0.5;
-  for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    const leg = cyl(0.06 * H, 0.05 * H, legH, z < 0 && hump ? dm : cm, x * bodyR * 0.55, 0, z * L * 0.3, 6);
-    g.add(leg);
-  }
-  const head = new THREE.Group();
-  const skull = new THREE.Mesh(new THREE.BoxGeometry(H * 0.24, H * 0.26, H * 0.42), hump ? dm : cm);
-  skull.position.z = -H * 0.18;
-  head.add(skull);
-  if (hump) {
-    const beard = new THREE.Mesh(new THREE.ConeGeometry(H * 0.1, H * 0.28, 6).rotateX(Math.PI), dm);
-    beard.position.set(0, -H * 0.2, -H * 0.12);
-    head.add(beard);
-  }
-  if (horns) {
-    for (const s of [-1, 1]) {
-      const h = new THREE.Mesh(new THREE.ConeGeometry(H * 0.035, H * horns, 5), mat(0x2a241e));
-      h.rotation.z = s * -1.1;
-      h.position.set(s * H * 0.16, H * 0.12, -H * 0.06);
-      head.add(h);
-    }
-  }
-  head.position.set(0, H * (0.72 - headDown * 0.45), -L * 0.5 - H * 0.05);
-  head.rotation.x = headDown * 0.9;
-  g.add(head);
-  const tail = cyl(0.02 * H, 0.03 * H, H * 0.45, cm, 0, H * 0.32, L * 0.48, 5);
-  g.add(tail);
-  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  g.rotation.y = (rnd() - 0.5) * 0.3;
-  return g;
-}
+// photographed surfaces (pbr.js), shared across the builders
+const M = {
+  canvas: () => pbr('rough_linen', { scale: 0.8, tint: 0xfff0d4, bright: 1.5, side: THREE.DoubleSide }),
+  plank: (tint) => pbr('brown_planks_08', { scale: 1.2, tint }),
+  weathered: (tint = 0xd8d0c8) => pbr('wood_planks_grey', { scale: 1.2, tint }),
+  iron: () => pbr('painted_steel', { scale: 0.8, tint: 0x2e2a28, metal: 0.5 }),
+  galv: (side = THREE.FrontSide) => pbr('painted_steel', { scale: 1, tint: 0xc4c8cc, metal: 0.65, rough: 0.6, bright: 1.3, side }),
+  log: () => pbr('bark_brown_02', { scale: 1.2, tint: 0xc0a080 }),
+  grass: () => pbr('thatch_roof_angled', { scale: 0.6, tint: 0xd0d890, bright: 1.5, side: THREE.DoubleSide }),
+};
 
 // ── builders ──
 
 /** A short wagon train: three prairie schooners with ox teams, in line. */
 function wagons() {
   const g = new THREE.Group();
-  const rnd = seeded(1843);
-  const canvas = mat(0xe9e1cc, { roughness: 0.9, side: THREE.DoubleSide });
-  const bedPaint = [0x3e5b78, 0x4f6a3e, 0x6e5338];
-  const gear = mat(0x8e2f22, { roughness: 0.7 });
-  const iron = mat(0x2b2724, { roughness: 0.5, metalness: 0.4 });
+  const canvas = M.canvas();
+  const bedPaint = [0xa8c0e0, 0xb8d0a0, 0xe0b890]; // milk paint: blue, green, buff, over the planks
+  const gear = M.plank(0xe08070); // red running gear
+  const iron = M.iron();
+  const yoke = M.plank(0xc8a888);
+  const wheels = { 0.55: wheelGeo(0.55), 0.66: wheelGeo(0.66) };
   for (let w = 0; w < 3; w++) {
     const wagon = new THREE.Group();
-    const bed = mat(bedPaint[w], { roughness: 0.8 });
-    wagon.add(box(1.15, 0.62, 3.4, bed, 0, 0.95, 0));
+    const bed = M.plank(bedPaint[w]);
+    // the box: floor, sides and ends of planks, the sides flaring at the top
+    wagon.add(box(1.15, 0.08, 3.4, bed, 0, 0.95, 0));
+    for (const s of [-1, 1]) wagon.add(box(0.05, 0.62, 3.4, bed, s * 0.56, 0.95, 0), box(1.15, 0.62, 0.05, bed, 0, 0.95, s * 1.68));
+    wagon.add(box(1.2, 0.06, 0.08, iron, 0, 1.55, -1.68), box(1.2, 0.06, 0.08, iron, 0, 1.55, 1.68));
     // canvas bonnet over the bows: a half-round arch along the bed, flaring
     // up and out at the front and back as the end bows lean outward
     const bonnet = new THREE.PlaneGeometry(Math.PI, 3.6, 18, 8);
@@ -109,28 +82,33 @@ function wagons() {
     const bm = new THREE.Mesh(bonnet, canvas);
     bm.castShadow = true;
     wagon.add(bm);
+    // the hickory bows showing through as ribs
+    for (let k = 0; k < 5; k++) {
+      const z = -1.6 + k * 0.8;
+      const bow = new THREE.Mesh(new THREE.TorusGeometry(1, 0.025, 4, 16, Math.PI).scale(0.67, 0.96, 1), yoke);
+      bow.position.set(0, 1.24, z);
+      wagon.add(bow);
+    }
     // running gear and wheels (rear larger)
     wagon.add(box(0.12, 0.12, 3.6, gear, 0, 0.62, 0));
     for (const [z, r] of [[-1.15, 0.55], [1.2, 0.66]]) {
       for (const s of [-1, 1]) {
-        const wh = wheel(r, gear);
+        const wh = new THREE.Mesh(wheels[r], gear);
         wh.rotation.y = Math.PI / 2;
         wh.position.set(s * 0.72, r, z);
+        wh.castShadow = true;
         wagon.add(wh);
       }
       wagon.add(cyl(0.05, 0.05, 1.5, iron, 0, r, z).rotateZ(Math.PI / 2));
     }
-    // tongue and two yoke of oxen
+    // tongue, yokes and two yoke of oxen
     wagon.add(box(0.1, 0.1, 3.2, gear, 0, 0.55, -3.3));
+    const oxen = [];
     for (let k = 0; k < 2; k++) {
-      for (const s of [-1, 1]) {
-        const coat = [0x7a4a2a, 0x5a3a22, 0xc7b8a0, 0x3a2a20][Math.floor(rnd() * 4)];
-        const ox = beast({ L: 2.1, H: 1.45, coat, dark: coat, rnd, horns: 0.32 });
-        ox.position.set(s * 0.55, 0, -3.6 - k * 2.6);
-        wagon.add(ox);
-      }
-      wagon.add(box(1.6, 0.12, 0.14, mat(0x6b4a2c), 0, 1.25, -3.1 - k * 2.6));
+      for (const s of [-1, 1]) oxen.push([s * 0.6, 0, -3.9 - k * 2.7, 0, 1.0 + ((w * 4 + k * 2 + s) % 3) * 0.04]);
+      wagon.add(box(1.6, 0.12, 0.14, yoke, 0, 1.3, -2.95 - k * 2.7));
     }
+    wagon.add(animalsAt('ox', oxen));
     wagon.position.set(Math.sin(w * 0.8) * 3, 0, w * 13);
     wagon.rotation.y = Math.sin(w * 0.8) * 0.12;
     g.add(wagon);
@@ -141,25 +119,25 @@ function wagons() {
 /** Aermotor-style steel windmill with an 8 ft wheel and a stock tank. */
 function windmill() {
   const g = new THREE.Group();
-  const steel = mat(0x9da3a6, { metalness: 0.6, roughness: 0.45 });
+  const steel = M.galv();
   const H = 33 * FT;
   const spread = 1.8;
-  // four legs leaning in to the head
+  // four angle-iron legs leaning in to the head
   for (const [x, z] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
     const a = new THREE.Vector3(x * spread, 0, z * spread), b = new THREE.Vector3(x * 0.22, H, z * 0.22);
     const len = a.distanceTo(b);
-    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, len, 6), steel);
+    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.07, len, 0.07), steel);
     leg.position.copy(a).lerp(b, 0.5);
     leg.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
     leg.castShadow = true;
     g.add(leg);
   }
-  // girts at five levels
+  // girts at five levels and the cross-braces between them
   for (let i = 1; i <= 5; i++) {
     const y = (i / 6) * H;
     const w = spread - (spread - 0.22) * (y / H);
     for (const r of [0, Math.PI / 2, Math.PI, Math.PI * 1.5]) {
-      const girt = new THREE.Mesh(new THREE.BoxGeometry(w * 2, 0.04, 0.04), steel);
+      const girt = new THREE.Mesh(new THREE.BoxGeometry(w * 2, 0.05, 0.04), steel);
       girt.position.set(Math.sin(r) * w, y, Math.cos(r) * w);
       girt.rotation.y = r;
       g.add(girt);
@@ -168,10 +146,10 @@ function windmill() {
   // head: wheel of 18 sails, tail vane
   const head = new THREE.Group();
   head.position.y = H + 0.3;
-  head.add(box(0.3, 0.3, 0.7, mat(0x5d6164, { metalness: 0.5, roughness: 0.5 }), 0, -0.15, 0));
+  head.add(box(0.3, 0.3, 0.7, steel, 0, -0.15, 0));
   const rotor = new THREE.Group();
   rotor.position.z = -0.45;
-  const sailMat = mat(0xb9bec0, { metalness: 0.5, roughness: 0.4, side: THREE.DoubleSide });
+  const sailMat = M.galv(THREE.DoubleSide);
   const R = 1.22;
   for (let i = 0; i < 18; i++) {
     const a = (i / 18) * Math.PI * 2;
@@ -184,17 +162,18 @@ function windmill() {
   rotor.add(new THREE.Mesh(new THREE.TorusGeometry(R * 0.97, 0.02, 4, 36), steel));
   rotor.add(new THREE.Mesh(new THREE.TorusGeometry(R * 0.36, 0.02, 4, 24), steel));
   head.add(rotor);
-  const vane = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), mat(0xd9dcdc, { metalness: 0.4, roughness: 0.5, side: THREE.DoubleSide }));
+  const vane = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 0.9), sailMat);
   vane.rotation.y = Math.PI / 2;
   vane.position.set(0, 0.15, 1.5);
   head.add(vane, box(0.05, 0.05, 1.3, steel, 0, -0.05, 0.8));
   head.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   g.add(head);
-  // pump rod and a round galvanised stock tank
+  // pump rod and a round galvanised stock tank of corrugated steel
   g.add(cyl(0.025, 0.025, H, steel, 0, 0, 0, 5));
-  const tank = cyl(1.8, 1.8, 0.6, mat(0xa7acad, { metalness: 0.55, roughness: 0.5 }), 3.2, 0, 0.5, 28);
+  const tank = cyl(1.8, 1.8, 0.6, pbr('corrugated_iron', { scale: 0.6, tint: 0xc8ccd0, metal: 0.55, bright: 1.2 }), 3.2, 0, 0.5, 32);
   g.add(tank);
-  const water = new THREE.Mesh(new THREE.CircleGeometry(1.75, 28).rotateX(-Math.PI / 2), mat(0x3d5560, { roughness: 0.1, metalness: 0.2 }));
+  g.add(new THREE.Mesh(new THREE.TorusGeometry(1.8, 0.04, 6, 32).rotateX(Math.PI / 2).translate(3.2, 0.6, 0.5), steel));
+  const water = new THREE.Mesh(new THREE.CircleGeometry(1.75, 28).rotateX(-Math.PI / 2), landmarkWater());
   water.position.set(3.2, 0.52, 0.5);
   g.add(water);
   return {
@@ -204,96 +183,101 @@ function windmill() {
   };
 }
 
-/** A small herd of grazing bison. */
+/** A small herd of grazing bison: bulls, cows and a calf or two. */
 function bison() {
-  const g = new THREE.Group();
   const rnd = seeded(1871);
-  const n = 9;
-  for (let i = 0; i < n; i++) {
-    const bull = rnd() < 0.35;
-    const calf = !bull && rnd() < 0.25;
-    const H = bull ? 1.8 : calf ? 1.05 : 1.5;
-    const b = beast({ L: H * 1.75, H, coat: calf ? 0x8a5a33 : 0x5a4130, dark: calf ? 0x7a4e2c : 0x2f2219, hump: calf ? 0.2 : 1, rnd, headDown: rnd() < 0.6 ? 1 : 0.2, horns: calf ? null : 0.16 });
+  const spots = [];
+  for (let i = 0; i < 9; i++) {
+    const bull = rnd() < 0.35, calf = !bull && rnd() < 0.25;
     const a = rnd() * Math.PI * 2, r = 4 + Math.sqrt(rnd()) * 22;
-    b.position.set(Math.cos(a) * r, 0, Math.sin(a) * r);
-    b.rotation.y = rnd() * Math.PI * 2;
-    g.add(b);
+    spots.push([Math.cos(a) * r, 0, Math.sin(a) * r, rnd() * Math.PI * 2, bull ? 1 : calf ? 0.55 : 0.84]);
   }
+  const g = new THREE.Group();
+  g.add(animalsAt('bison', spots));
   return { group: g, glow: [] };
 }
 
-function sodTexture() {
-  return canvasTex(256, 256, (c, w, h) => {
-    const rnd = seeded(7);
-    c.fillStyle = '#4a3b2a';
-    c.fillRect(0, 0, w, h);
-    const rows = 10, rh = h / rows;
-    for (let r = 0; r < rows; r++) {
-      const off = r % 2 ? 0.5 : 0;
-      for (let k = -1; k < 4; k++) {
-        const x = (k + off) * (w / 3);
-        const v = 70 + rnd() * 40;
-        c.fillStyle = `rgb(${v + 20},${v},${v * 0.6})`;
-        c.fillRect(x + 2, r * rh + 2, w / 3 - 4, rh - 4);
-        // grass roots curling out of each sod block
-        c.fillStyle = `rgba(110,120,60,${0.4 + rnd() * 0.3})`;
-        c.fillRect(x + 2, r * rh + 2, w / 3 - 4, 3);
-      }
-    }
-  }, [2, 1]);
-}
-
-/** A plains sod house with a sod roof, plank door and two small windows. */
+/** A plains sod house: walls of cut sod laid like bricks, sod roof, plank door, two small windows. */
 function sodhouse() {
   const g = new THREE.Group();
-  const sod = new THREE.MeshStandardMaterial({ map: sodTexture(), roughness: 1 });
-  const roofSod = mat(0x6d6b3d, { roughness: 1 });
-  const wood = mat(0x6b5038, { roughness: 0.9 });
+  const sod = pbr('brown_mud_dry', { scale: 1.2, tint: 0xb8a890 });
+  const roofSod = pbr('grass_ground', { scale: 2, tint: 0xa8b080 });
+  const wood = M.weathered();
   const glass = lit(0x2a2f33, 0xffc070, { night: 1.2, roughness: 0.3 });
   const W = 6.2, D = 5, Hh = 2.3;
-  g.add(box(W, Hh, D, sod));
-  g.add(gable(W + 0.6, 1.3, D + 0.6, roofSod, 0, Hh, 0));
-  // grass tussocks along the ridge and eaves
   const rnd = seeded(11);
-  for (let i = 0; i < 26; i++) {
-    const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.22, 6, 4).scale(1.4, 0.45, 1.1), mat(0x7f7d44, { roughness: 1 }));
-    const side = rnd() < 0.5 ? -1 : 1;
-    const u = rnd();
-    tuft.position.set((rnd() - 0.5) * W, Hh + 0.1 + u * 1.2, side * (D / 2 + 0.3) * (1 - u));
-    g.add(tuft);
+  // "Nebraska marble": blocks of prairie sod about 0.9 × 0.3 m and 0.6 m
+  // thick, laid in courses with the joints broken, each a little askew
+  const blocks = [], LEN = 0.9, CH = 0.29;
+  const n = Math.round(Hh / CH);
+  for (let c = 0; c < n; c++) {
+    const y = c * CH, off = (c % 2) * LEN / 2;
+    for (const [len, along, fixed, sz] of [[W, 'x', D / 2 - 0.3, 1], [W, 'x', -D / 2 + 0.3, 1], [D - 1.2, 'z', W / 2 - 0.3, 1], [D - 1.2, 'z', -W / 2 + 0.3, 1]]) {
+      for (let t = -len / 2 - off; t < len / 2; t += LEN) {
+        const a = Math.max(-len / 2, t), b = Math.min(len / 2, t + LEN - 0.03);
+        if (b - a < 0.15) continue;
+        const mid = (a + b) / 2;
+        // the door and window openings
+        if (along === 'x' && fixed > 0 && ((Math.abs(mid - 0.8) < 0.55 && y < 1.9) || (Math.abs(mid + 1.6) < 0.45 && y > 0.9 && y < 1.6) || (Math.abs(mid - 2.2) < 0.45 && y > 0.9 && y < 1.6))) continue;
+        const geo = new THREE.BoxGeometry(along === 'x' ? b - a : 0.6, CH - 0.02, along === 'x' ? 0.6 : b - a);
+        geo.rotateY((rnd() - 0.5) * 0.04).translate(along === 'x' ? mid : fixed, y + CH / 2, along === 'x' ? fixed : mid);
+        blocks.push(geo);
+      }
+    }
   }
-  g.add(box(0.9, 1.9, 0.08, wood, 0.8, 0, D / 2 + 0.01));
-  for (const x of [-1.6, 2.2]) g.add(box(0.7, 0.6, 0.06, glass, x, 1.1, D / 2 + 0.01));
-  g.add(cyl(0.09, 0.09, 1.2, mat(0x2a2522, { metalness: 0.5 }), -1.8, Hh + 0.8, -0.6, 8));
-  // a woodpile of buffalo chips and a water barrel
-  g.add(cyl(0.3, 0.3, 0.9, wood, 3.6, 0, 1.6, 10));
+  const walls = new THREE.Mesh(mergeGeometries(blocks), sod);
+  walls.castShadow = walls.receiveShadow = true;
+  g.add(walls);
+  g.add(gable(W + 0.6, 1.3, D + 0.6, roofSod, 0, Hh, 0));
+  // grass growing out of the roof sod along the ridge and eaves
+  const tufts = new THREE.InstancedMesh(tuftGeo(11), M.grass(), 40);
+  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), sc = new THREE.Vector3();
+  for (let i = 0; i < 40; i++) {
+    const side = rnd() < 0.5 ? -1 : 1, u = rnd();
+    v.set((rnd() - 0.5) * W, Hh + u * 1.3, side * (D / 2 + 0.3) * (1 - u));
+    tufts.setMatrixAt(i, m4.compose(v, q.setFromAxisAngle(sc.set(side, 0, 0).normalize(), 0.5).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rnd() * 6)), sc.setScalar(0.6 + rnd() * 0.4)));
+  }
+  g.add(tufts);
+  // plank door and frames in the openings, the windows
+  g.add(box(0.9, 1.9, 0.08, wood, 0.8, 0, D / 2 - 0.3));
+  for (const x of [-1.6, 2.2]) g.add(box(0.7, 0.6, 0.06, glass, x, 1.0, D / 2 - 0.3), box(0.86, 0.08, 0.6, wood, x, 0.9, D / 2 - 0.3));
+  g.add(cyl(0.09, 0.09, 1.2, M.iron(), -1.8, Hh + 0.8, -0.6, 10));
+  // a water barrel
+  g.add(cyl(0.3, 0.27, 0.9, M.plank(0xc8a888), 3.6, 0, 1.6, 14));
+  for (const y of [0.15, 0.75]) g.add(new THREE.Mesh(new THREE.TorusGeometry(0.29, 0.015, 4, 16).rotateX(Math.PI / 2).translate(3.6, y, 1.6), M.iron()));
   return { group: g, glow: [glass] };
 }
 
 /** A log trading post with a porch, hitching rail, barrels and a painted sign. */
 function tradingpost() {
   const g = new THREE.Group();
-  const log = mat(0x7a5f45, { roughness: 0.95 });
-  const dark = mat(0x4b3a2b, { roughness: 0.9 });
+  const log = M.log();
+  const chink = pbr('white_plaster_02', { scale: 1.2, tint: 0xc0a888 }); // clay chinking between the logs
+  const shake = M.weathered(0xc8c0b8);
+  const deck = M.plank(0xd0b090);
   const glass = lit(0x2a2f33, 0xffc070, { night: 1.2, roughness: 0.3 });
   const W = 10, D = 6.5, H = 3;
-  // stacked logs on all four walls
+  // stacked logs on all four walls, crossing at the corners
+  const logs = [];
   for (let i = 0; i < 11; i++) {
     const y = 0.14 + i * 0.27;
     for (const s of [-1, 1]) {
-      g.add(cyl(0.15, 0.15, W + 0.5, log, 0, 0, 0, 8).rotateZ(Math.PI / 2).translateX(-y).translateZ(s * D / 2));
-      g.add(cyl(0.15, 0.15, D + 0.5, log, 0, 0, 0, 8).rotateX(Math.PI / 2).translateZ(y).translateX(s * W / 2));
+      logs.push(new THREE.CylinderGeometry(0.15, 0.15, W + 0.5, 10).rotateZ(Math.PI / 2).translate(0, y, s * D / 2));
+      logs.push(new THREE.CylinderGeometry(0.15, 0.15, D + 0.5, 10).rotateX(Math.PI / 2).translate(s * W / 2, y + 0.13, 0));
     }
   }
-  g.add(box(W - 0.3, H, D - 0.3, dark));
+  const lm = new THREE.Mesh(mergeGeometries(logs), log);
+  lm.castShadow = lm.receiveShadow = true;
+  g.add(lm);
+  g.add(box(W - 0.2, H, D - 0.2, chink));
   // low gable, shake roof
-  g.add(gable(W + 1, 1.5, D + 1.2, mat(0x5c4b3c, { roughness: 1 }), 0, H, 0));
+  g.add(gable(W + 1, 1.5, D + 1.2, shake, 0, H, 0));
   // front porch
-  g.add(box(W, 0.2, 2.2, mat(0x8a6d50), 0, 0, D / 2 + 1.1));
-  for (const x of [-4.6, -1.5, 1.5, 4.6]) g.add(cyl(0.1, 0.1, 2.6, log, x, 0.2, D / 2 + 2.05, 8));
-  g.add(box(W + 0.4, 0.12, 2.6, mat(0x5c4b3c), 0, 2.8, D / 2 + 1.1));
-  g.add(box(1, 2, 0.08, dark, 0, 0.2, D / 2 + 0.02));
-  for (const x of [-3, 3]) g.add(box(1, 0.8, 0.06, glass, x, 1.1, D / 2 + 0.02));
+  g.add(box(W, 0.2, 2.2, deck, 0, 0, D / 2 + 1.1));
+  for (const x of [-4.6, -1.5, 1.5, 4.6]) g.add(cyl(0.1, 0.1, 2.6, log, x, 0.2, D / 2 + 2.05, 10));
+  g.add(box(W + 0.4, 0.12, 2.6, shake, 0, 2.8, D / 2 + 1.1));
+  g.add(box(1, 2, 0.08, M.weathered(0x9a8a80), 0, 0.2, D / 2 + 0.16));
+  for (const x of [-3, 3]) g.add(box(1, 0.8, 0.06, glass, x, 1.1, D / 2 + 0.16));
   const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.6, 0.8), new THREE.MeshStandardMaterial({
     roughness: 0.9,
     map: canvasTex(512, 96, (c, w, h) => {
@@ -303,11 +287,15 @@ function tradingpost() {
     }),
   }));
   sign.position.set(0, 3.25, D / 2 + 2.42);
-  g.add(sign);
+  g.add(sign, box(4.8, 0.95, 0.06, shake, 0, 2.78, D / 2 + 2.38));
   // hitching rail and barrels
-  g.add(box(4, 0.1, 0.1, log, -2, 1, D / 2 + 4.2));
-  for (const x of [-4, 0]) g.add(cyl(0.08, 0.08, 1.05, log, x, 0, D / 2 + 4.2, 6));
-  for (const [x, z] of [[4.2, 4.3], [4.9, 4.6], [4.4, 5.3]]) g.add(cyl(0.32, 0.28, 0.85, mat(0x6e5236), x, 0, D / 2 + z - 2.5, 10));
+  g.add(cyl(0.06, 0.06, 4, log, -2, 1, D / 2 + 4.2, 8).rotateZ(Math.PI / 2));
+  for (const x of [-4, 0]) g.add(cyl(0.08, 0.08, 1.05, log, x, 0, D / 2 + 4.2, 8));
+  const barrel = M.plank(0xc8a888);
+  for (const [x, z] of [[4.2, 4.3], [4.9, 4.6], [4.4, 5.3]]) {
+    g.add(cyl(0.32, 0.28, 0.85, barrel, x, 0, D / 2 + z - 2.5, 14));
+    for (const y of [0.12, 0.72]) g.add(new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.015, 4, 16).rotateX(Math.PI / 2).translate(x, y, D / 2 + z - 2.5), M.iron()));
+  }
   return { group: g, glow: [glass] };
 }
 
@@ -351,7 +339,8 @@ function chimneyrock() {
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
   geo.computeVertexNormals();
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+  // the photographed rock face under the bedding colours, at cliff scale
+  const m = pbr('rock_face_03', { scale: 22, tint: 0xe4e8f4, bright: 1.45, vertex: true }); // pale buff, not the photo's warm brown
   const mesh = new THREE.Mesh(geo, m);
   mesh.position.y = -4;
   mesh.castShadow = true;

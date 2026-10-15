@@ -46,7 +46,7 @@ setLandmarkDay(lm, night ? 0 : 1);
 const box = new THREE.Box3().setFromObject(lm.group);
 const size = box.getSize(new THREE.Vector3());
 const c = box.getCenter(new THREE.Vector3());
-const R = Math.max(size.x, size.y, size.z) * (Number(q.get('dist')) || 1);
+const R = (Math.max(size.x, size.y, size.z) || 40) * (Number(q.get('dist')) || 1); // models that load later have no size yet
 const cam = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 5000);
 const view = q.get('view') || 'front';
 const V = { front: [0.35, 0.45, 1.2], side: [1.3, 0.4, 0.2], top: [0.01, 1.6, 0.4], tee: [0.05, 0.08, 1.9], back: [-0.3, 0.45, -1.2] }[view] || [0.35, 0.45, 1.2];

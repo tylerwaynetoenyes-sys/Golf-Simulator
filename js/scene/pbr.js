@@ -11,6 +11,7 @@
 //     glow   night emissive colour (lit stone, windows) via userData.night
 //     offset polygon offset (draped paving over the ground)
 //     bright albedo multiplier over the normalised mid (1.8 for white paint)
+//     vertex multiply by the geometry's vertex colours (per-building tints)
 import * as THREE from 'three';
 
 const BASE = new URL('../../assets/textures/pbr/', import.meta.url).href;
@@ -54,12 +55,12 @@ function set(id) {
 const ALIAS = { metal_plate: 'painted_steel', red_bricks_02: 'red_brick' };
 
 const cache = new Map();
-export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow = null, night = 0.5, side = THREE.FrontSide, offset = 0, bright = 1 } = {}) {
+export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow = null, night = 0.5, side = THREE.FrontSide, offset = 0, bright = 1, vertex = false } = {}) {
   id = ALIAS[id] || id;
-  const key = `${id}|${scale}|${tint}|${metal}|${rough}|${glow}|${side}|${offset}|${bright}`;
+  const key = `${id}|${scale}|${tint}|${metal}|${rough}|${glow}|${side}|${offset}|${bright}|${vertex}`;
   if (cache.has(key)) return cache.get(key);
   const tx = set(id);
-  const m = new THREE.MeshStandardMaterial({ color: tint, metalness: metal, roughness: 1, side });
+  const m = new THREE.MeshStandardMaterial({ color: tint, metalness: metal, roughness: 1, side, vertexColors: vertex });
   if (offset) Object.assign(m, { polygonOffset: true, polygonOffsetFactor: offset, polygonOffsetUnits: offset });
   if (glow != null) { m.emissive = new THREE.Color(glow); m.emissiveIntensity = 0; m.userData.night = night; }
   const uni = { uTriG: tx.gain, uTriD: { value: tx.diff }, uTriR: { value: tx.rough }, uTriN: { value: tx.nor }, uTriS: { value: 1 / scale }, uTriRough: { value: rough }, uTriK: { value: bright } };
