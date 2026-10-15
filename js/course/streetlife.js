@@ -4,6 +4,7 @@
 // hydraulics), and people hanging out by them in everyday streetwear, a few
 // with gold chains. All of it stands outside the field of play.
 import * as THREE from 'three';
+import { model } from '../scene/models.js';
 
 const M = {};
 function mats() {
@@ -80,6 +81,8 @@ function wheel(r, wire, white) {
  * Returns a group sitting on y = 0, nose toward +X, ~5.3 m long.
  */
 export function car(kind, rand, color) {
+  const imported = importedCar(kind, rand);
+  if (imported) return imported;
   const m = mats();
   const low = kind === 'lowrider';
   const L = low ? 5.4 : 5.0, W = low ? 1.98 : 1.9;
@@ -165,8 +168,104 @@ export function car(kind, rand, color) {
   return g;
 }
 
+/**
+ * The imported cars (Sketchfab, CC BY): the 1964 Impala lowrider (mrkuza)
+ * and the abandoned sedan (rashad-brahimli), which goes up on cinder blocks.
+ * Normalised to sit on y = 0, centred, nose along +X. Null if not loaded.
+ */
+function importedCar(kind, rand) {
+  const low = kind === 'lowrider';
+  const M = model(low ? 'lowrider' : 'wreck');
+  if (!M) return null;
+  const m = mats();
+  const g = new THREE.Group();
+  const body = new THREE.Group();
+  g.add(body);
+  let bb = new THREE.Box3().setFromObject(M);
+  const size = bb.getSize(new THREE.Vector3());
+  if (size.z > size.x) M.rotation.y = Math.PI / 2; // length along X
+  bb = new THREE.Box3().setFromObject(M);
+  const c = bb.getCenter(new THREE.Vector3());
+  M.position.set(-c.x, -bb.min.y, -c.z);
+  body.add(M);
+  const L = Math.max(size.x, size.z);
+  if (!low) {
+    // up on cinder blocks where the wheels were
+    body.position.y = 0.36;
+    body.rotation.z = (rand() - 0.5) * 0.06;
+    for (const ax of [L * 0.3, -L * 0.3]) for (const sz of [-1, 1]) {
+      for (let k = 0; k < 2; k++) {
+        const blk = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.2, 0.2), m.block);
+        blk.position.set(ax + (k ? 0.03 : -0.02), 0.1 + k * 0.2, sz * 0.72);
+        blk.rotation.y = (rand() - 0.5) * 0.3;
+        blk.castShadow = true;
+        g.add(blk);
+      }
+    }
+    g.userData.update = null;
+    return g;
+  }
+  // hydraulics: the nose lifts about the rear axle now and then
+  const pivot = new THREE.Group();
+  pivot.position.x = -L * 0.3;
+  g.remove(body);
+  pivot.add(body);
+  body.position.x = L * 0.3;
+  g.add(pivot);
+  const state = { t: rand() * 20, period: 9 + rand() * 9 };
+  g.userData.update = (dt) => {
+    state.t += dt;
+    const u = state.t % state.period;
+    const lift = u < 2.4 ? Math.sin((u / 2.4) * Math.PI) ** 2 : 0;
+    pivot.rotation.z = lift * 0.14;
+  };
+  return g;
+}
+
+/** A shirt / trousers / skin / shoes material for the imported figures, split by height. */
+function outfit(rand) {
+  const pick = (a) => new THREE.Color(a[Math.floor(rand() * a.length)]);
+  const uni = {
+    uShirt: { value: pick([0xf2f2ee, 0x1c1c1e, 0x9a1b1f, 0x1f3b78, 0x2d6a3e, 0xd4a017, 0x6a6a6a]) },
+    uPants: { value: pick([0x22324a, 0x1d1d1f, 0x5b5146, 0x3c4e63, 0x2b2b2b]) },
+    uSkin: { value: pick([0x5c3a21, 0x6b4226, 0x8d5524, 0xc68642, 0xe0ac69]) },
+    uShoe: { value: pick([0xf4f4f0, 0x111111, 0xb22222]) },
+  };
+  const mt = new THREE.MeshStandardMaterial({ roughness: 0.8 });
+  mt.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uni);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vH;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvH = position.y;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying float vH; uniform vec3 uShirt; uniform vec3 uPants; uniform vec3 uSkin; uniform vec3 uShoe;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        vec3 cc = vH < 0.09 ? uShoe : vH < 0.88 ? uPants : vH < 1.47 ? uShirt : uSkin;
+        diffuseColor.rgb = cc;`);
+  };
+  mt.customProgramCacheKey = () => 'fwOutfit';
+  return mt;
+}
+
 /** A person (~1.75 m) in streetwear; `chain` adds a gold chain. Faces +X. */
 export function person(rand, { chain = false } = {}) {
+  const P = model('people');
+  if (P && P.children.length) {
+    const fig = P.children[Math.floor(rand() * P.children.length)];
+    const g = new THREE.Group();
+    const mt = outfit(rand);
+    fig.traverse((o) => { if (o.isMesh) { o.material = mt; o.castShadow = true; } });
+    fig.position.set(0, 0, 0);
+    fig.rotation.set(0, Math.PI / 2, 0); // the scans face +Z: turn them to +X
+    g.add(fig);
+    if (chain) {
+      const m = mats();
+      const c = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.012, 6, 24), m.gold);
+      c.rotation.x = Math.PI / 2 - 0.55;
+      c.rotation.z = Math.PI / 2;
+      c.position.set(0.07, 1.4, 0);
+      g.add(c);
+    }
+    return g;
+  }
   const g = new THREE.Group();
   const skin = [0x5c3a21, 0x6b4226, 0x8d5524, 0xc68642, 0xe0ac69][Math.floor(rand() * 5)];
   const top = [0xf2f2ee, 0x1c1c1e, 0x9a1b1f, 0x1f3b78, 0x2d6a3e, 0xd4a017, 0x777777][Math.floor(rand() * 7)];

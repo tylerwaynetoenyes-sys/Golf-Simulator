@@ -12,6 +12,7 @@
 // Far landmarks are modelled in map axes (+x east, +z south).
 import * as THREE from 'three';
 import { mat, lit, box, cyl, sphere, seeded, canvasTex, facadeMaterial } from './kit.js';
+import { model } from '../../scene/models.js';
 
 const BROWN = 0x6e5a42;
 
@@ -127,6 +128,14 @@ function eiffel() {
   g.add(box(10, 14, 10, deck, 0, 276, 0)); // the top-floor cabins and Eiffel's office
   g.add(cyl(3.2, 4.6, 6, deck, 0, 290, 0, 12)); // the lantern
   g.add(cyl(1.0, 1.6, 34, mat(0xd8d8d8, { metalness: 0.6 }), 0, 296, 0, 8)); // antennas to 330 m
+  // the detailed model (Johnson-Martin, Sketchfab, CC BY) replaces the
+  // procedural lattice when it's loaded, painted the tower's brown
+  const M = model('eiffel');
+  if (M) {
+    g.clear();
+    M.traverse((o) => { if (o.isMesh) { o.material = iron; o.castShadow = true; } });
+    g.add(M);
+  }
   const beam = new THREE.Mesh(new THREE.ConeGeometry(14, 600, 16, 1, true).translate(0, -300, 0).rotateZ(Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0xfff1d0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   const beamPivot = new THREE.Group();

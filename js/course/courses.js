@@ -34,10 +34,12 @@ const loaded = new Map([[CONFLUENCE.id, CONFLUENCE]]);
 export async function loadCourse(id) {
   if (loaded.has(id)) return loaded.get(id);
   const c = courseById(id);
-  if (!c.dem) { loaded.set(id, c); return c; }
+  // imported models (Eiffel Tower, statue, cars, people), browser only
+  const models = typeof window !== 'undefined' ? import('../scene/models.js').then((m) => m.preloadCourseModels(c.id)) : null;
+  if (!c.dem) { await models; loaded.set(id, c); return c; }
   // scanned trees load alongside the terrain (browser only; the Node tools skip them)
   const trees = typeof window !== 'undefined' ? import('../scene/trees.js').then((m) => m.loadHeroTrees()) : null;
-  const [d] = await Promise.all([loadDem(c.id), trees]);
+  const [d] = await Promise.all([loadDem(c.id), trees, models]);
   const out = { ...c, holes: prepareDemHoles(c, d) };
   loaded.set(id, out);
   return out;

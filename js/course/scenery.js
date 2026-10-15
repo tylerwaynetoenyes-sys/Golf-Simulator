@@ -6,7 +6,7 @@
 //            shoreline
 //   crowds   spectators on the mounds round the greens (tournament courses)
 import * as THREE from 'three';
-import { person } from './lm/kit.js';
+import { person as figure } from './streetlife.js';
 
 function sailboat(rand) {
   const g = new THREE.Group();
@@ -130,9 +130,10 @@ export function dressScenery(T, hole, rand, ground, buildLandmark) {
       const r = T.greenR + 18 + rand() * 14;
       const x = G.x + Math.cos(a) * r, z = G.z + Math.sin(a) * r;
       if (T.terrain(x, z).surface === 'water') continue;
-      const p = person([0xf2f2ee, 0x1f3b78, 0xd4a017, 0x9a1b1f, 0x2d6a3e, 0x6fa8dc, 0xe48fb0][Math.floor(rand() * 7)], rand);
+      const p = figure(rand);
       p.position.set(x, ground(x, z), z);
-      p.rotation.y = Math.atan2(G.x - x, G.z - z) - Math.PI / 2;
+      // figures look down their +X: turn each to face the green
+      p.rotation.y = Math.atan2(-(G.z - z), G.x - x);
       group.add(p);
     }
   }
