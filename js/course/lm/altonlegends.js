@@ -9,7 +9,8 @@
 // Front faces +Z. Footprint x∈[-14,14], z∈[-10,10]; Wadlow ~3.0 m to the crown.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, seeded, canvasTex } from './kit.js';
+import { mat, lit, seeded, canvasTex, boulderGeometry } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
 
 function batcher() {
   const lists = new Map();
@@ -57,58 +58,25 @@ function ell(rx, ry, rz, m, p, rot = [0, 0, 0], seg = 14) {
   return o;
 }
 
-function brickTex() {
-  const rnd = seeded(1926);
-  return canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#6a4a3a'; g.fillRect(0, 0, w, h);
-    // herringbone: 8 px unit, bricks 2:1
-    const u = 16;
-    for (let y = -2 * u; y < h + 2 * u; y += u) for (let x = -2 * u; x < w + 2 * u; x += u) {
-      const t = rnd();
-      g.fillStyle = `rgb(${128 + t * 40 | 0},${58 + t * 22 | 0},${42 + t * 16 | 0})`;
-      const k = ((x + y) / u) & 3;
-      if (k === 0) g.fillRect(x + 1, y + 1, 2 * u - 2, u - 2);
-      else if (k === 2) g.fillRect(x + 1, y + 1, u - 2, 2 * u - 2);
-    }
-  }, [6, 4]);
-}
-function bronzeTex() {
-  const rnd = seeded(7);
-  return canvasTex(128, 128, (g, w, h) => {
-    g.fillStyle = '#7a5532'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 400; i++) {
-      const t = rnd();
-      g.fillStyle = t < 0.2 ? 'rgba(80,110,90,0.18)' : t < 0.6 ? 'rgba(50,32,18,0.22)' : 'rgba(170,125,80,0.18)';
-      g.beginPath(); g.arc(rnd() * w, rnd() * h, 2 + rnd() * 8, 0, 7); g.fill();
-    }
-  }, [2, 2]);
-}
-function graniteTex(base) {
-  const rnd = seeded(31);
-  return canvasTex(128, 128, (g, w, h) => {
-    g.fillStyle = base; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 2600; i++) { const v = rnd() < 0.5 ? 40 + rnd() * 50 : 170 + rnd() * 60; g.fillStyle = `rgba(${v},${v},${v},0.4)`; g.fillRect(rnd() * w, rnd() * h, 1.3, 1.3); }
-  }, [1, 1]);
-}
-
 export default function build() {
   const group = new THREE.Group();
   const B = batcher();
   const rnd = seeded(1940);
 
-  const bTex = bronzeTex();
-  const bronze = lit(0xffffff, 0xffb06a, { map: bTex, roughness: 0.36, metalness: 0.85, night: 0.22 });
-  const bronzeDark = lit(0x8a8079, 0xff9a50, { map: bTex, roughness: 0.42, metalness: 0.8, night: 0.15 });
-  const brass = mat(0xc9a050, { roughness: 0.3, metalness: 0.9 });
-  const brick = mat(0xffffff, { map: brickTex(), roughness: 0.92 });
-  const granite = mat(0xffffff, { map: graniteTex('#8d8a86'), roughness: 0.55 });
-  const graniteDark = mat(0xffffff, { map: graniteTex('#4c4a4a'), roughness: 0.35 });
-  const iron = mat(0x1d2022, { roughness: 0.5, metalness: 0.6 });
+  // photographed surfaces (pbr.js): cast bronze (steel's mottled finish under
+  // a bronze tint reads as patina), grey granite, brick pavers, bark mulch
+  const bronze = pbr('painted_steel', { scale: 0.35, tint: 0xd09868, metal: 0.55, rough: 0.5, bright: 1.2, glow: 0xffb06a, night: 0.22 });
+  const bronzeDark = pbr('painted_steel', { scale: 0.35, tint: 0x907058, metal: 0.5, rough: 0.55, glow: 0xff9a50, night: 0.15 });
+  const brass = pbr('painted_steel', { scale: 0.3, tint: 0xf0c060, metal: 0.95, rough: 0.35, bright: 1.6 });
+  const brick = pbr('red_brick', { scale: 1.1, tint: 0xd8b0a0 });
+  const granite = pbr('granite_wall', { scale: 4, tint: 0xc0cce8, bright: 1.3 }); // big scale: one stone's grain, not coursed blocks
+  const graniteDark = pbr('granite_wall', { scale: 4, tint: 0x6a6a74, rough: 0.5 });
+  const iron = pbr('painted_steel', { scale: 0.6, tint: 0x25282a, metal: 0.6 });
   const lampM = lit(0xfff3d8, 0xffd59a, { night: 2.0, roughness: 0.3 });
   const upM = lit(0xd8d4c8, 0xffe2b0, { night: 2.2, roughness: 0.3 });
-  const wood = mat(0x7a5536, { roughness: 0.7 });
-  const hedge = mat(0x3c5a2c, { roughness: 0.95, flatShading: true });
-  const mulch = mat(0x4a3526, { roughness: 1 });
+  const wood = pbr('brown_planks_08', { scale: 0.8, tint: 0x9a7050 });
+  const hedge = pbr('grass_ground', { scale: 0.45, tint: 0x5a8848, rough: 0.9 }); // clipped boxwood: fine leaf texture
+  const mulch = pbr('bark_brown_02', { scale: 0.5, tint: 0x8a6a58 });
   const glow = [bronze, bronzeDark, lampM, upM];
 
   // ---------- paving ----------
@@ -127,17 +95,16 @@ export default function build() {
   // (from Tyler's photographs) a broad grey granite plinth, its front face
   // cut with his name and dates; granite benches and sloped tablets nearby
   const inscr = new THREE.MeshStandardMaterial({
-    roughness: 0.6,
+    roughness: 0.6, transparent: true, // the lettering only, cut into the granite face
+    polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     map: canvasTex(512, 96, (c, w, h) => {
-      c.fillStyle = '#8f8d88'; c.fillRect(0, 0, w, h);
-      for (let i = 0; i < 1500; i++) { const v = 110 + Math.random() * 60; c.fillStyle = `rgba(${v},${v},${v - 4},0.5)`; c.fillRect(Math.random() * w, Math.random() * h, 1.5, 1.5); }
       c.fillStyle = '#d9c9a0'; c.textAlign = 'center';
       c.font = '600 34px Georgia, serif'; c.fillText('ROBERT PERSHING WADLOW', w / 2, 42);
       c.font = '500 24px Georgia, serif'; c.fillText('FEBRUARY 22, 1918 — JULY 15, 1940', w / 2, 78);
     }),
   });
   B.add(M(new THREE.BoxGeometry(2.7, 0.46, 2.3), granite, WX, 0.15 + 0.23, WZ));
-  B.add(M(new THREE.PlaneGeometry(2.4, 0.42), inscr, WX, 0.38, WZ + 1.152));
+  B.add(M(new THREE.PlaneGeometry(2.4, 0.42), inscr, WX, 0.38, WZ + 1.153));
   figureWadlow(new THREE.Matrix4().compose(V(WX, 0.61, WZ), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0.12, 0)), V(1, 1, 1)));
   for (const [x, z, ry] of [[WX - 3.6, WZ - 2.6, 0.3], [WX + 2.6, WZ - 3.0, -0.2]]) {
     for (const dx of [-0.7, 0.7]) B.add(M(new THREE.BoxGeometry(0.3, 0.42, 0.42), granite, x + dx * Math.cos(ry), 0.36, z - dx * Math.sin(ry), 0, ry, 0));
@@ -152,12 +119,13 @@ export default function build() {
   // (from Tyler's photographs) a round concrete plinth on a wider round
   // base, set in the brick and engraved-granite paving, a bronze foot plate,
   // and a rough limestone planter wall behind
-  const concrete = mat(0xb9b6ae, { roughness: 0.95 });
+  const concrete = pbr('concrete_wall_008', { scale: 1.5, tint: 0xd2dcf6, bright: 1.3 });
   B.add(M(new THREE.CylinderGeometry(1.25, 1.25, 0.12, 32), concrete, MX, 0.2, MZ));
   B.add(M(new THREE.CylinderGeometry(0.85, 0.88, PH - 0.2, 32), concrete, MX, 0.26 + (PH - 0.2) / 2, MZ));
   B.add(M(new THREE.CylinderGeometry(0.5, 0.5, 0.04, 6), bronzeDark, MX, PH + 0.18, MZ));
   {
-    const lime = mat(0xd9d2c0, { roughness: 1, flatShading: true });
+    // dry-laid blocks of rough-faced limestone
+    const lime = pbr('rock_face_03', { scale: 0.7, tint: 0xf0e8d8, bright: 1.2 });
     for (let i = 0; i < 16; i++) {
       const a = -2.4 + (i / 15) * 1.6, r = 3.1;
       for (let row = 0; row < 2; row++) {
@@ -213,12 +181,12 @@ export default function build() {
     for (let z = -3.4; z < 4.6; z += 1.0) shrubs.push([sx * 12.6, 0.36, z, 0.42 + rnd() * 0.1]);
   }
   B.build(group);
-  const sh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), hedge, shrubs.length);
+  const sh = new THREE.InstancedMesh(boulderGeometry(1, seeded(5), { detail: 3, flat: 1 }), hedge, shrubs.length);
   const fl = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 4), mat(0xffffff, { roughness: 0.8 }), shrubs.length * 3);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = V(1, 1, 1), p = V(0, 0, 0), c = new THREE.Color();
   shrubs.forEach(([x, y, z, r], i) => {
     m4.compose(p.set(x, y + r * 0.6, z), q.setFromEuler(new THREE.Euler(0, rnd() * 3, 0)), s.set(r, r * 0.8, r)); sh.setMatrixAt(i, m4);
-    sh.setColorAt(i, c.setHSL(0.27 + rnd() * 0.04, 0.45, 0.2 + rnd() * 0.06));
+    sh.setColorAt(i, c.setHSL(0.27, 0.15, 0.85 + rnd() * 0.15));
     for (let k = 0; k < 3; k++) {
       m4.compose(p.set(x + (rnd() - 0.5) * r * 1.6, y + 0.1, z + (rnd() - 0.5) * r * 1.6 + r * 0.6), q.identity(), s.set(0.09, 0.07, 0.09));
       fl.setMatrixAt(i * 3 + k, m4); fl.setColorAt(i * 3 + k, c.set([0xd8423a, 0xf2e6c8, 0x8a5ac0][(i + k) % 3]));
