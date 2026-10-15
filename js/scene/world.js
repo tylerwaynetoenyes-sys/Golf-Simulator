@@ -18,6 +18,7 @@ import { PlayerMarkers } from './markers.js';
 import { Environment } from './environment.js';
 import { Ambient } from './ambient.js';
 import { Rain } from './rain.js';
+import { patchOccluders, setOcclusion } from './occlusion.js';
 import { Club } from './club.js';
 
 export class World {
@@ -122,6 +123,8 @@ export class World {
     // the St. Louis skyline belongs to the Confluence Course only
     this.skyline.group.visible = !hole.course || hole.course === 'confluence';
     const T = this.course.load(hole);
+    // trees, shrubs and long grass fade where they'd hide the ball
+    patchOccluders(this.course.root);
     this.terrainFn = T.terrain;
     this.groundFn = T.groundHeight;
     this.ball.setGround(this.course.visualHeight);
@@ -189,6 +192,10 @@ export class World {
     this.skyline.update(t, dt, this.camera, this.r.renderer.domElement.height);
     this.range.update(t, dt);
     this.rig.update(dt, ballPos, playT);
+    // keep the corridor from the camera to the ball clear (not in flyovers)
+    // keep the view clear along what the camera is aiming at (the ball, or
+    // the landing area the spotter frames), not in flyovers
+    setOcclusion(this.camera.position, this.rig.mode === 'address' ? ballPos : this.rig.look, this.sceneMode === 'course' && this.rig.mode !== 'flyover' && this.rig.mode !== 'showcase');
     this.env.focus(this._focusV.lerpVectors(this.camera.position, this.rig.look, 0.3));
     this.env.update(dt);
     this.ball.update(dt, this.camera);

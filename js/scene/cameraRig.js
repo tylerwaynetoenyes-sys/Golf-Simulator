@@ -58,8 +58,9 @@ export class CameraRig {
     const a = ((this.heading + this.aimDeg) * Math.PI) / 180;
     const fx = Math.sin(a), fz = -Math.cos(a);
     const o = this.origin;
-    const back = this.putting ? 2.4 : 4.2;
-    const up = this.putting ? 1.05 : 1.75;
+    // standing behind the ball, at a golfer's eye height
+    const back = this.putting ? 2.4 : 3.8;
+    const up = this.putting ? 1.05 : 1.68;
     const x = o.x - fx * back, z = o.z - fz * back;
     const gy = this.ground(x, z);
     this.desiredPos.set(x, Math.max(o.y + up, gy + 1.2), z);
@@ -171,17 +172,17 @@ export class CameraRig {
     for (const side of [-1, 1]) for (const d of [16, 22, 12]) {
       const back = d * 0.45;
       const cam = new THREE.Vector3(e.x - fx * back + rx * d * side, 0, e.z - fz * back + rz * d * side);
-      cam.y = Math.max(g(cam.x, cam.z) + 1.8, e.y - 1.5);
-      let lift = 0;
-      while (lift < 14 && this._blocked(cam, e.x, e.y, e.z, 2.5)) { cam.y += 2; lift += 2; }
-      const cost = lift + (this._blocked(cam, e.x, e.y, e.z, 2.5) ? 100 : 0) + (d !== 16 ? 1 : 0);
+      // standing on the ground at eye level, looking up at the strike
+      cam.y = g(cam.x, cam.z) + 1.7;
+      const underTree = this.obstacle && this.obstacle(cam.x, cam.z) > cam.y - 2;
+      const cost = (this._blocked(cam, e.x, e.y, e.z, 2.5, false) ? 100 : 0) + (underTree ? 10 : 0) + (d !== 16 ? 1 : 0);
       if (!best || cost < best.cost) best = { cam, cost };
     }
     this.treeCam = { pos: best.cam, point: new THREE.Vector3(e.x, e.y, e.z), at: Math.max(0.35, e.t - 0.9), t: e.t, cut: false };
   }
 
   /** Does a tree canopy (or the ground) sit between `from` and the point? Ignores the last `skip` metres. */
-  _blocked(from, tx, ty, tz, skip = 1.5) {
+  _blocked(from, tx, ty, tz, skip = 1.5, trees = true) {
     const g = this.ground;
     const dx = tx - from.x, dy = ty - from.y, dz = tz - from.z;
     const L = Math.hypot(dx, dy, dz);
@@ -192,7 +193,7 @@ export class CameraRig {
       if (L * (1 - u) < skip) break;
       const x = from.x + dx * u, y = from.y + dy * u, z = from.z + dz * u;
       if (y < g(x, z) + 0.2) return true;
-      if (this.canopy && this.canopy(x, y, z)) return true;
+      if (trees && this.canopy && this.canopy(x, y, z)) return true;
     }
     return false;
   }
@@ -218,29 +219,48 @@ export class CameraRig {
     // Try both sides (and a closer, straighter option); keep the one that
     // needs the least lifting to see both spots and isn't next to a mast.
     const candidates = [];
-    for (const side of [-1, 1]) for (const [bk, lt] of [[back, lateral], [back * 0.8, lateral * 0.5]]) {
+    // canopy in the view: sample the sight lines to the landing and rest
+    // points at a few heights; a spotter stands where the view is open
+    const leafy = (cam) => {
+      if (!this.canopy) return 0;
+      let n = 0;
+      for (const [tx, ty, tz] of [[lp.x, lpY + 1, lp.z], [rest.x, rY + 1, rest.z], [mx, (lpY + rY) / 2 + 6, mz]]) {
+        for (let i = 1; i <= 10; i++) {
+          const u = i / 12;
+          for (const dy of [0, 2.5]) if (this.canopy(cam.x + (tx - cam.x) * u, cam.y + dy + (ty - cam.y) * u, cam.z + (tz - cam.z) * u)) n++;
+        }
+      }
+      return n;
+    };
+    for (const side of [-1, 1]) for (const [bk, lt] of [[back, lateral], [back * 0.8, lateral * 0.5], [back * 1.1, 2]]) {
       const cam = new THREE.Vector3(mx - fx * bk + rx * lt * side, 0, mz - fz * bk + rz * lt * side);
-      cam.y = Math.max(g(cam.x, cam.z), Math.min(lpY, rY) - 2) + 4 + bk * 0.07;
+      // a spotter standing beside the landing area, at eye level
+      cam.y = g(cam.x, cam.z) + 1.7;
       const base = cam.y;
       const blocked = (tx, ty, tz) => {
         for (let i = 1; i < 14; i++) {
           const u = i / 14;
           const px = cam.x + (tx - cam.x) * u, pz = cam.z + (tz - cam.z) * u;
           const py = cam.y + (ty - cam.y) * u;
-          const top = Math.max(g(px, pz) + 0.6, this.obstacle ? this.obstacle(px, pz) - 1.5 : -Infinity);
+          const top = g(px, pz) + 0.6; // trees fade out of the way (occlusion.js); only ground blocks
           if (top > py) return true;
         }
         return false;
       };
       let k = 0;
-      for (; k < 12 && (blocked(lp.x, lpY + 0.3, lp.z) || blocked(rest.x, rY + 0.3, rest.z)); k++) cam.y += 2.5;
-      if (this.obstacle) cam.y = Math.max(cam.y, this.obstacle(cam.x, cam.z));
+      // over a crest, step up onto it a little (never more than ~6 m)
+      for (; k < 3 && (blocked(lp.x, lpY + 0.3, lp.z) || blocked(rest.x, rY + 0.3, rest.z)); k++) cam.y += 2;
+      const underTree = this.obstacle && this.obstacle(cam.x, cam.z) > cam.y - 2;
       const mast = this.nearPole ? this.nearPole(cam.x, cam.z, 5) : false;
       // prefer the side the ball didn't curve toward (usually the open fairway)
       const preferred = (result.offline > 6 && side < 0) || (result.offline < -6 && side > 0) ? 0 : 0.5;
-      candidates.push({ cam, cost: (cam.y - base) + (mast ? 40 : 0) + preferred + (bk < back ? 1 : 0) });
+      const leaf = leafy(cam);
+      candidates.push({ cam, leaf, cost: (cam.y - base) * 2 + (mast ? 40 : 0) + (underTree ? 12 : 0) + leaf * 3 + preferred + (bk < back ? 1 : 0) });
     }
     candidates.sort((a, b) => a.cost - b.cost);
+    // into the woods: nowhere down there has a clear view, so stay with the
+    // golfer's eye from the tee and watch it go
+    if (candidates[0].leaf > 4) return;
     const cam = candidates[0].cam;
     this.landCam = cam;
     this.landPoint = new THREE.Vector3(lp.x, lpY, lp.z);
@@ -410,12 +430,14 @@ export class CameraRig {
         this.desiredLook.copy(target);
         this.rate = 2;
         this.lookRate = 6;
-      } else if (playT < 0.55 && this.style === 'cinematic') {
-        // launch: hold behind the player for the strike, let the ball leave
+      } else if (this.style === 'cinematic') {
+        // the golfer's view: stay where you stood, at eye level, and turn to
+        // follow the ball; the lens tightens as it flies away
+        const d = Math.hypot(b.x - o.x, b.z - o.z);
         this.desiredPos.copy(this.pos);
-        this.desiredLook.lerpVectors(this.look, b, 0.25);
-        this.lookRate = 10;
-        this.baseFov = 42;
+        this.desiredLook.lerpVectors(this.look, b, playT < 0.35 ? 0.25 : 1);
+        this.lookRate = playT < 0.35 ? 10 : 7;
+        this.baseFov = THREE.MathUtils.clamp(44 - d * 0.07, 22, 44);
       } else {
         // chase: behind and above the ball, looking a little ahead of it
         const hx = b.x - o.x, hz = b.z - o.z;
@@ -465,7 +487,7 @@ export class CameraRig {
         const dist = THREE.MathUtils.clamp(off.length(), 8, 30);
         const a0 = Math.atan2(off.z, off.x) + 0.16 * dt;
         const x = p.x + Math.cos(a0) * dist, z = p.z + Math.sin(a0) * dist;
-        this.desiredPos.set(x, Math.max(g(x, z), p.y - 2, -50) + 3.5, z);
+        this.desiredPos.set(x, Math.max(g(x, z), p.y - 2, -50) + 1.7, z);
       }
       this.desiredLook.copy(p);
     }
@@ -476,23 +498,21 @@ export class CameraRig {
     if (b && (this.mode === 'shot' || this.mode === 'rest') && !cupClose && !(this.result?.putt) && !this.result?.holed) {
       const target = this.mode === 'rest' ? this.restPos : b;
       let tries = 0;
-      while (target && tries < 10 && this._blocked(this.desiredPos, target.x, target.y + 0.15, target.z)) {
-        this.desiredPos.y += 2;
-        if (tries >= 5) this.desiredPos.lerp(this._v2.set(target.x, this.desiredPos.y, target.z), 0.15);
+      // trees fade out of the way (occlusion.js); a ridge in between makes
+      // the camera step up a little and then close in, staying near eye level
+      while (target && tries < 6 && this._blocked(this.desiredPos, target.x, target.y + 0.15, target.z, 1.5, false)) {
+        if (tries < 2) this.desiredPos.y += 1.5;
+        else this.desiredPos.lerp(this._v2.set(target.x, this.desiredPos.y, target.z), 0.2);
         tries++;
       }
       if (tries) this.rate = Math.max(this.rate, 3);
     }
 
     if (this.mode !== 'flyover') {
-      // never park the camera inside a tree canopy
-      if (this.obstacle) this.desiredPos.y = Math.max(this.desiredPos.y, this.obstacle(this.desiredPos.x, this.desiredPos.z));
+      // the camera never climbs over trees any more: anything between it
+      // and the ball fades out instead (js/scene/occlusion.js)
       damp(this.pos, this.desiredPos, this.rate, dt);
       damp(this.look, this.desiredLook, this.lookRate, dt);
-      if (this.obstacle) {
-        const clear = this.obstacle(this.pos.x, this.pos.z);
-        if (this.pos.y < clear) this.pos.y += (clear - this.pos.y) * (1 - Math.exp(-12 * dt));
-      }
     }
     const want = this.baseFov * this.fovScale;
     this.fov += (want - this.fov) * (1 - Math.exp(-3 * dt));
