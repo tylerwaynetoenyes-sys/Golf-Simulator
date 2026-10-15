@@ -798,7 +798,7 @@ function groundMeshes(D, Hf, cut, blend, glow) {
 /** Downtown Alton and West Alton: OSM footprints extruded on the ground.
  * Brick and limestone commercial blocks with flat roofs, frame houses with
  * pitched ones, churches with spires. Merged per 400 m cell. */
-function townMeshes(D, gy, skip, glow, rnd) {
+export function townMeshes(D, gy, skip, glow, rnd) {
   const facade = canvasTex(256, 256, (c, w, h) => {
     c.fillStyle = '#e6e2da'; c.fillRect(0, 0, w, h);
     c.fillStyle = 'rgba(0,0,0,0.06)';

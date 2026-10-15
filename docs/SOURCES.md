@@ -260,3 +260,13 @@ Draco-compressed (`assets/models/cars/`, `assets/models/boats/`):
 - "«Progress» motorboat" by isiosiusin (sketchfab.com/isiosiusin)
 
 The crowds use the scanned people already credited above (people_lo.glb).
+
+## Confluence Point
+
+`assets/courses/confluencepoint/`: `dem.*`/`far.*` (Terrarium, USGS 3DEP) and
+`sat.*` (EOxCloudless). `assets/landmarks/confluence/` (`tools/bake-alton.mjs`,
+map axes): OpenStreetMap from the main API's map call (Overpass was down),
+converted to the same JSON. The Confluence Tower's form (two shafts, lookouts
+at 50, 100 and 150 ft, 180 ft) from KAI Design / Building Design+Construction
+and the National Park Service; bark and plank textures (bark_brown_02,
+brown_planks_08) from Poly Haven, CC0.
