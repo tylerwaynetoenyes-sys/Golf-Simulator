@@ -11,6 +11,7 @@ import { CUP } from '../core/physics.js';
 import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
 import { plantTrees, updateTrees, THEME_TREES } from '../scene/trees.js';
 import { tuftGeometry, grassMaterial, GRASS } from './grass.js';
+import { buildCity } from './buildings.js';
 import { buildDecay } from './decay.js';
 import { dressPinFlag, flagpole, fireworks } from './usa.js';
 
@@ -368,6 +369,13 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
         g.add(h);
         this.farLms.push(lm);
       }
+    }
+    // the real city round the course (OpenStreetMap footprints and heights)
+    if (T.F && hole.buildings && T.F.d?.city) {
+      const city = buildCity(T.F.d.city, T, hole.buildings);
+      for (const m of city.haze) hazeLess(m, 0.7);
+      g.add(city.group);
+      this.farLms.push(city);
     }
 
     // keep trees and masts out of the landmark's footprint
@@ -1090,6 +1098,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       const x = pt.x + pt.rx * d, z = pt.z + pt.rz * d;
       if (T.terrain(x, z).surface !== 'rough') continue;
       if (T.greenEdge(x, z) < 3) continue;
+      if (this._mownCarry(x, z)) continue;
       const deep = T.roughDepth(x, z) === 'deep';
       const h = (deep ? 0.2 : 0.1) + rand() * (deep ? 0.2 : 0.07);
       q.setFromAxisAngle(up, rand() * 6.28);
@@ -1249,6 +1258,13 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
    * spread thin, so where the camera actually looks (the ball) gets a thick
    * patch, rebuilt whenever the ball settles somewhere new.
    */
+  /** The strip from the tee to the fairway is mown short, as on a real course. */
+  _mownCarry(x, z) {
+    const T = this.T;
+    const pr = T.project(x, z);
+    return pr.s > -12 && pr.s < (T.fwHalf > 0 ? T.fwStart : T.length - T.greenR) && Math.abs(pr.d) < Math.max(T.fwHalf, 14) + 6;
+  }
+
   _nearGrassAt(x, z) {
     const T = this.T;
     if (!T || !this.tuftGeo) return;
@@ -1271,6 +1287,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
       if (T.terrain(px, pz).surface !== 'rough') continue;
       if (T.greenEdge(px, pz) < 2.5) continue;
+      if (this._mownCarry(px, pz)) continue;
       const deep = T.roughDepth(px, pz) === 'deep';
       // the first-cut edge of the rough stays short
       const h = (deep ? 0.18 : 0.08) + rand() * (deep ? 0.18 : 0.06);

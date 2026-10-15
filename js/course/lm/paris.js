@@ -38,40 +38,95 @@ function frustum(ra, rb, ya, yb, m) {
   return new THREE.Mesh(g, m);
 }
 
+/**
+ * Straight members between point pairs, as one instanced mesh of unit
+ * square bars (a member is a bar scaled to its length and section).
+ */
+function members(list, m) {
+  const geo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+  const im = new THREE.InstancedMesh(geo, m, list.length);
+  const up = new THREE.Vector3(0, 1, 0), d = new THREE.Vector3(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), m4 = new THREE.Matrix4();
+  list.forEach(([a, b, t], i) => {
+    d.subVectors(b, a);
+    const L = d.length();
+    q.setFromUnitVectors(up, d.normalize());
+    sc.set(t, L, t);
+    im.setMatrixAt(i, m4.compose(a, q, sc));
+  });
+  im.castShadow = true;
+  return im;
+}
+
+/**
+ * The Eiffel Tower as a lattice, from its published dimensions: four curved
+ * legs, each a cross-braced square column, rising from a 125 m base and
+ * merging above the second floor into one tapering shaft; the decorative
+ * arches under the first floor; platforms at 57.6, 115.7 and 276.1 m; the
+ * crown and antennas to 330 m.
+ */
 function eiffel() {
   const g = new THREE.Group();
-  const iron = latticeMaterial([4, 6]);
-  const ironFine = latticeMaterial([3, 10]);
-  const deck = lit(BROWN, 0xffb04a, { night: 0.8, roughness: 0.8 });
-  // the four legs: curving inward from the 125 m base to the first platform
+  const iron = lit(BROWN, 0xffa53a, { night: 0.9, roughness: 0.72, metalness: 0.25 });
+  const deck = lit(0x5f4d39, 0xffb04a, { night: 0.8, roughness: 0.8 });
+  const half = (y) => 5 + 57.5 * Math.exp(-y / 85); // outer half-width
+  const legW = (y) => 26 - 5.5 * (y / 116); // a leg column's side, until they merge
+  const MERGE = 128;
+  // section heights: closer at the bottom where the members are heavy
+  const ys = [];
+  for (let y = 0; y < MERGE; y += y < 60 ? 6 : 7.5) ys.push(y);
+  ys.push(MERGE);
+  for (let y = MERGE + 9; y < 276; y += 9 + (y - MERGE) * 0.03) ys.push(y);
+  ys.push(276);
+  const list = [];
+  const V = (x, y, z) => new THREE.Vector3(x, y, z);
+  const face = (A, B, C, D, tChord, tBrace) => {
+    // A,B lower pair; C,D upper pair: X brace between them
+    list.push([A, C, tChord], [B, D, tChord], [A, D, tBrace], [B, C, tBrace], [A, B, tBrace * 0.8]);
+  };
+  // the legs, below the merge
   for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
-    const pts = [];
-    for (let i = 0; i <= 8; i++) {
-      const u = i / 8;
-      const y = u * 57;
-      const r = 62.5 - (62.5 - 33) * (1 - (1 - u) ** 1.6); // the leg's outer edge curves in
-      pts.push(new THREE.Vector3(sx * (r - 12), y, sz * (r - 12)));
+    const ring = (y) => {
+      const h = half(y), w = Math.min(legW(y), h);
+      const o = h, i = h - w;
+      // four corners of this leg's square section
+      return [V(sx * o, y, sz * o), V(sx * i, y, sz * o), V(sx * i, y, sz * i), V(sx * o, y, sz * i)];
+    };
+    for (let k = 0; k + 1 < ys.length && ys[k] < MERGE; k++) {
+      const lo = ring(ys[k]), hi = ring(ys[k + 1]);
+      const tc = 1.5 - ys[k] * 0.006, tb = 0.55;
+      for (let e = 0; e < 4; e++) face(lo[e], lo[(e + 1) % 4], hi[e], hi[(e + 1) % 4], tc, tb);
     }
-    const curve = new THREE.CatmullRomCurve3(pts);
-    const leg = new THREE.Mesh(new THREE.TubeGeometry(curve, 16, 9, 4, false), iron);
-    g.add(leg);
   }
-  // the decorative arches under the first platform, one per face
-  for (let k = 0; k < 4; k++) {
-    const arc = new THREE.Mesh(new THREE.TorusGeometry(39, 1.6, 6, 32, Math.PI), deck);
-    arc.rotation.y = (k * Math.PI) / 2;
-    arc.position.y = 12;
-    arc.translateZ(42);
-    g.add(arc);
+  // the shaft above the merge
+  const sq = (y) => { const h = half(y); return [V(-h, y, -h), V(h, y, -h), V(h, y, h), V(-h, y, h)]; };
+  for (let k = ys.indexOf(MERGE); k + 1 < ys.length; k++) {
+    const lo = sq(ys[k]), hi = sq(ys[k + 1]);
+    for (let e = 0; e < 4; e++) face(lo[e], lo[(e + 1) % 4], hi[e], hi[(e + 1) % 4], 1.1, 0.42);
   }
-  g.add(box(70, 7, 70, deck, 0, 52, 0)); // first platform (57 m)
-  g.add(frustum(30, 19, 57, 115, iron)); // up to the second
-  g.add(box(42, 5, 42, deck, 0, 112, 0)); // second platform (115 m)
-  g.add(frustum(17, 5.2, 117, 274, ironFine)); // the long taper to the top
-  g.add(box(16, 6, 16, deck, 0, 274, 0)); // top platform (276 m)
-  g.add(box(9, 16, 9, deck, 0, 280, 0));
-  g.add(cyl(1.2, 1.8, 34, mat(0xd8d8d8, { metalness: 0.6 }), 0, 296, 0, 8)); // antennas to 330 m
-  // night: a rotating beacon and the hourly sparkle
+  // the four decorative arches between the legs, springing from the ground
+  for (let f = 0; f < 4; f++) {
+    const ang = (f * Math.PI) / 2;
+    const pts = [];
+    for (let i = 0; i <= 18; i++) {
+      const u = i / 18;
+      const x = -38 + 76 * u, y = 39 * Math.sin(Math.PI * u) ** 0.8 + (1 - Math.sin(Math.PI * u)) * 8;
+      pts.push(V(x, y, 0));
+    }
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i].clone(), b = pts[i + 1].clone();
+      for (const p of [a, b]) { const z = half(p.y) - 1; p.applyAxisAngle(V(0, 1, 0), ang); p.add(V(0, 0, 0)); const r = V(0, 0, z).applyAxisAngle(V(0, 1, 0), ang); p.add(r); }
+      list.push([a, b, 1.3]);
+    }
+  }
+  g.add(members(list, iron));
+  // platforms: decks with a lit gallery round each
+  const plat = (y, w, h) => { g.add(box(w, h, w, deck, 0, y, 0)); g.add(box(w + 2, 1.2, w + 2, deck, 0, y + h, 0)); };
+  plat(57.6 - 6, 2 * half(57.6) + 4, 6);
+  plat(115.7 - 5, 2 * half(115.7) + 3, 5);
+  plat(276.1 - 5, 2 * half(276) + 3, 5);
+  g.add(box(10, 14, 10, deck, 0, 276, 0)); // the top-floor cabins and Eiffel's office
+  g.add(cyl(3.2, 4.6, 6, deck, 0, 290, 0, 12)); // the lantern
+  g.add(cyl(1.0, 1.6, 34, mat(0xd8d8d8, { metalness: 0.6 }), 0, 296, 0, 8)); // antennas to 330 m
   const beam = new THREE.Mesh(new THREE.ConeGeometry(14, 600, 16, 1, true).translate(0, -300, 0).rotateZ(Math.PI / 2),
     new THREE.MeshBasicMaterial({ color: 0xfff1d0, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide }));
   const beamPivot = new THREE.Group();
@@ -92,8 +147,8 @@ function eiffel() {
   g.add(sparkle);
   return {
     group: g,
-    glow: [iron, ironFine, deck],
-    haze: [iron, ironFine, deck],
+    glow: [iron, deck],
+    haze: [iron, deck],
     update(t, dt, day) {
       const night = 1 - day;
       beamPivot.rotation.y = t * 0.6;

@@ -35,6 +35,15 @@ async function loadSat(base) {
   }
 }
 
+/** OpenStreetMap buildings round the course (tools/fetch-buildings.mjs), if baked. Browser only. */
+async function loadCity(base) {
+  if (typeof document === 'undefined') return null;
+  try {
+    const r = await fetch(`${base}/buildings.json`);
+    return r.ok ? await r.json() : null;
+  } catch { return null; }
+}
+
 /** A sampler over one baked grid (exported for the Node tools). */
 export function gridFrom(meta, buf) {
   const q = new Uint16Array(buf);
@@ -70,8 +79,8 @@ export function gridFrom(meta, buf) {
 export function loadDem(id) {
   if (!cache.has(id)) {
     const base = `assets/courses/${id}`;
-    cache.set(id, Promise.all([loadGrid(base, 'dem'), loadGrid(base, 'far'), loadSat(base)]).then(([dem, far, sat]) => {
-      const out = { dem, far, sat };
+    cache.set(id, Promise.all([loadGrid(base, 'dem'), loadGrid(base, 'far'), loadSat(base), loadCity(base)]).then(([dem, far, sat, city]) => {
+      const out = { dem, far, sat, city };
       ready.set(id, out);
       return out;
     }).catch((e) => { cache.delete(id); throw e; }));
@@ -139,7 +148,7 @@ export function prepareDemHoles(course, d) {
     const loc = (p) => p.map(([X, Z]) => f.toLocal(X, Z));
     const withPoly = (o) => (o.poly ? { ...o, poly: loc(o.poly) } : o);
     return {
-      ...h, line, demFrame: f, course: course.id, theme: course.theme, far,
+      ...h, line, demFrame: f, course: course.id, theme: course.theme, far, buildings: course.buildings ?? null,
       green: withPoly(h.green),
       bunkers: (h.bunkers || []).map(withPoly),
       ...(h.fairways ? { fairways: h.fairways.map(loc) } : {}),

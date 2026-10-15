@@ -315,8 +315,12 @@ export class HoleTerrain {
         w = Math.max(w, smooth(this.greenR + 60, this.greenR + 15, Math.hypot(x - this.green.x, z - this.green.z)));
         w = Math.max(w, smooth(50, 15, Math.hypot(x, z)));
         let h = raw[k] + (sm[k] - raw[k]) * w;
-        // fill: playing ground never sits in the river or the sea
-        if (this.seaLevel != null && w > 0) h = Math.max(h, raw[k] + (Math.max(raw[k], this.seaLevel + 0.8) - raw[k]) * w);
+        // fill: playing ground never sits in the river or the sea, except on a
+        // hole that plays over it (carryWater), where only the tee and green are dry
+        const fw = this.hole.carryWater
+          ? Math.max(smooth(45, 15, Math.hypot(x, z)), smooth(this.greenR + 40, this.greenR + 12, Math.hypot(x - this.green.x, z - this.green.z)))
+          : w;
+        if (this.seaLevel != null && fw > 0) h = Math.max(h, raw[k] + (Math.max(raw[k], this.seaLevel + 0.8) - raw[k]) * fw);
         grade[k] = h;
       }
     }
