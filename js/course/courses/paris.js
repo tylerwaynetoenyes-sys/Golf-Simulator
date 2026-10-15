@@ -13,6 +13,7 @@ export default {
   place: 'Champ de Mars · Trocadéro',
   theme: 'paris',
   dem: true,
+  life: 'park', // js/course/courseLife.js
   enrich: true, // design pass: bunkering, greenside sand, shaping (js/course/design.js)
   blurb: 'Down the Champ de Mars to the foot of the Eiffel Tower, over the Seine and up the Trocadéro, with the Haussmann avenues either side.',
   credit: 'Elevation: Mapzen terrain tiles (EU-DEM, produced using Copernicus data; SRTM, USGS); buildings and landmark positions © OpenStreetMap contributors (ODbL); ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',

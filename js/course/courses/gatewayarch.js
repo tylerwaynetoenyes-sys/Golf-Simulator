@@ -12,6 +12,7 @@ export default {
   place: 'Gateway Arch National Park · St. Louis, Missouri',
   theme: 'urban',
   dem: true,
+  life: 'park', // js/course/courseLife.js
   enrich: true,
   blurb: 'Nine short holes on the Arch grounds: round the crescent ponds, under the Arch and once straight through it, the Old Courthouse and downtown behind.',
   credit: 'Elevation: USGS 3DEP via AWS Terrain Tiles; map data © OpenStreetMap contributors; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',

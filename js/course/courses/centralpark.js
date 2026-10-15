@@ -13,6 +13,7 @@ export default {
   place: 'Central Park · Manhattan, New York',
   theme: 'parkland',
   dem: true,
+  life: 'park', // js/course/courseLife.js
   noShore: true, // the park's landmarks plant its lakes' shores (the formal basins stay clean)
   enrich: true,
   origin: [40.7812, -73.9665],

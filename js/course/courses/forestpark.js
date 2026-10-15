@@ -14,6 +14,7 @@ export default {
   place: 'Forest Park · St. Louis, Missouri',
   theme: 'parkland',
   dem: true,
+  life: 'park', // js/course/courseLife.js
   noShore: true, // the park's landmarks plant its lakes' shores (the formal basins stay clean)
   enrich: true,
   origin: [38.64, -90.28677],

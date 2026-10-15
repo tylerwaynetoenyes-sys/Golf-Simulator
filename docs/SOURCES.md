@@ -265,6 +265,14 @@ quays, bridges, boats and the Liberty replica are modelled in
 `js/course/lm/seine.js`; the replica is cut from the Statue of Liberty model
 credited above.
 
+## Course life
+
+`assets/models/golf_cart.glb`: "area 9 golf cart" by maxdragon
+(https://sketchfab.com/3d-models/5fd13a5303af4f3bbbba993dad35f788),
+CC BY 4.0; scaled to 2.4 m and exported with Draco in Blender. The cart
+paths, tee signs, ball washers and benches are modelled in
+`js/course/courseLife.js`.
+
 ## Built surfaces
 
 `assets/textures/pbr/` (Poly Haven, CC0; colour, roughness and normal,

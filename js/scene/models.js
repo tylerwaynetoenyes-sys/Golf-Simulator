@@ -27,6 +27,7 @@ const FILES = {
   zooRocks: 'zoo_rocks.glb', // two scanned boulders (spogna, 3dhdscan), 1 m across
   zooMarine: 'zoo_marine.glb', // California sea lion (zhaoqinzzq) and harbor seal (c4rn4g3)
   zooMore: 'zoo_more.glb', // gorilla, orangutan (rt699448), hippo (psk98077)
+  golfCart: 'golf_cart.glb', // "area 9 golf cart" by maxdragon (Sketchfab, CC BY 4.0)
   cahokiaPeople: 'cahokia_people.glb', // four Mississippian figures (MakeHuman, CC0), one node each
 };
 /** Which models each course uses. */
@@ -82,7 +83,9 @@ function load(name) {
 /** Load what a course needs (browser only). */
 export function preloadCourseModels(courseId) {
   if (typeof window === 'undefined') return Promise.resolve();
-  return Promise.all((COURSE_MODELS[courseId] || []).map(load));
+  // every course gets the shared course life (js/course/courseLife.js): people and carts
+  const list = new Set([...(COURSE_MODELS[courseId] || []), 'peopleLo', 'golfCart']);
+  return Promise.all([...list].map(load));
 }
 
 /** A clone of a loaded model, or null if it isn't loaded. Materials are shared. */

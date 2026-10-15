@@ -7,6 +7,7 @@ import { HoleTerrain } from './holeTerrain.js';
 import { buildLandmark, setLandmarkDay } from './landmarks.js';
 import { createWaterMaterial, waterMaterials } from '../scene/river.js';
 import { shoreLife, ellipseRing } from '../scene/shore.js';
+import { courseLife } from './courseLife.js';
 import { makeFlag, lightConeMaterial } from '../scene/rangeProps.js';
 import { CUP } from '../core/physics.js';
 import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
@@ -282,6 +283,12 @@ export class CourseWorld {
       const rings = T.ponds.map((p) => ({ pts: p.poly ? p.poly.pts : ellipseRing(p), level: p.level }));
       const skip = (x, z) => T.greenEdge(x, z) < 6 || Math.hypot(x, z) < 12;
       g.add(shoreLife(rings, { skip, budget: this.r?.quality?.pixelRatio < 1.5 ? 500 : 900 }));
+    }
+    // the course in use: cart path, carts, the next group, spectators, tee furniture
+    {
+      let ls = 31 + (hole.n || 1) * 7;
+      const lr = () => ((ls = (ls * 16807) % 2147483647) / 2147483647);
+      g.add(courseLife(T, hole, { style: hole.life || 'club', rnd: lr }));
     }
     for (const cr of T.creeks) {
       const pt = T.pointAt(cr.s);

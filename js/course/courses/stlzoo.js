@@ -12,6 +12,7 @@ export default {
   place: "Forest Park · St. Louis, Missouri",
   theme: "parkland",
   dem: true,
+  life: 'park', // js/course/courseLife.js
   enrich: true,
   blurb: "Nine short holes through the Saint Louis Zoo, round the 1904 Flight Cage, Sea Lion Sound and River's Edge. Party mode, if you switch it on in Settings, gives every hole a house rule.",
   credit: "Elevation: USGS 3DEP 1 m LiDAR (public domain); map data © OpenStreetMap contributors; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0",
