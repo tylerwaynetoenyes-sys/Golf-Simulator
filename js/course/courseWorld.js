@@ -390,6 +390,9 @@ diffuseColor.rgb *= stripes * turf;`);
     holder.rotation.y = Math.atan2(-T.finalDir.x, -T.finalDir.z) + (lmSpec.rot || 0);
     holder.scale.setScalar(lmSpec.scale || 1);
     g.add(holder);
+    // a landmark laid on its own real ground meets the hole's here (and keeps
+    // its far-flung parts out of the footprint that keeps trees off it)
+    this.landmark.fit?.(holder, T);
     // the landmark's own trees, planted with the course's real models below
     const lmTrees = [];
     const takeTrees = (lm, h, far) => {
@@ -398,7 +401,7 @@ diffuseColor.rgb *= stripes * turf;`);
       const M = h.matrix.clone().multiply(lm.group.matrix), k = M.getMaxScaleOnAxis(), v = new THREE.Vector3();
       for (const t of lm.trees) {
         v.set(t.x, t.y, t.z).applyMatrix4(M);
-        lmTrees.push({ ...t, x: v.x, y: v.y, z: v.z, h: t.h * k, crown: t.crown * k, far });
+        lmTrees.push({ ...t, x: v.x, y: v.y, z: v.z, h: t.h * k, crown: t.crown * k, far: far || !!t.far });
       }
     };
     takeTrees(this.landmark, holder, false);

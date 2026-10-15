@@ -201,3 +201,21 @@ Data (any use; credit "Contains modified Copernicus Sentinel data").
 Used by `js/course/rock.js` on steep ground, per course: limestone
 (Alton, Godfrey, St. Louis, Paris), badlands (Scotts Bluff), ochre (Cap
 Canaille, Cassis), granite (Pebble Beach).
+
+## The Alton riverfront (Confluence hole 4)
+
+`assets/landmarks/alton/` is baked by `tools/bake-alton.mjs` in the
+riverfront's own frame (origin the Riverfront Park amphitheater, +x inland
+square to the shore, +z downstream):
+
+- `ground.bin`: elevation from the AWS Terrarium tiles (USGS 3DEP / NED),
+  12 m over 3.4 x 3.4 km, with land cover rasterised from OpenStreetMap
+- `ground.json`: OpenStreetMap buildings, streets, lots, piers and
+  breakwaters (© OpenStreetMap contributors, ODbL 1.0)
+- `sat.jpg`: EOxCloudless 2024 by EOX IT Services GmbH (contains modified
+  Copernicus Sentinel data 2024), CC BY-NC-SA 4.0
+
+The Clark Bridge's spans (92 - 230 - 92 m, two pylons) are from Structurae;
+its pylons were placed from Esri World Imagery (viewed, not redistributed)
+on the OSM centre line. The Argosy, the elevators and Lincoln Shields'
+tower and memorial are modelled from photographs.

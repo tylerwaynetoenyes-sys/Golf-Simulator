@@ -55,12 +55,15 @@ export const HOLES = [
     note: "Alton's riverfront: grain elevators, the Clark Bridge (1994), the Argosy casino boat and the Riverfront Amphitheater. Drive from the bluff to the river's edge.",
     line: [[0, 0], [-8, -240], [10, -405]], fw: 33, fwStart: 120,
     elev: [[0, 14], [0.35, 5], [0.6, 1], [1, 0]],
-    tilt: [[0, -0.02], [0.6, -0.03], [1, -0.015]],
+    // the ground falls left, to the river (and the ponds lie on the low side)
+    tilt: [[0, 0.02], [0.6, 0.03], [1, 0.015]],
     mounds: [{ t: 0.5, off: 34, r: 16, h: 4 }],
     green: { r: 15, slope: [0.012, 0] }, pin: [5, 2],
     bunkers: [{ t: 0.58, off: 22, rx: 9, rz: 8 }, { t: 0.97, off: 17, rx: 8, rz: 6 }],
     water: [{ t: 1.0, off: -48, rx: 26, rz: 70, level: -0.6 }, { t: 0.5, off: -55, rx: 22, rz: 80, level: -0.8 }],
-    lm: { type: 'riverfront', at: [-150, 110], scale: 1, rot: 0 },
+    // the amphitheater just off the left of the hole; the river, the bridge and
+    // West Alton laid out from there on the real map (lm/riverfront.js)
+    lm: { type: 'riverfront', at: [-186, 132], scale: 1, rot: 0 },
   },
   {
     n: 5, name: 'Piasa Bluff', par: 3, landmark: 'piasa',
