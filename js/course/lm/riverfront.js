@@ -875,42 +875,40 @@ function townHouses(D, gy, skip, rnd, out, { near = 480, cap = 110 } = {}) {
 }
 
 export function townMeshes(D, gy, skip, glow, rnd, houses = null) {
-  // near the riverfront the houses are the real models; the rest stay extruded
+  // near the riverfront the houses are the real models; the rest stay extruded,
+  // with photographed walls (red brick, buff limestone, painted clapboard)
+  // tinted per building, gravel and slate roofs, and real windows: glass set
+  // in the wall with stone sills and lintels, some lit at night, shopfronts
+  // along the ground floor of the bigger buildings
   const taken = houses ? townHouses(D, gy, skip, rnd, houses) : new Set();
-  const facade = canvasTex(256, 256, (c, w, h) => {
-    c.fillStyle = '#e6e2da'; c.fillRect(0, 0, w, h);
-    c.fillStyle = 'rgba(0,0,0,0.06)';
-    for (let y = 0; y < h; y += 8) c.fillRect(0, y, w, 1);
-    const bw = w / 4, fh = h / 2;
-    for (let f = 0; f < 2; f++) for (let b = 0; b < 4; b++) {
-      const x = b * bw + bw * 0.28, y = f * fh + fh * 0.2, ww = bw * 0.44, wh = fh * 0.58;
-      c.fillStyle = '#f2efe8'; c.fillRect(x - 3, y - 4, ww + 6, wh + 8);
-      c.fillStyle = '#2d343c'; c.fillRect(x, y, ww, wh);
-      c.fillStyle = 'rgba(200,215,230,0.25)'; c.fillRect(x + 2, y + 2, ww * 0.4, wh - 4);
-      c.fillStyle = '#f2efe8'; c.fillRect(x, y + wh / 2 - 1, ww, 3);
-    }
-  });
-  facade.wrapS = facade.wrapT = THREE.RepeatWrapping;
-  const lamps = canvasTex(256, 256, (c, w, h) => {
-    c.fillStyle = '#000'; c.fillRect(0, 0, w, h);
-    const r = seeded(11), bw = w / 4, fh = h / 2;
-    for (let f = 0; f < 2; f++) for (let b = 0; b < 4; b++) if (r() < 0.45) { c.fillStyle = '#ffcf8a'; c.fillRect(b * bw + bw * 0.28, f * fh + fh * 0.2, bw * 0.44, fh * 0.58); }
-  });
-  lamps.wrapS = lamps.wrapT = THREE.RepeatWrapping;
-  const wallM = new THREE.MeshStandardMaterial({ map: facade, vertexColors: true, roughness: 0.85, emissiveMap: lamps, emissive: 0xffffff, emissiveIntensity: 0 });
-  wallM.userData.night = 0.9;
-  glow.push(wallM);
-  const roofM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.8 });
-  const BRICK = [0xb8664c, 0xa65a43, 0xc27a5e, 0x9a5240, 0xd8c39e, 0xe6dfd2, 0xcdb68e];
+  const M = {
+    brick: pbr('red_brick', { scale: 1.6, vertex: true }),
+    stone: pbr('white_sandstone_bricks', { scale: 1.8, vertex: true }),
+    siding: pbr('white_plaster_02', { scale: 2, bright: 1.5, vertex: true }),
+    flat: pbr('gravel_stones', { scale: 1.6, vertex: true }),
+    pitched: pbr('roof_slates_02', { scale: 1.4, vertex: true }),
+    trim: pbr('white_sandstone_bricks', { scale: 1.2, tint: 0xf2ece0, bright: 1.2 }),
+    glass: mat(0x44505c, { roughness: 0.1, metalness: 0.5 }),
+    lamp: lit(0x44505c, 0xffd29a, { night: 1.1, roughness: 0.08, metalness: 0.6 }),
+  };
+  glow.push(M.lamp);
+  const BRICK = [0xc89888, 0xb88878, 0xa88070, 0xd0a090, 0x987068, 0xc09080]; // firings of red brick, weathered
+  const STONE = [0xfff0d8, 0xf0e4d0, 0xe8dcc8]; // buff limestone and cream terra cotta
   const SIDING = [0xe8e4da, 0xd8d4c6, 0xc9cfd2, 0xe1d6bd, 0xa9b7c0, 0xf0ece2];
-  const ROOF = [0x4b4d50, 0x55524e, 0x5e4b3c, 0x3f4245, 0x6b5a4a];
+  const ROOF = [0xb8b8b8, 0xa8a49e, 0xb8a090, 0x9a9ea2, 0xc0b0a0];
+  // big cells: the whole town is ~120k triangles, and every cell costs a
+  // draw call per material (eight of them)
   const cells = new Map();
   const cell = (x, z) => {
-    const k = `${Math.floor(x / 400)},${Math.floor(z / 400)}`;
-    if (!cells.has(k)) cells.set(k, { wall: { p: [], n: [], u: [], c: [] }, roof: { p: [], n: [], c: [] } });
+    const k = `${Math.floor(x / 1500)},${Math.floor(z / 1500)}`;
+    if (!cells.has(k)) cells.set(k, new Map());
     return cells.get(k);
   };
-  const col = new THREE.Color();
+  const list = (C, m) => {
+    if (!C.has(m)) C.set(m, { p: [], n: [], c: [] });
+    return C.get(m);
+  };
+  const col = new THREE.Color(), white = new THREE.Color(1, 1, 1);
   let core = null; // a point inside the building: roof faces turn away from it
   const tri = (R, a, b, c, color) => {
     let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
@@ -920,6 +918,17 @@ export function townMeshes(D, gy, skip, glow, rnd, houses = null) {
     }
     const l = Math.hypot(...n) || 1;
     for (const p of [a, b, c]) { R.p.push(...p); R.n.push(n[0] / l, n[1] / l, n[2] / l); R.c.push(color.r, color.g, color.b); }
+  };
+  /** A flat rectangle on a wall: along (dx, dz) from u0 to u1, y0 to y1, `out` metres proud, facing (nx, nz). */
+  const panel = (R, x1, z1, dx, dz, nx, nz, u0, u1, y0, y1, out, color = white) => {
+    const P = (u, y) => [x1 + dx * u + nx * out, y, z1 + dz * u + nz * out];
+    for (const q of [P(u0, y0), P(u1, y1), P(u1, y0), P(u0, y0), P(u0, y1), P(u1, y1)]) { R.p.push(...q); R.n.push(nx, 0, nz); R.c.push(color.r, color.g, color.b); }
+  };
+  /** A ledge (sill, cornice): its top and its front face. */
+  const ledge = (R, x1, z1, dx, dz, nx, nz, u0, u1, y, hgt, depth) => {
+    panel(R, x1, z1, dx, dz, nx, nz, u0, u1, y - hgt, y, depth);
+    const P = (u, t) => [x1 + dx * u + nx * t, y, z1 + dz * u + nz * t];
+    for (const q of [P(u0, 0), P(u1, depth), P(u1, 0), P(u0, 0), P(u0, depth), P(u1, depth)]) { R.p.push(...q); R.n.push(0, 1, 0); R.c.push(1, 1, 1); }
   };
   D.buildings.forEach((b, bi) => { if (taken.has(bi)) b._model = true; });
   for (const b of D.buildings) {
@@ -935,8 +944,9 @@ export function townMeshes(D, gy, skip, glow, rnd, houses = null) {
     const A = Math.abs(area), k = b.k;
     let h = b.h;
     const house = ['house', 'detached', 'residential', 'semidetached_house', 'terrace', 'bungalow'].includes(k) || (k === 'yes' && A < 350);
+    const shed = ['garage', 'garages', 'shed', 'carport', 'roof'].includes(k);
     if (!h) {
-      if (['garage', 'garages', 'shed', 'carport', 'roof'].includes(k)) h = 3;
+      if (shed) h = 3;
       else if (house) h = 5.5 + rnd() * 2.5;
       else if (k === 'church' || k === 'cathedral') h = 14;
       else if (['apartments', 'hotel', 'hospital'].includes(k)) h = 12 + rnd() * 8;
@@ -948,24 +958,57 @@ export function townMeshes(D, gy, skip, glow, rnd, houses = null) {
     const y0 = lo - 0.6, top = hi + h;
     const C = cell(cx, cz);
     core = [cx, top - 1, cz];
-    col.set(house ? SIDING[Math.floor(rnd() * SIDING.length)] : BRICK[Math.floor(rnd() * BRICK.length)]);
-    // walls, with the facade tile scaled to 3.3 m bays and floors
-    let run = 0;
+    const stoneFront = !house && rnd() < 0.3;
+    const wallM = house ? M.siding : stoneFront ? M.stone : M.brick;
+    col.set(house ? SIDING[Math.floor(rnd() * SIDING.length)] : stoneFront ? STONE[Math.floor(rnd() * STONE.length)] : BRICK[Math.floor(rnd() * BRICK.length)]);
+    const W = list(C, wallM), G = list(C, M.glass), L = list(C, M.lamp), T = list(C, M.trim);
+    const floorH = house ? 2.9 : 3.6, shop = !house && !shed && A > 120 && ['yes', 'commercial', 'retail', 'office', 'apartments', 'hotel'].includes(k);
     for (let i = 0; i < pts.length; i++) {
       const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % pts.length];
       const len = Math.hypot(x2 - x1, z2 - z1);
       if (len < 0.05) continue;
-      const nxv = (z2 - z1) / len, nzv = -(x2 - x1) / len;
-      const u0 = run / 13.2, u1 = (run + len) / 13.2, v0 = 0, v1 = (top - y0) / 6.8;
-      run += len;
-      const W = C.wall;
+      const dx = (x2 - x1) / len, dz = (z2 - z1) / len, nx = dz, nz = -dx;
       // wound to face outward (the footprint is counter-clockwise in x/z), so every wall shows from outside
-      const quad = [[x1, y0, z1, u0, v0], [x2, top, z2, u1, v1], [x2, y0, z2, u1, v0], [x1, y0, z1, u0, v0], [x1, top, z1, u0, v1], [x2, top, z2, u1, v1]];
-      for (const [x, y, z, u, vv] of quad) { W.p.push(x, y, z); W.n.push(nxv, 0, nzv); W.u.push(u, vv); W.c.push(col.r, col.g, col.b); }
+      panel(W, x1, z1, dx, dz, nx, nz, 0, len, y0, top, 0, col);
+      // far-off houses are a few pixels across: their windows would only cost triangles
+      if (shed || len < 2.4 || (house && Math.hypot(cx, cz) > 900)) continue;
+      // windows, bay by bay and floor by floor
+      const bays = Math.max(1, Math.floor(len / (house ? 3.6 : 3.3))), bw = len / bays;
+      const floors = Math.max(1, Math.floor((top - lo - 0.8) / floorH));
+      for (let f = 0; f < floors; f++) {
+        const base = lo + f * floorH;
+        if (f === 0 && shop && len > 6) {
+          // the shopfront: plate glass between brick piers, a stone band over it
+          for (let j = 0; j < bays; j++) {
+            const u = j * bw;
+            if (gy(x1 + dx * (u + bw / 2), z1 + dz * (u + bw / 2)) > base + 0.5) continue;
+            panel(rnd() < 0.6 ? L : G, x1, z1, dx, dz, nx, nz, u + 0.35, u + bw - 0.35, base + 0.5, base + 3.0, 0.03);
+          }
+          ledge(T, x1, z1, dx, dz, nx, nz, 0, len, base + 3.5, 0.45, 0.2);
+          continue;
+        }
+        const wy = base + (house ? 0.9 : 1.0), wh = house ? 1.5 : 1.9;
+        if (wy + wh > top - 0.5) break;
+        let any = false;
+        for (let j = 0; j < bays; j++) {
+          const um = (j + 0.5) * bw, ww = Math.min(house ? 1.0 : 1.2, bw * 0.5);
+          if (gy(x1 + dx * um, z1 + dz * um) > wy - 0.2) continue;
+          panel(rnd() < 0.4 ? L : G, x1, z1, dx, dz, nx, nz, um - ww / 2, um + ww / 2, wy, wy + wh, 0.03);
+          any = true;
+        }
+        // the brick blocks' stone sill and lintel courses run the length of each floor
+        if (any && !house) {
+          panel(T, x1, z1, dx, dz, nx, nz, 0, len, wy - 0.16, wy, 0.06);
+          panel(T, x1, z1, dx, dz, nx, nz, 0, len, wy + wh, wy + wh + 0.3, 0.05);
+        }
+      }
+      // a stone cornice along the top of the commercial blocks
+      if (!house) ledge(T, x1, z1, dx, dz, nx, nz, -0.15, len + 0.15, top, 0.5, 0.3);
     }
-    // roofs: pitched over the small houses, flat (with a parapet look) on the rest
+    // roofs: pitched over the small houses, flat (gravel inside the cornice) on the rest
     col.set(ROOF[Math.floor(rnd() * ROOF.length)]);
     if (house && pts.length <= 8) {
+      const R = list(C, M.pitched);
       // a gable along the footprint's longer axis, over its oriented box
       let best = 0, ang = 0;
       for (let i = 0; i < pts.length; i++) { const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % pts.length]; const l = Math.hypot(x2 - x1, z2 - z1); if (l > best) { best = l; ang = Math.atan2(z2 - z1, x2 - x1); } }
@@ -976,39 +1019,33 @@ export function townMeshes(D, gy, skip, glow, rnd, houses = null) {
       const rise = Math.min(4, (b1 - b0) * 0.42), bm = (b0 + b1) / 2, o = 0.4;
       const e1 = P(a0 - o, b0 - o, top), e2 = P(a1 + o, b0 - o, top), e3 = P(a1 + o, b1 + o, top), e4 = P(a0 - o, b1 + o, top);
       const r1 = P(a0 - o, bm, top + rise), r2 = P(a1 + o, bm, top + rise);
-      tri(C.roof, e1, r1, e2, col); tri(C.roof, e2, r1, r2, col);
-      tri(C.roof, e3, r2, e4, col); tri(C.roof, e4, r2, r1, col);
-      tri(C.roof, e1, e4, r1, col); tri(C.roof, e2, r2, e3, col);
+      tri(R, e1, r1, e2, col); tri(R, e2, r1, r2, col);
+      tri(R, e3, r2, e4, col); tri(R, e4, r2, r1, col);
+      tri(R, e1, e4, r1, col); tri(R, e2, r2, e3, col);
     } else {
+      const R = list(C, M.flat);
       const contour = pts.map(([x, z]) => new THREE.Vector2(x, z));
       const tris = THREE.ShapeUtils.triangulateShape(contour, []);
-      for (const [a, bb, c] of tris) tri(C.roof, [pts[a][0], top, pts[a][1]], [pts[c][0], top, pts[c][1]], [pts[bb][0], top, pts[bb][1]], col);
+      for (const [a, bb, c] of tris) tri(R, [pts[a][0], top, pts[a][1]], [pts[c][0], top, pts[c][1]], [pts[bb][0], top, pts[bb][1]], col);
       if (k === 'church' || k === 'cathedral') {
         // a spire over the front
         const s = 3.2, sh = h * 1.6, sx = pts[0][0] * 0.7 + cx * 0.3, sz = pts[0][1] * 0.7 + cz * 0.3;
         const base = [[sx - s, top, sz - s], [sx + s, top, sz - s], [sx + s, top, sz + s], [sx - s, top, sz + s]];
         const apex = [sx, top + sh, sz];
-        col.set(0x5d6166);
-        for (let i = 0; i < 4; i++) tri(C.roof, base[i], apex, base[(i + 1) % 4], col);
+        col.set(0xa0a4aa);
+        for (let i = 0; i < 4; i++) tri(list(C, M.pitched), base[i], apex, base[(i + 1) % 4], col);
       }
     }
   }
   const meshes = [];
   for (const C of cells.values()) {
-    if (C.wall.p.length) {
+    for (const [m, R] of C) {
+      if (!R.p.length) continue;
       const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(C.wall.p, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(C.wall.n, 3));
-      g.setAttribute('uv', new THREE.Float32BufferAttribute(C.wall.u, 2));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(C.wall.c, 3));
-      meshes.push(new THREE.Mesh(g, wallM));
-    }
-    if (C.roof.p.length) {
-      const g = new THREE.BufferGeometry();
-      g.setAttribute('position', new THREE.Float32BufferAttribute(C.roof.p, 3));
-      g.setAttribute('normal', new THREE.Float32BufferAttribute(C.roof.n, 3));
-      g.setAttribute('color', new THREE.Float32BufferAttribute(C.roof.c, 3));
-      meshes.push(new THREE.Mesh(g, roofM));
+      g.setAttribute('position', new THREE.Float32BufferAttribute(R.p, 3));
+      g.setAttribute('normal', new THREE.Float32BufferAttribute(R.n, 3));
+      if (m.vertexColors) g.setAttribute('color', new THREE.Float32BufferAttribute(R.c, 3));
+      meshes.push(new THREE.Mesh(g, m));
     }
   }
   for (const m of meshes) { m.castShadow = false; m.receiveShadow = true; }
