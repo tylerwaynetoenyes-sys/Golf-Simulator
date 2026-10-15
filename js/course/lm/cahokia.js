@@ -7,7 +7,8 @@
 // plaza, and low mist drifting over the prairie. Drawn as heritage landscape.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, box, cyl, seeded, canvasTex } from './kit.js';
+import { box, cyl, seeded, canvasTex } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
 
 /** A stepped, rounded-rectangle earthwork terrace. */
 function terrace(w, d, h, inset, r = 6) {
@@ -45,16 +46,17 @@ export default function build() {
   const glow = [];
   const rnd = seeded(1050);
 
-  const grassTex = canvasTex(256, 256, (c, w, h) => {
-    c.fillStyle = '#6d8a48'; c.fillRect(0, 0, w, h);
-    for (let i = 0; i < 2600; i++) {
-      const v = rnd();
-      c.fillStyle = v < 0.4 ? 'rgba(130,150,80,0.5)' : v < 0.7 ? 'rgba(80,105,50,0.5)' : 'rgba(165,160,100,0.4)';
-      c.fillRect(rnd() * w, rnd() * h, 1 + rnd() * 2, 3 + rnd() * 5);
-    }
-  }, [10, 10]);
-  const grass = new THREE.MeshStandardMaterial({ map: grassTex, color: 0xffffff, roughness: 1 });
-  const prairie = new THREE.MeshStandardMaterial({ map: grassTex, color: 0xd8cc9a, roughness: 1 });
+  // photographed surfaces (pbr.js): mown turf on the earthworks, red cedar,
+  // clay daub, prairie-grass thatch, concrete and painted steel
+  const grass = pbr('grass_ground', { scale: 5, tint: 0x84a868 });
+  const cedar = pbr('bark_brown_02', { scale: 1.2, tint: 0xb07a58 });
+  const logM = pbr('bark_brown_02', { scale: 1.2, tint: 0x8c7058 });
+  const daub = pbr('white_plaster_02', { scale: 2.5, tint: 0xc9b08a, glow: 0xffb870, night: 0.35 });
+  const thatch = pbr('thatch_roof_angled', { scale: 1.6, tint: 0xd2b27a });
+  const timber = pbr('brown_planks_08', { scale: 1.2, tint: 0x8a6a50 });
+  const conc = pbr('brushed_concrete', { scale: 2.5, tint: 0xd8d2c4 });
+  const steel = pbr('painted_steel', { scale: 1, tint: 0x3a3e44, metal: 0.4 });
+  glow.push(daub);
 
   // ── Monks Mound: four terraces, the first broad and low ──
   const mound = new THREE.Group();
@@ -70,8 +72,8 @@ export default function build() {
   T1b.position.set(48, 9, 30);
   mound.add(T1, T2, T3, T4, T1b);
   // the modern staircase up the south (+Z) face
-  const stairMat = mat(0x8a7f70, { roughness: 0.9 });
-  const rail = mat(0x3a3d40, { metalness: 0.5, roughness: 0.5 });
+  const stairMat = conc;
+  const rail = steel;
   // faces: [zBottom, zTop, yBottom, yTop]; walkways between them on each terrace
   const faces = [[70, 61, 0, 9], [42, 34, 9, 17], [21, 14, 17, 24], [6, 2, 24, 28]];
   const steps = [];
@@ -95,18 +97,16 @@ export default function build() {
     }
   }
   // reconstructed summit building: wattle-and-daub walls, steep thatched roof
-  const daub = lit(0xa58a62, 0xffb870, { night: 0.35, roughness: 1 });
-  glow.push(daub);
-  const thatch = mat(0x8c7348, { roughness: 1 });
   const temple = new THREE.Group();
   temple.add(box(16, 4.2, 10, daub, 0, 0, 0));
-  const roof = new THREE.Mesh(new THREE.ConeGeometry(10.5, 9, 4, 1), thatch);
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(10.5, 9, 4, 1, true), thatch);
   roof.rotation.y = Math.PI / 4;
   roof.scale.set(1.15, 1, 0.75);
   roof.position.y = 8.6;
   roof.castShadow = true;
   temple.add(roof);
-  temple.add(box(2.2, 2.6, 0.4, mat(0x2a221a), 0, 0, 5.05));
+  temple.add(box(2.2, 2.6, 0.4, timber, 0, 0, 5.05));
+  for (const [px, pz] of [[-8, -5], [8, -5], [8, 5], [-8, 5], [-4, 5], [4, 5], [-4, -5], [4, -5]]) temple.add(cyl(0.22, 0.26, 4.6, logM, px, 0, pz, 10)); // wall posts
   temple.position.set(-12, 28, -18);
   mound.add(temple);
   mound.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
@@ -135,14 +135,13 @@ export default function build() {
   }
 
   // ── Woodhenge: red-cedar post circle with a centre post ──
-  const cedar = mat(0x7a4a2c, { roughness: 0.95 });
   const posts = [];
   const WH = { x: -120, z: 40, r: 30 };
   const n = 36;
   for (let i = 0; i < n; i++) {
     const a = (i / n) * Math.PI * 2;
     const h = 6 + rnd() * 1.2;
-    posts.push(new THREE.CylinderGeometry(0.32, 0.4, h, 7).translate(WH.x + Math.cos(a) * WH.r, h / 2, WH.z + Math.sin(a) * WH.r));
+    posts.push(new THREE.CylinderGeometry(0.32, 0.4, h, 10).translate(WH.x + Math.cos(a) * WH.r, h / 2, WH.z + Math.sin(a) * WH.r));
   }
   posts.push(new THREE.CylinderGeometry(0.45, 0.55, 9, 8).translate(WH.x, 4.5, WH.z));
   const wh = new THREE.Mesh(mergeGeometries(posts), cedar);
@@ -157,23 +156,23 @@ export default function build() {
   for (let s = 0; s < len; s += 0.55) {
     const h = 4.2 + rnd() * 0.5;
     const x = PAL.x0 + dx * s, z = PAL.z0 + dz * s;
-    logs.push(new THREE.CylinderGeometry(0.26, 0.28, h, 6).translate(x, h / 2, z));
-    logs.push(new THREE.ConeGeometry(0.26, 0.5, 6).translate(x, h + 0.25, z));
+    logs.push(new THREE.CylinderGeometry(0.26, 0.28, h, 8).translate(x, h / 2, z));
+    logs.push(new THREE.ConeGeometry(0.26, 0.5, 8).translate(x, h + 0.25, z));
     // bastions every 25 m
     if (Math.abs((s % 25) - 12.5) < 0.3) {
       const bx = x - dz * 3, bz = z + dx * 3;
       for (let a = 0; a < Math.PI * 2; a += 0.28) {
         const hh = 5.6;
-        logs.push(new THREE.CylinderGeometry(0.26, 0.28, hh, 6).translate(bx + Math.cos(a) * 3, hh / 2, bz + Math.sin(a) * 3));
+        logs.push(new THREE.CylinderGeometry(0.26, 0.28, hh, 8).translate(bx + Math.cos(a) * 3, hh / 2, bz + Math.sin(a) * 3));
       }
     }
   }
-  const pal = new THREE.Mesh(mergeGeometries(logs), mat(0x6b5139, { roughness: 1 }));
+  const pal = new THREE.Mesh(mergeGeometries(logs), logM);
   pal.castShadow = true;
   g.add(pal);
 
   // ── interpretive plaza: paths, signboards and a covered artifact case ──
-  const path = mat(0xb8ab92, { roughness: 1 });
+  const path = pbr('gravel_stones', { scale: 1.5, tint: 0xd8ccb8 });
   g.add(box(6, 0.1, 70, path, -12, 0, 105));
   g.add(box(80, 0.1, 5, path, -50, 0, 120));
   const boardMat = new THREE.MeshStandardMaterial({
@@ -189,7 +188,8 @@ export default function build() {
   });
   for (const [x, z, ry] of [[-22, 112, 0.3], [-46, 124, -0.2], [-70, 124, 0.1]]) {
     const b = new THREE.Group();
-    b.add(box(0.18, 1.0, 0.18, mat(0x3a2e22), -0.9, 0, 0), box(0.18, 1.0, 0.18, mat(0x3a2e22), 0.9, 0, 0));
+    b.add(box(0.18, 1.0, 0.18, timber, -0.9, 0, 0), box(0.18, 1.0, 0.18, timber, 0.9, 0, 0));
+    b.add(box(2.4, 0.1, 1.6, timber, 0, 1.5, 0).rotateX(-0.35)); // the frame behind the panel
     const p = new THREE.Mesh(new THREE.PlaneGeometry(2.2, 1.4), boardMat);
     p.position.y = 1.5; p.rotation.x = -0.35;
     b.add(p);
@@ -198,31 +198,45 @@ export default function build() {
   }
   // artifact case: a glass-topped cabinet with a chunkey stone and pottery
   const caseG = new THREE.Group();
-  caseG.add(box(3, 0.9, 1.4, mat(0x4a3a2a), 0, 0, 0));
+  caseG.add(box(3, 0.9, 1.4, timber, 0, 0, 0));
   const glass = new THREE.Mesh(new THREE.BoxGeometry(3, 0.7, 1.4), new THREE.MeshStandardMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.2 }));
   glass.position.y = 1.25;
   caseG.add(glass);
-  const stone = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.08, 20), mat(0x9a8e7a, { roughness: 0.6 }));
+  const stone = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.08, 20), pbr('granite_wall', { scale: 0.4, tint: 0xc8bca8 }));
   stone.position.set(-0.8, 0.95, 0);
   caseG.add(stone);
   for (const [x, s] of [[0.1, 0.22], [0.75, 0.16]]) {
-    const pot = new THREE.Mesh(new THREE.LatheGeometry([0, 0.6, 0.9, 1, 0.8, 0.5, 0.55].map((r, i) => new THREE.Vector2(r * s, i * s * 0.32)), 16), mat(0x8a5a3a, { roughness: 0.85 }));
+    const pot = new THREE.Mesh(new THREE.LatheGeometry([0, 0.6, 0.9, 1, 0.8, 0.5, 0.55].map((r, i) => new THREE.Vector2(r * s, i * s * 0.32)), 16), pbr('white_plaster_02', { scale: 0.3, tint: 0xa8603a }));
     pot.position.set(x, 0.9, 0);
     caseG.add(pot);
   }
   // a shade roof over it
-  caseG.add(box(0.15, 2.6, 0.15, mat(0x3a2e22), -1.8, 0, -1), box(0.15, 2.6, 0.15, mat(0x3a2e22), 1.8, 0, -1));
-  caseG.add(box(0.15, 2.6, 0.15, mat(0x3a2e22), -1.8, 0, 1), box(0.15, 2.6, 0.15, mat(0x3a2e22), 1.8, 0, 1));
-  caseG.add(box(4.4, 0.15, 2.8, thatch, 0, 2.6, 0));
+  caseG.add(cyl(0.08, 0.09, 2.6, logM, -1.8, 0, -1, 8), cyl(0.08, 0.09, 2.6, logM, 1.8, 0, -1, 8));
+  caseG.add(cyl(0.08, 0.09, 2.6, logM, -1.8, 0, 1, 8), cyl(0.08, 0.09, 2.6, logM, 1.8, 0, 1, 8));
+  caseG.add(box(4.4, 0.3, 2.8, thatch, 0, 2.6, 0));
   caseG.position.set(-34, 0, 118);
   g.add(caseG);
   // path lights (night)
-  const lampM = lit(0x2a2a2a, 0xffd9a0, { night: 1.8 });
+  const lampM = pbr('painted_steel', { scale: 0.5, tint: 0x3a3a3a, metal: 0.4, glow: 0xffd9a0, night: 1.8 });
   glow.push(lampM);
   for (let z = 78; z <= 130; z += 9) g.add(cyl(0.1, 0.12, 0.7, lampM, -15.6, 0, z, 6), cyl(0.1, 0.12, 0.7, lampM, -8.4, 0, z, 6));
 
   // ── prairie grass beds around the base ──
-  const tuft = new THREE.ConeGeometry(0.35, 1.2, 4).translate(0, 0.6, 0);
+  // a clump of big bluestem: a dozen tapering blades arching out from the root
+  const tuft = (() => {
+    const blades = [], r = seeded(7);
+    for (let i = 0; i < 12; i++) {
+      const a = r() * Math.PI * 2, lean = 0.25 + r() * 0.45, h = 0.8 + r() * 0.6;
+      const b = new THREE.PlaneGeometry(0.07, h, 1, 3).translate(0, h / 2, 0);
+      const p = b.attributes.position;
+      for (let k = 0; k < p.count; k++) { const u = p.getY(k) / h; p.setX(k, p.getX(k) * (1 - u * 0.9)); p.setZ(k, lean * u * u * h); }
+      b.rotateY(a).translate(Math.cos(a) * 0.08, 0, Math.sin(a) * 0.08);
+      blades.push(b);
+    }
+    const g = mergeGeometries(blades); g.computeVertexNormals();
+    return g;
+  })();
+  const prairie = pbr('thatch_roof_angled', { scale: 0.8, tint: 0xd8c890, side: THREE.DoubleSide });
   const tufts = new THREE.InstancedMesh(tuft, prairie, 900);
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p3 = new THREE.Vector3();
   let k = 0;
