@@ -365,7 +365,8 @@ built in Blender with MPFB 2 (MakeHuman for Blender, GPL; the generated
 bodies and the MakeHuman system, skins and hair assets are CC0) and dressed
 from the archaeological record: the Keller figurine's wrap-around skirt, the
 deerskin mantle, breechcloth and moccasins of Southeastern dress, marine-shell
-beads and copper ear spools as found in the Mound 72 and other burials, a cane
+beads (Mound 72 held some 20,000) and the copper ear spools of Mississippian
+burials, a cane
 basket of maize, a red-slipped long-necked bottle, a bundle of prairie grass
 for thatch, and a chunkey pole and stone. Clothing and props were modelled for
 the game; surfaces are Poly Haven CC0 (`brown_leather`, `rough_linen`,
