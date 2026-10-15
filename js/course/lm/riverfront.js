@@ -1215,10 +1215,25 @@ export default function build() {
   const live = { bulbs: null, halos: null, nav: null, boats: null, tow: null };
 
   /** Lay the map out. `edge`/`holeY` describe the hole's ground (see shapeGround). */
-  function addWorld(D, edge, holeY, sync) {
-    const { Hf, cut, blend, gy } = shapeGround(D, edge, holeY);
-    const skipAt = (x, z) => edge(x, z) < 12;
-    for (const m of groundMeshes(D, Hf, cut, blend, glow)) ext.add(m.isMesh ? m : Object.assign(new THREE.Mesh(m, water), { receiveShadow: true }));
+  /**
+   * Lay the map out. On its own (Confluence 4) it brings its ground and river:
+   * `edge`/`holeY` describe the hole's ground (see shapeGround). On a real-
+   * ground course (`onCourse`: {gy, inPlay}) the course has the ground, river
+   * and woods already, so only the built things go down, on its ground.
+   */
+  function addWorld(D, edge, holeY, sync, onCourse = null) {
+    let gy, skipAt, cut = null;
+    if (onCourse) {
+      gy = onCourse.gy;
+      skipAt = onCourse.inPlay;
+      edge = (x, z) => (onCourse.inPlay(x, z) ? -1 : 1e9);
+      sync = false; // no extra trees: the course plants its own woods
+    } else {
+      const sg = shapeGround(D, edge, holeY);
+      gy = sg.gy; cut = sg.cut;
+      skipAt = (x, z) => edge(x, z) < 12;
+      for (const m of groundMeshes(D, sg.Hf, sg.cut, sg.blend, glow)) ext.add(m.isMesh ? m : Object.assign(new THREE.Mesh(m, water), { receiveShadow: true }));
+    }
     // set-piece areas the town keeps out of
     const keep = [[-240, -80, -905, -565], [-262, -135, -615, -380], [-75, 75, -75, 75]];
     const skipB = (x, z, b) => edge(x, z) < 70 || b.k === 'casino' || b.k === 'silo' || keep.some(([a, bb, c, d]) => x > a && x < bb && z > c && z < d);
@@ -1393,8 +1408,19 @@ export default function build() {
   const res = {
     group, glow, update, trees: [],
     /** Lay the map on the hole's ground: called by the course once the landmark is placed. */
-    fit(holder, T) {
+    fit(holder, T, opts = {}) {
       holder.updateMatrix();
+      if (opts.course) {
+        // on a real-ground course: stand on its ground, keep off its field of play
+        const w = new THREE.Vector3();
+        const L = holder.matrix.clone();
+        const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
+        const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
+        const inPlay = (x, z) => { toW(x, z); const pr = T.project(w.x, w.z); return Math.abs(pr.d) < T.oobLateral + 6 && pr.s > -40 && pr.s < T.length + 60; };
+        const go = (d) => addWorld(d, null, null, false, { gy, inPlay });
+        if (DATA) go(DATA); else ready.then((d) => d && go(d));
+        return;
+      }
       // the map lives beside the holder (same transform), out of its footprint
       ext.position.copy(holder.position); ext.quaternion.copy(holder.quaternion); ext.scale.copy(holder.scale);
       holder.parent.add(ext);

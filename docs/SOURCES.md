@@ -219,3 +219,12 @@ The Clark Bridge's spans (92 - 230 - 92 m, two pylons) are from Structurae;
 its pylons were placed from Esri World Imagery (viewed, not redistributed)
 on the OSM centre line. The Argosy, the elevators and Lincoln Shields'
 tower and memorial are modelled from photographs.
+
+## The Alton Riverfront course
+
+`assets/courses/alton/`: `dem.*` and `far.*` by `tools/fetch-dem.mjs`
+(AWS Terrarium tiles: USGS 3DEP / NED), centred 38.8844°N 90.1777°W;
+`sat.*` by `tools/fetch-sat-eox.mjs` (EOxCloudless 2024, the same output as
+`tools/fetch-sat.py --source eox`, decoded with macOS `sips`). The holes were
+routed on open ground from the OpenStreetMap land cover baked for the
+riverfront (above); the riverfront itself stands at its mapped position.

@@ -425,8 +425,10 @@ diffuseColor.rgb *= stripes * turf;`);
         // into the hole's frame, plus any extra turn the course asks for
         h.rotation.y = T.F.bearing + (f.rot || 0);
         if (f.scale) h.scale.setScalar(f.scale);
-        for (const m of lm.haze || []) hazeLess(m, 0.55);
         g.add(h);
+        // one laid out on the real map stands on the course's ground (see lm/riverfront.js)
+        lm.fit?.(h, T, { course: true });
+        for (const m of lm.haze || []) hazeLess(m, 0.55);
         takeTrees(lm, h, true);
         this.farLms.push(lm);
       }

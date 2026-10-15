@@ -362,6 +362,8 @@ export const THEME_TREES = {
   // per course, ahead of the theme:
   // Pebble Beach: Monterey cypress on the cliffs, Monterey pine inland
   pebble: { broad: [9, 9, 0], conifer: [8, 9], density: 0.5, conifersFirst: true, scatter: 0.7 },
+  // Alton: river-bottom cottonwoods, silver maples and sycamores, open parks along the water
+  alton: { broad: [6, 2, 3, 0], conifer: [4], density: 0.5, scatter: 0.45 },
   // TPC Sawgrass: live oaks, sabal palms and slash pine
   sawgrass: { broad: [0, 12, 12, 1], conifer: [8], density: 0.75, scatter: 0.6 },
 };

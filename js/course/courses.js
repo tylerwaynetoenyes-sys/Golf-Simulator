@@ -12,6 +12,7 @@ import liberty from './courses/liberty.js';
 import eaststl from './courses/eaststl.js';
 import paris from './courses/paris.js';
 import cassis from './courses/cassis.js';
+import alton from './courses/alton.js';
 
 const CONFLUENCE = {
   id: 'confluence',
@@ -24,7 +25,7 @@ const CONFLUENCE = {
 };
 
 /** Every course, in picker order (holes may still need loading: see loadCourse). */
-export const COURSES = [CONFLUENCE, eaststl, oregon, paris, cassis, liberty, pebble, sawgrass, rollinghills];
+export const COURSES = [CONFLUENCE, alton, eaststl, oregon, paris, cassis, liberty, pebble, sawgrass, rollinghills];
 
 export const courseById = (id) => COURSES.find((c) => c.id === id) || CONFLUENCE;
 
