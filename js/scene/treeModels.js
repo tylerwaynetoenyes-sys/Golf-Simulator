@@ -13,6 +13,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { OCCLUDE, OCC_DECL, OCC_TEST } from './occlusion.js';
 
 /**
  * Species models. `height` is the size a tree of scale 1 stands at; `kind`
@@ -298,8 +299,11 @@ const IMPOSTOR_SHADE = 'vec3(0.74, 0.76, 0.7)';
 function impostorMaterial(imp) {
   const m = new THREE.MeshStandardMaterial({ map: imp.texture, alphaTest: 0.4, roughness: 1, metalness: 0, side: THREE.DoubleSide });
   m.onBeforeCompile = (sh) => {
+    // cards in the way of the shot fade out like the models (js/scene/occlusion.js)
+    Object.assign(sh.uniforms, OCCLUDE);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
+varying vec3 vOccW;
 attribute vec4 iPos;   // x, y, z, rotation
 attribute vec3 iSize;  // width, height, hidden
 attribute vec3 iTint;
@@ -318,12 +322,14 @@ varying vec3 vTint;`)
   vec3 right = vec3(fw.z, 0.0, -fw.x);
   vec3 transformed = iPos.xyz + right * position.x * iSize.x + vec3(0.0, position.y * iSize.y, 0.0);
   if (iSize.z > 0.5) transformed = iPos.xyz - vec3(0.0, 1000.0, 0.0);
+  vOccW = transformed;
   vTint = iTint;`)
       .replace('#include <project_vertex>', `vec4 mvPosition = viewMatrix * vec4(transformed, 1.0);
   gl_Position = projectionMatrix * mvPosition;`)
       .replace('#include <worldpos_vertex>', 'vec4 worldPosition = vec4(transformed, 1.0);');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vTint;')
+      .replace('#include <common>', `#include <common>\nvarying vec3 vTint;\n${OCC_DECL}`)
+      .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>\n${OCC_TEST}`)
       // a model's crown shades itself (shadow map, inner leaves); the flat
       // card can't, so its albedo carries that darkening
       .replace('#include <map_fragment>', `#include <map_fragment>\n  diffuseColor.rgb *= vTint * ${IMPOSTOR_SHADE};`)

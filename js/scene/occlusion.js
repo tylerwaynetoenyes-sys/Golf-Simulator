@@ -12,6 +12,28 @@ export const OCCLUDE = {
   uOccOn: { value: 0 },
 };
 
+/** The fragment side, for shaders that place their own vertices (tree impostors set vOccW themselves). */
+export const OCC_DECL = 'varying vec3 vOccW; uniform vec3 uOccA; uniform vec3 uOccB; uniform float uOccR; uniform float uOccOn;';
+export const OCC_TEST = `
+        if (uOccOn > 0.5) {
+          vec3 ab = uOccB - uOccA;
+          float L = length(ab);
+          float t = clamp(dot(vOccW - uOccA, ab) / max(L * L, 1e-4), 0.0, 1.0);
+          float d = length(vOccW - (uOccA + ab * t));
+          // the corridor narrows toward the ball and stops 3 m short of it
+          float along = t * L;
+          float r = mix(uOccR, 2.2, sqrt(t));
+          float inside = (1.0 - smoothstep(r * 0.6, r, d)) * step(0.0, L - 3.0 - along);
+          // and anything right in front of the lens, whichever way it looks
+          inside = max(inside, 1.0 - smoothstep(8.0, 14.0, length(vOccW - uOccA)));
+          if (inside > 0.0) {
+            // 4x4 ordered dither: drop a share of fragments that grows to all
+            vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
+            float b = mod(q.x * 4.0 + q.y * 3.0 + q.x * q.y, 16.0) / 16.0;
+            if (b < inside * 1.02) discard;
+          }
+        }`;
+
 const PATCHED = new WeakSet();
 
 function patch(m) {
@@ -33,26 +55,9 @@ function patch(m) {
           vOccW = (modelMatrix * occP).xyz;
         }`);
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vOccW; uniform vec3 uOccA; uniform vec3 uOccB; uniform float uOccR; uniform float uOccOn;')
+      .replace('#include <common>', `#include <common>\n${OCC_DECL}`)
       .replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-        if (uOccOn > 0.5) {
-          vec3 ab = uOccB - uOccA;
-          float L = length(ab);
-          float t = clamp(dot(vOccW - uOccA, ab) / max(L * L, 1e-4), 0.0, 1.0);
-          float d = length(vOccW - (uOccA + ab * t));
-          // the corridor narrows toward the ball and stops 3 m short of it
-          float along = t * L;
-          float r = mix(uOccR, 2.2, sqrt(t));
-          float inside = (1.0 - smoothstep(r * 0.6, r, d)) * step(0.0, L - 3.0 - along);
-          // and anything right in front of the lens, whichever way it looks
-          inside = max(inside, 1.0 - smoothstep(8.0, 14.0, length(vOccW - uOccA)));
-          if (inside > 0.0) {
-            // 4x4 ordered dither: drop a share of fragments that grows to all
-            vec2 q = mod(floor(gl_FragCoord.xy), 4.0);
-            float b = mod(q.x * 4.0 + q.y * 3.0 + q.x * q.y, 16.0) / 16.0;
-            if (b < inside * 1.02) discard;
-          }
-        }`);
+${OCC_TEST}`);
   };
   m.customProgramCacheKey = () => `${prevKey ? prevKey.call(m) : ''}|occ`;
   m.needsUpdate = true;
