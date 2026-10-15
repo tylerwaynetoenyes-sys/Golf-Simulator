@@ -38,7 +38,7 @@ const PALETTES = {
   // short-grass prairie in late summer: cured buffalo and grama grass, sage,
   // and the buff Brule siltstone and Gering sandstone of the bluffs
   western: { grass: C(0.66, 0.55, 0.32), scrub: C(0.46, 0.47, 0.34), rock: C(0.8, 0.71, 0.56), rockSlope: 0.42,
-    rough: C(0.33, 0.47, 0.2), deep: C(0.5, 0.5, 0.27) },
+    rough: C(0.44, 0.47, 0.24), deep: C(0.6, 0.53, 0.31) }, // the rough is the prairie, cured and tawny
   // Provençal garrigue on white Urgonian limestone, red Cap Canaille cliffs
   coastal: { grass: C(0.4, 0.43, 0.26), scrub: C(0.3, 0.36, 0.22), rock: C(0.84, 0.8, 0.72), rockSlope: 0.45,
     rough: C(0.32, 0.45, 0.2), deep: C(0.42, 0.45, 0.26), shore: C(0.86, 0.8, 0.66) },

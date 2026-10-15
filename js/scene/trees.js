@@ -350,6 +350,8 @@ const VARIANTS = [
 export const THEME_TREES = {
   parkland: { broad: [0, 1, 2, 3], conifer: [4, 5], density: 1 },
   western: { broad: [6], conifer: [7, 7, 8], density: 0.45, conifersFirst: true, scatter: 1 },
+  // Scotts Bluff: open shortgrass prairie; ponderosa and juniper on the bluff slopes, cottonwoods in the draws
+  oregon: { broad: [6], conifer: [7, 7, 8], density: 0.16, conifersFirst: true, scatter: 0.5 },
   // Provence: umbrella pines and Aleppo pines on the slopes, olives and
   // cypresses lower down
   coastal: { broad: [9, 10, 10, 10], conifer: [9, 8, 11], density: 0.6, conifersFirst: true, scatter: 0.8 },

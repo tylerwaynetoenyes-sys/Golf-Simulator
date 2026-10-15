@@ -348,4 +348,104 @@ function chimneyrock() {
   return { group: g, glow: [], haze: [m] };
 }
 
-export default { wagons, windmill, bison, sodhouse, tradingpost, chimneyrock };
+
+// ── the Oregon Trail itself: ruts across the prairie to Mitchell Pass, and a wagon train on them ──
+// The route (DEM metres, from the course's origin 41.832°N 103.700°W): up the North Platte
+// valley from the east, south of the bluff, and west through Mitchell Pass (41.829°N 103.709°W).
+const TRAIL = [[3200, 980], [2300, 820], [1600, 700], [900, 540], [250, 440], [-300, 380], [-747, 333], [-1300, 300], [-2200, 260]];
+
+function trail() {
+  const group = new THREE.Group();
+  const live = { train: [], path: null };
+  const update = (t) => {
+    const P = live.path;
+    if (!P) return;
+    for (const wg of live.train) {
+      const u = wg.userData;
+      let sv = P.s0 + ((u.lead + t * 0.95) % P.span); // the train rolls west at a walk, then starts again
+      sv = Math.min(P.len - 1, Math.max(0, sv));
+      let i = 0; while (i < P.pts.length - 2 && P.cum[i + 1] < sv) i++;
+      const k = (sv - P.cum[i]) / (P.cum[i + 1] - P.cum[i] || 1);
+      const x = P.pts[i][0] + (P.pts[i + 1][0] - P.pts[i][0]) * k, z = P.pts[i][1] + (P.pts[i + 1][1] - P.pts[i][1]) * k;
+      wg.position.set(x, P.gy(x, z), z);
+      wg.rotation.y = Math.atan2(-(P.pts[i + 1][0] - P.pts[i][0]), -(P.pts[i + 1][1] - P.pts[i][1])); // the team (−z) leads
+      wg.visible = !P.onField(x, z);
+      wg.children[0].rotation.z = Math.sin(t * 2.1 + u.lead) * 0.012; // the bed rocks over the ruts
+    }
+  };
+  const res = {
+    group, glow: [], update, trees: [],
+    fit(holder, T, opts = {}) {
+      if (!opts.course) return;
+      holder.updateMatrix();
+      const L = holder.matrix.clone(), w = new THREE.Vector3();
+      const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
+      const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
+      const prj = (x, z) => { toW(x, z); return T.project(w.x, w.z); };
+      const onField = (x, z) => { const pr = prj(x, z); return Math.abs(pr.d) < Math.max(T.fwHalf || 0, 14) + 16 && pr.s > -30 && pr.s < T.length + 40; };
+      // the ruts: two bare tracks a wagon's width apart, in a band of trampled grass, resampled to follow the ground
+      const pts = [];
+      for (let i = 0; i < TRAIL.length - 1; i++) {
+        const [ax, az] = TRAIL[i], [bx2, bz] = TRAIL[i + 1], n = Math.ceil(Math.hypot(bx2 - ax, bz - az) / 6);
+        for (let k = 0; k < n; k++) {
+          const t = k / n;
+          // the trail wanders a little, as wagons picked their way
+          const wob = Math.sin((ax + (bx2 - ax) * t) * 0.011) * 6;
+          pts.push([ax + (bx2 - ax) * t, az + (bz - az) * t + wob]);
+        }
+      }
+      pts.push(TRAIL[TRAIL.length - 1]);
+      const band = [], ruts = [];
+      const strip = (out, a, b, o0, o1, dy) => {
+        const L2 = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / L2, nz = (b[0] - a[0]) / L2;
+        const A0 = [a[0] + nx * o0, a[1] + nz * o0], A1 = [a[0] + nx * o1, a[1] + nz * o1], B0 = [b[0] + nx * o0, b[1] + nz * o0], B1 = [b[0] + nx * o1, b[1] + nz * o1];
+        const Y = (q) => gy(q[0], q[1]) + dy;
+        out.push(A0[0], Y(A0), A0[1], B0[0], Y(B0), B0[1], B1[0], Y(B1), B1[1], A0[0], Y(A0), A0[1], B1[0], Y(B1), B1[1], A1[0], Y(A1), A1[1]);
+      };
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i], b = pts[i + 1];
+        if (onField((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)) continue;
+        const pr = prj(a[0], a[1]);
+        if (Math.abs(pr.d) > 1600 || pr.s < -1600 || pr.s > T.length + 1600) continue;
+        strip(band, a, b, -3.2, 3.2, 0.25);
+        strip(ruts, a, b, -1.15, -0.55, 0.3);
+        strip(ruts, a, b, 0.55, 1.15, 0.3);
+      }
+      const mk = (list, material) => {
+        if (!list.length) return;
+        const g = new THREE.BufferGeometry();
+        g.setAttribute('position', new THREE.Float32BufferAttribute(list, 3));
+        g.setAttribute('normal', new THREE.Float32BufferAttribute(new Float32Array(list.length).map((_, i) => (i % 3 === 1 ? 1 : 0)), 3)); // draped flat: lit as the ground is
+        const m = new THREE.Mesh(g, material);
+        m.receiveShadow = true;
+        group.add(m);
+      };
+      mk(band, pbr('grass_ground', { scale: 3, tint: 0xb4a47e, bright: 1, offset: -1, side: THREE.DoubleSide }));
+      mk(ruts, pbr('brown_mud_dry', { scale: 1.5, tint: 0x9c8468, offset: -3, side: THREE.DoubleSide }));
+      // the train: nine wagons, each with its ox team, near this hole on the trail
+      const cum = [0];
+      for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]));
+      toW(0, 0);
+      let best = 0, bd = Infinity;
+      const Li = L.clone().invert();
+      const mid = T.pointAt(T.length * 0.5), hc = new THREE.Vector3(mid.x, 0, mid.z).applyMatrix4(Li);
+      pts.forEach((p, i) => { const d = Math.hypot(p[0] - hc.x, p[1] - hc.z); if (d < bd) { bd = d; best = i; } });
+      const span = 1400;
+      live.path = { pts, cum, len: cum[cum.length - 1], s0: Math.max(0, cum[best] - span / 2), span, gy, onField };
+      for (let k = 0; k < 3; k++) {
+        const set = wagons().group;
+        for (const wagon of [...set.children]) {
+          const wg = new THREE.Group();
+          wagon.position.set(0, 0, 0); wagon.rotation.set(0, 0, 0);
+          wg.add(wagon);
+          wg.userData.lead = (live.train.length * 19) % span;
+          group.add(wg);
+          live.train.push(wg);
+        }
+      }
+    },
+  };
+  return res;
+}
+
+export default { wagons, windmill, bison, sodhouse, tradingpost, chimneyrock, trail };

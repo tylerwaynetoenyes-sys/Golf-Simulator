@@ -96,6 +96,8 @@ export default {
   ],
   // far landmarks placed at their true positions (DEM-frame metres)
   far: [
+    // the trail's ruts across the prairie to Mitchell Pass, and a wagon train rolling west on them
+    { type: 'trail', ll: [41.832, -103.7], maxD: Infinity },
     { type: 'chimneyrock', dem: [29100, 14300] },
   ],
 };
