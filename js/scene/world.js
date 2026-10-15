@@ -21,6 +21,7 @@ import { Rain } from './rain.js';
 import { patchOccluders, setOcclusion } from './occlusion.js';
 import { patchRock } from '../course/rock.js';
 import { Club } from './club.js';
+import { updateInstanceCulling } from './instanceCull.js';
 
 export class World {
   constructor(canvas, quality = 'high') {
@@ -177,7 +178,12 @@ export class World {
     const prevTarget = r.getRenderTarget();
     r.setRenderTarget(this._lieRT);
     r.clear();
+    // the sun's shadow map from the last frame is still right (nothing has
+    // moved since): drawing it again would double the frame's shadow work
+    const shadows = r.shadowMap.autoUpdate;
+    r.shadowMap.autoUpdate = false;
     r.render(this.scene, cam);
+    r.shadowMap.autoUpdate = shadows;
     r.readRenderTargetPixels(this._lieRT, 0, 0, size, size, this._liePx);
     r.setRenderTarget(prevTarget);
     this.club.root.visible = clubVis;
@@ -213,6 +219,7 @@ export class World {
     this.markers.update(t);
     this.ambient.update(dt, t);
     this.rain.update(dt, this.camera, this.env.wind(0, { gust: false }), this.env.day);
+    updateInstanceCulling(this.camera); // crowds, cars and boats: only the ones in view
     if (render) this.r.render();
   }
 }

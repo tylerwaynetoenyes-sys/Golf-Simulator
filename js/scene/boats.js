@@ -6,6 +6,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { cull } from './instanceCull.js';
 
 const FILES = [['baycruiser_lo'], ['runabout_lo']]; // ~1-1.5k triangles each: seen from the course
 let ready = null;
@@ -56,13 +57,19 @@ export async function boatFleet(n, rnd = Math.random) {
   const group = new THREE.Group();
   insts.forEach((i) => { if (i.count) group.add(i); });
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s = new THREE.Vector3();
+  let culled = null;
   return {
     group,
     place(i, x, y, z, euler, L) {
       const k = pick[i], inst = insts[k], k2 = L / models[k].len;
-      inst.setMatrixAt(index[i], m4.compose(v.set(x, y, z), q.setFromEuler(euler), s.set(k2, k2, k2)));
-      inst.instanceMatrix.needsUpdate = true;
+      m4.compose(v.set(x, y, z), q.setFromEuler(euler), s.set(k2, k2, k2));
+      if (culled) culled[k].set(index[i], m4);
+      else { inst.setMatrixAt(index[i], m4); inst.instanceMatrix.needsUpdate = true; }
     },
-    done() { for (const i of insts) i.computeBoundingSphere(); },
+    /** Every boat placed once: from now on only the ones in view are drawn. */
+    done() {
+      if (culled) return;
+      culled = insts.map((inst, k) => { inst.computeBoundingSphere(); inst.boundingSphere.radius += 1; return cull(inst, models[k].len * 0.55, { scaled: true }); });
+    },
   };
 }

@@ -7,6 +7,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { cull } from './instanceCull.js';
 
 // ~1.4k triangles each: parked cars are seen from the course, 100 m and more away
 const FILES = ['everest_lo', 'karoq_lo', 'polo_lo', 'odyssey_lo'];
@@ -76,6 +77,7 @@ export async function carsAt(spots, rnd = Math.random, { max = 80, near = null }
     inst.castShadow = false;
     inst.receiveShadow = true;
     inst.computeBoundingSphere();
+    cull(inst, 3); // a car from its centre
     g.add(inst);
   });
   return g;

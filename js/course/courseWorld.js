@@ -1480,18 +1480,19 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
     const T = this.T;
     if (!T || !this.tuftGeo) return;
     const N = Math.round(9000 * Math.max(0.5, this.treeDensity ?? 1));
+    // in cells of 11 m, each culled on its own: the patch round the ball is
+    // as thick as ever, but the cells behind and under the camera aren't drawn
     if (!this.nearGrass) {
-      const mat = this.tuftMats?.[{ western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.theme]] || this.tuftMat;
-      this.nearGrass = new THREE.InstancedMesh(this.tuftGeo, mat, N);
-      this.nearGrass.receiveShadow = true;
-      this.nearGrass.frustumCulled = false;
+      this.nearGrass = new THREE.Group();
+      this.nearGrass.userData.mat = this.tuftMats?.[{ western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.theme]] || this.tuftMat;
       this.holeGroup.add(this.nearGrass);
     }
-    const im = this.nearGrass;
+    for (const im of [...this.nearGrass.children]) { this.nearGrass.remove(im); im.dispose(); }
     const rand = seeded(Math.round(x * 13 + z * 7));
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    const R = 22, CELL = 11, side = Math.ceil((2 * R) / CELL);
+    const cells = Array.from({ length: side * side }, () => []);
     let n = 0;
-    const R = 22;
     for (let i = 0; i < N * 2 && n < N; i++) {
       // denser toward the centre, where the ball sits
       const r = R * Math.pow(rand(), 0.75), a = rand() * Math.PI * 2;
@@ -1505,10 +1506,18 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       q.setFromAxisAngle(up, rand() * 6.28);
       const spread = 0.7 + rand() * 0.6;
       sc.set(spread, h, spread);
-      im.setMatrixAt(n++, m4.compose(p.set(px, this._coarseH(px, pz) - 0.02, pz), q, sc));
+      const ci = Math.min(side - 1, Math.floor((px - x + R) / CELL)), cj = Math.min(side - 1, Math.floor((pz - z + R) / CELL));
+      cells[cj * side + ci].push(m4.compose(p.set(px, this._coarseH(px, pz) - 0.02, pz), q, sc).clone());
+      n++;
     }
-    im.count = n;
-    im.instanceMatrix.needsUpdate = true;
+    for (const list of cells) {
+      if (!list.length) continue;
+      const im = new THREE.InstancedMesh(this.tuftGeo, this.nearGrass.userData.mat, list.length);
+      im.receiveShadow = true;
+      list.forEach((m, i) => im.setMatrixAt(i, m));
+      im.computeBoundingSphere();
+      this.nearGrass.add(im);
+    }
     this._nearAt = { x, z };
   }
 

@@ -5,6 +5,7 @@
 // with the figure facing +Z at yaw 0.
 import * as THREE from 'three';
 import { model } from './models.js';
+import { cull } from './instanceCull.js';
 
 /** A group of instanced scanned people at `spots`, or null if the scans aren't loaded. */
 export function crowdAt(spots, rnd = Math.random) {
@@ -36,6 +37,7 @@ export function crowdAt(spots, rnd = Math.random) {
       inst.castShadow = false;
       inst.receiveShadow = true;
       inst.computeBoundingSphere();
+      cull(inst, 2); // a standing figure from its feet
       g.add(inst);
     }
   });

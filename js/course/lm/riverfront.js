@@ -1564,7 +1564,7 @@ export default function build() {
 
   // the crowd on the lawn and two flags at the plaza
   const people = [];
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 70; i++) {
     const k = Math.floor(rnd() * 8), t = -0.9 + rnd() * 1.8, r = 14 + k * 4 + 1.5 + rnd() * 2;
     people.push([SC.x + Math.cos(t) * r, 0.42 * k + 0.42, SC.z + Math.sin(t) * r, Math.PI / 2 - t + Math.PI]);
   }
@@ -1718,7 +1718,7 @@ export default function build() {
     }
     // real cruisers and runabouts in the slips (js/scene/boats.js), bobbing
     // about a third of the slips taken (the roofs hide the rest from the course)
-    for (let i = boats.length - 1; i >= 0; i--) if (rnd() > 0.15) boats.splice(i, 1);
+    for (let i = boats.length - 1; i >= 0; i--) if (rnd() > 0.34) boats.splice(i, 1);
     boatFleet(boats.length, rnd).then((f) => { if (f) { ext.add(f.group); live.boats = { boats, fleet: f }; } });
 
     // a towboat pushing hopper barges up the channel
@@ -1729,13 +1729,13 @@ export default function build() {
 
     // parked cars (the casino's lots fullest) and the traffic on the bridge
     // real cars (js/scene/cars.js): the casino's lot fills first, then the nearest lots; traffic on the bridge
-    carsAt(parkedCars(D, gy, skipAt, rnd, (x, z) => Math.hypot(x + 150, z + 470) < 260), rnd, { max: 36, near: [-150, -470] }).then((g) => ext.add(g));
-    carsAt(carSpots, rnd, { max: 10 }).then((g) => ext.add(g));
+    carsAt(parkedCars(D, gy, skipAt, rnd, (x, z) => Math.hypot(x + 150, z + 470) < 260), rnd, { max: 80, near: [-150, -470] }).then((g) => ext.add(g));
+    carsAt(carSpots, rnd, { max: 26 }).then((g) => ext.add(g));
 
     // walkers on the riverfront trail
     const walk = [];
     for (const r of D.roads) {
-      if (!['footway', 'cycleway', 'path'].includes(r.k) || walk.length > 16) continue;
+      if (!['footway', 'cycleway', 'path'].includes(r.k) || walk.length > 70) continue;
       for (const [x, z] of r.p) if (Math.hypot(x, z + 200) < 420 && !skipAt(x, z) && rnd() < 0.35) walk.push([x + (rnd() - 0.5) * 2, gy(x, z) + 0.15, z + (rnd() - 0.5) * 2]);
     }
     crowd(ext, walk, rnd);
@@ -1785,6 +1785,7 @@ export default function build() {
         e.set(Math.sin(t * 0.8 + ph) * 0.025, yaw + Math.PI / 2, Math.sin(t * 1.1 + ph) * 0.02);
         fleet.place(i, x, WY + Math.sin(t * 0.9 + ph) * 0.07, z, e, L);
       }
+      fleet.done(); // all placed: cull them per boat from here on
     }
     if (live.tow) {
       // up the channel at 1.4 m/s, round again from below the bridge

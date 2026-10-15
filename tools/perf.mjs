@@ -9,8 +9,11 @@
 // at the display's 60 Hz), GPU time
 // per frame (timer query; absolute values swing with the GPU's power state,
 // compare runs made back to back), draw calls and triangles per frame with
-// the shadow pass, and how many trees are models versus impostor cards.
-// Budget for the iPad: 60 fps, under ~300 draw calls, under ~1.5M triangles.
+// the shadow pass (the median frame, and the heaviest: one-off renders such
+// as the lie magnifier land there), and how many trees are models versus
+// impostor cards.
+// Budget for the iPad: 60 fps, under ~300 draw calls, under ~1.5M triangles
+// in the steady (median) frame; a peak far above it is a hitch worth a look.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -37,15 +40,16 @@ const MEASURE = `(async () => {
   const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
   const orig = w.r.render.bind(w.r), qs = [];
   if (ext) w.r.render = () => { const q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); orig(); gl.endQuery(ext.TIME_ELAPSED_EXT); qs.push(q); };
-  let calls = 0, tris = 0; R.info.autoReset = false;
+  const calls = [], tris = []; R.info.autoReset = false;
   const t = []; let last = performance.now();
-  await new Promise((d) => { const end = last + 4000; const k = (n) => { t.push(n - last); last = n; calls = Math.max(calls, R.info.render.calls); tris = Math.max(tris, R.info.render.triangles); R.info.reset(); n < end ? requestAnimationFrame(k) : d(); }; requestAnimationFrame(k); });
+  await new Promise((d) => { const end = last + 4000; const k = (n) => { t.push(n - last); last = n; calls.push(R.info.render.calls); tris.push(R.info.render.triangles); R.info.reset(); n < end ? requestAnimationFrame(k) : d(); }; requestAnimationFrame(k); });
   R.info.autoReset = true; w.r.render = orig;
   await new Promise((r) => setTimeout(r, 300));
   const g = qs.filter((q) => gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)).map((q) => gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6).sort((a, b) => a - b);
-  t.shift(); t.sort((a, b) => a - b);
+  t.shift(); t.sort((a, b) => a - b); calls.sort((a, b) => a - b); tris.sort((a, b) => a - b);
+  const mid = (a) => a[a.length >> 1], top = (a) => a[a.length - 1];
   const trees = (await import('/js/scene/treeModels.js')).forestStats();
-  return { mode: w.rig.mode, ms: t[t.length >> 1], p95: t[Math.floor(t.length * 0.95)], gpu: g.length ? g[g.length >> 1] : null, calls, tris, near: trees.near, far: trees.far };
+  return { mode: w.rig.mode, ms: t[t.length >> 1], p95: t[Math.floor(t.length * 0.95)], gpu: g.length ? g[g.length >> 1] : null, calls: mid(calls), callsMax: top(calls), tris: mid(tris), trisMax: top(tris), near: trees.near, far: trees.far };
 })()`;
 
 try {
@@ -64,8 +68,8 @@ try {
   await ev(`(() => { const k = 'alton-range.v1'; const d = JSON.parse(localStorage.getItem(k) || '{}'); d.settings = { ...(d.settings || {}), quality: '${quality}' }; localStorage.setItem(k, JSON.stringify(d)); return 1; })()`);
   const gpuName = await ev(`(() => { const gl = document.createElement('canvas').getContext('webgl2'); const x = gl.getExtension('WEBGL_debug_renderer_info'); return x ? gl.getParameter(x.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); })()`);
   console.log(`${gpuName}, 2360x1640, quality ${quality}`);
-  console.log('hole            view      frame  p95    gpu   calls  tris    trees (model/card)');
-  const row = (h, m) => console.log(`${h.padEnd(15)} ${m.mode.padEnd(9)} ${m.ms.toFixed(1).padStart(5)} ${m.p95.toFixed(1).padStart(5)} ${(m.gpu ?? 0).toFixed(1).padStart(6)} ${String(m.calls).padStart(6)} ${(m.tris / 1e6).toFixed(2).padStart(5)}M  ${m.near}/${m.far}`);
+  console.log('hole            view      frame  p95    gpu   calls (max)   tris (peak)     trees (model/card)');
+  const row = (h, m) => console.log(`${h.padEnd(15)} ${m.mode.padEnd(9)} ${m.ms.toFixed(1).padStart(5)} ${m.p95.toFixed(1).padStart(5)} ${(m.gpu ?? 0).toFixed(1).padStart(6)} ${String(m.calls).padStart(6)} (${String(m.callsMax).padStart(3)})  ${(m.tris / 1e6).toFixed(2).padStart(5)}M (${(m.trisMax / 1e6).toFixed(2)}M)  ${m.near}/${m.far}`);
   for (const h of holes) {
     const [c, n] = h.split(':');
     await send('Page.navigate', { url: `${base}/?play=${c}&hole=${n || 1}&day` });
