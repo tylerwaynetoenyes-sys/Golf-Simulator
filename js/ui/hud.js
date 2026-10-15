@@ -316,6 +316,7 @@ export class HUD {
       ${h.note ? `<p class="hc-note">${escape(h.note)}</p>` : ''}
       ${h.rings ? `<div class="hc-rings"><span class="ring-gold"></span><span class="ring-white"></span>${escape(h.rings)}</div>` : ''}
       ${h.rules ? `<div class="hc-rules">${escape(h.rules)}</div>` : ''}
+      ${h.party ? `<div class="hc-rules hc-party">${escape(h.party)}</div>` : ''}
       <div class="hc-skip">Tap or press Enter to skip</div>`;
     el.dataset.visible = 'true';
     holeCardIn(el);

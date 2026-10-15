@@ -7,6 +7,7 @@ export function esc(s) {
 }
 
 const ICONS = {
+  party: '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h10l-1 9a4 4 0 0 1-8 0z"/><path d="M12 16v5M8 21h8"/></svg>',
   ok: '<svg viewBox="0 0 16 16"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   warn: '<svg viewBox="0 0 16 16"><path d="M8 4v5M8 12v.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',
   err: '<svg viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>',

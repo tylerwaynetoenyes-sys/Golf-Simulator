@@ -178,6 +178,7 @@ export function openSettings(game) {
     <div class="setting"><div><label>Graphics quality</label><div class="hint">Lower it if the frame rate dips.</div></div>${seg('quality', [['high', 'High'], ['medium', 'Medium'], ['low', 'Low']])}</div>
     <div class="setting"><div><label>Ghost tracers</label><div class="hint">Keep faint traces of your last six shots.</div></div>${tog('ghostTracers')}</div>
     <div class="setting"><div><label>Commentary</label><div class="hint">Occasional dry remarks. Never more than one a shot.</div></div>${tog('commentary')}</div>
+    <div class="setting"><div><label>Party mode</label><div class="hint">Drinking-game prompts: water, OB and three-putts drink, birdies hand them out, and every Zoo hole has its own rule. Any drink counts, water too; drink responsibly, and only if you're of age.</div></div>${tog('partyMode')}</div>
     <h3>Clubs</h3>
     <div class="setting"><div><label>Show the club</label><div class="hint">The club at address and through the strike. Off: just the ball.</div></div>${tog('showClub')}</div>
     <div class="club-sets">${CLUB_SETS.map((c) => `<button class="club-set" data-set="${c.id}" aria-pressed="${(s.clubSet || 'tour') === c.id}"><b>${esc(c.name)}</b><small>${esc(c.blurb)}</small></button>`).join('')}</div>

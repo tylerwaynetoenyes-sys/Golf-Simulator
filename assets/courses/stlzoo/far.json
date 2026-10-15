@@ -1,0 +1,79 @@
+{
+  "lat": 38.63518,
+  "lon": -90.29061,
+  "size": 16000,
+  "step": 32,
+  "n": 501,
+  "min": 116.03,
+  "max": 215.78,
+  "lidar": true,
+  "source": "USGS 3DEP 1 m bare-earth DEM (IL_10CountyNRCS_D23, IL_HicksDome_FluorsparDistrict_2019_D19, IL_MadisonCo_2014, MO_SaintLouis_2017), public domain",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 15 x74y429 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 1611
+    },
+    {
+      "tile": "USGS 1 Meter 15 x73y428 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 68
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y428 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 10930
+    },
+    {
+      "tile": "USGS one meter x72y428 MO SaintLouis 2017",
+      "project": "MO_SaintLouis_2017",
+      "published": "2020-03-30",
+      "samples": 17237
+    },
+    {
+      "tile": "USGS one meter x72y429 MO SaintLouis 2017",
+      "project": "MO_SaintLouis_2017",
+      "published": "2020-03-30",
+      "samples": 17171
+    },
+    {
+      "tile": "USGS one meter x73y428 MO SaintLouis 2017",
+      "project": "MO_SaintLouis_2017",
+      "published": "2020-03-30",
+      "samples": 80569
+    },
+    {
+      "tile": "USGS one meter x73y429 IL MadisonCo 2014",
+      "project": "IL_MadisonCo_2014",
+      "published": "2020-03-30",
+      "samples": 173
+    },
+    {
+      "tile": "USGS one meter x73y429 MO SaintLouis 2017",
+      "project": "MO_SaintLouis_2017",
+      "published": "2020-03-30",
+      "samples": 75583
+    },
+    {
+      "tile": "USGS one meter x74y428 MO SaintLouis 2017",
+      "project": "MO_SaintLouis_2017",
+      "published": "2020-03-30",
+      "samples": 20285
+    },
+    {
+      "tile": "USGS one meter x74y429 IL MadisonCo 2014",
+      "project": "IL_MadisonCo_2014",
+      "published": "2020-03-30",
+      "samples": 10741
+    },
+    {
+      "tile": "USGS one meter x74y429 MO SaintLouis 2017",
+      "project": "MO_SaintLouis_2017",
+      "published": "2020-03-30",
+      "samples": 16633
+    }
+  ]
+}

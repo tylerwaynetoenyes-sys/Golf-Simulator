@@ -7,6 +7,7 @@ import { bus } from '../core/events.js';
 import { units } from '../core/units.js';
 import * as U from '../core/units.js';
 import { CLUBS, clubById, demoLaunch } from '../data/clubs.js';
+import { partyCalls, partyRule } from './party.js';
 import { store } from '../data/store.js';
 import { audio } from '../audio/audio.js';
 import { radio, STATIONS } from '../audio/radio.js';
@@ -838,6 +839,10 @@ export class Game {
       const e = LIES[k];
       if (e && k !== 'first') toast(e.label, { kind: 'warn', sub: `Next shot: ${e.note.toLowerCase()}`, ms: 3200 });
     }
+    if (store.settings.partyMode && this.mode.course) {
+      // party mode: one prompt after another, a beat apart
+      partyCalls(outcome, this.mode.hole, this.roster.multi ? player : null).forEach((c, i) => setTimeout(() => toast(c.headline, { kind: 'party', sub: c.sub, ms: 3600 }), 900 + i * 1400));
+    }
     this.piasa?.reactTo({ result, outcome, launch, club });
     bus.emit('shot:result', { launch, result, outcome, source });
   }
@@ -908,7 +913,7 @@ export class Game {
     const lm = lmg ? lmg.getWorldPosition(new THREE.Vector3()) : null;
     const path = holeIntroPath(T, (x, z) => this.world.groundFn(x, z), rig, rig.addressPose(), lm);
     const rr = m.ringRadii;
-    this.hud.showHoleCard({ n: h.n, name: h.name, par: h.par, yards: Math.round(T.length / YD), note: h.note, idx: m.holeIdx + 1, of: m.holes.length, rings: `Gold ring ${Math.round(rr.one / 0.3048)} ft = 1-putt · white ${Math.round(rr.two / 0.3048)} ft = 2-putt`, rules: `${MULLIGANS[m.mulligans]?.short || ''} · water: drop or re-hit, +1 stroke` });
+    this.hud.showHoleCard({ n: h.n, name: h.name, par: h.par, yards: Math.round(T.length / YD), note: h.note, idx: m.holeIdx + 1, of: m.holes.length, rings: `Gold ring ${Math.round(rr.one / 0.3048)} ft = 1-putt · white ${Math.round(rr.two / 0.3048)} ft = 2-putt`, rules: `${MULLIGANS[m.mulligans]?.short || ''} · water: drop or re-hit, +1 stroke`, party: store.settings.partyMode ? partyRule(h) : null });
     const orbit = () => {
       this.hud.hideHoleCard();
       this._orbiting = true;

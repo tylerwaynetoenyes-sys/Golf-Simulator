@@ -292,3 +292,30 @@ overviews and Terrarium; `sat.*` EOxCloudless. `assets/landmarks/cahokia/`
 mapped (holes are routed at least 60 m off every one, the Grand Plaza left
 unplayed), the paths and the Interpretive Center's footprint. Hole notes from
 the Cahokia Mounds State Historic Site and UNESCO World Heritage listing.
+The neighbourhood of houses outside the palisade (`js/course/lm/cahokiasite.js`)
+follows the excavated Mississippian house: rectangular wall-trench pole walls,
+clay daub, grass thatch, a hearth in the yard.
+
+## Saint Louis Zoo
+
+`assets/courses/stlzoo/dem.*`: USGS 3DEP 1 m LiDAR (MO SaintLouis 2017,
+public domain) by `tools/fetch-lidar.py`, 2 m over 2 km; `far.*` its
+overviews and Terrarium; `sat.*` EOxCloudless; `buildings.json` OSM (the zoo
+and the park's landmarks skipped for the models). The zoo's buildings, walks,
+Wood Duck Pond and Sea Lion Sound are the Forest Park map
+(`assets/landmarks/forestpark/`, OSM). Hole notes from the Saint Louis Zoo.
+
+`assets/models/zoo_animals.glb` and `zoo_rocks.glb`, from Sketchfab under
+CC BY 4.0, decimated and re-textured at 1024 px (WebP) in Blender:
+
+| Node | Model | Author |
+|---|---|---|
+| giraffe | [Giraffe](https://sketchfab.com/3d-models/522c042aad9f4348a74c2985ec3f99f9) | BlueMesh |
+| elephant | [Silent Giant Elephant](https://sketchfab.com/3d-models/7cec3bda1a8549b7b7537e35c78c64ba) | rt699448 |
+| zebra | [Zebra](https://sketchfab.com/3d-models/bd7258ee007b4e0fb521abb74bfa99d0) | dirdim |
+| penguin | [African penguin (Spheniscus demersus) Low poly](https://sketchfab.com/3d-models/9e59070815fe451d93398e2ebdb9bb92) | majorgalah |
+| flamingo | [Flamingo](https://sketchfab.com/3d-models/b363f8f4f7394ddb9d5b3a337f2f7fc7) | muppe5 |
+| polarbear | [Polar Bear](https://sketchfab.com/3d-models/deeb7f4add9f4c36abaacdb73ce3e553) | kenchoo |
+| lion | [low poly realistic lion 3d model free](https://sketchfab.com/3d-models/8d08b8ab84434e8fb1c857c2dc6dccd0) | rt699448 |
+| rockA | [Rock Stone 14 .::RAWscan::.](https://sketchfab.com/3d-models/3b8de09bc6344f46a493d86e4e4d9678) | spogna |
+| rockB | [Red Big Stone](https://sketchfab.com/3d-models/82ed6e8d09b140b9816c39dc17946932) | 3dhdscan |

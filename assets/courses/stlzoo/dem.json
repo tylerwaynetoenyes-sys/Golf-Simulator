@@ -1,0 +1,25 @@
+{
+  "lat": 38.63518,
+  "lon": -90.29061,
+  "size": 2000.0,
+  "step": 2.0,
+  "n": 1001,
+  "min": 139.28,
+  "max": 177.07,
+  "lidar": true,
+  "source": "USGS 3DEP 1 m bare-earth DEM (MO_SaintLouis_2017), public domain",
+  "tiles": [
+    {
+      "tile": "USGS one meter x73y428 MO SaintLouis 2017",
+      "project": "MO_SaintLouis_2017",
+      "published": "2020-03-30",
+      "samples": 616325
+    },
+    {
+      "tile": "USGS one meter x73y429 MO SaintLouis 2017",
+      "project": "MO_SaintLouis_2017",
+      "published": "2020-03-30",
+      "samples": 385676
+    }
+  ]
+}

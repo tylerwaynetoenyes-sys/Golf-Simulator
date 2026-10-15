@@ -36,6 +36,7 @@ const DEFAULT_SETTINGS = {
   courseStart: 1,
   clubSet: 'tour', // see CLUB_SETS in js/scene/club.js
   showClub: true, // the club at address and through the strike
+  partyMode: false, // drinking-game prompts (js/game/party.js); off unless asked for
 };
 
 class Store {

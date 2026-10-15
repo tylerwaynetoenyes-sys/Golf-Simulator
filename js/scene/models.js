@@ -23,6 +23,8 @@ const FILES = {
   people: 'people_real.glb', // Renderpeople and deep3dstudio scans
   peopleLo: 'people_lo.glb', // the same four at ~1.5k triangles, for range
   rubble: 'rubble_concrete.glb', // a scanned heap of broken concrete (albentan2012)
+  zooAnimals: 'zoo_animals.glb', // giraffe, elephant, zebra, penguin, flamingo, polar bear, lion (one node each)
+  zooRocks: 'zoo_rocks.glb', // two scanned boulders (spogna, 3dhdscan), 1 m across
 };
 /** Which models each course uses. */
 export const COURSE_MODELS = {
@@ -34,6 +36,7 @@ export const COURSE_MODELS = {
   confluence: ['peopleLo'],
   alton: ['peopleLo'],
   forestpark: ['peopleLo'],
+  stlzoo: ['zooAnimals', 'zooRocks', 'peopleLo'],
 };
 
 const cache = new Map(); // name → THREE.Object3D (the loaded scene)

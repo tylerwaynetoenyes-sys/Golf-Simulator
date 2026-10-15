@@ -11,6 +11,7 @@
 //   the reconstructed stockade: the log palisade with bastions that walled
 //     the central precinct, a section rebuilt east of the plaza
 //   the Interpretive Center, on its footprint
+//   a neighbourhood of thatched, clay-daubed houses outside the palisade
 // Surfaces are photographed PBR sets (js/scene/pbr.js).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -23,6 +24,7 @@ const ready = fetch(`${BASE}ground.json`).then((r) => (r.ok ? r.json() : null)).
 
 export default function build() {
   const group = new THREE.Group();
+  group.name = 'cahokiasite';
   const glow = [];
   const res = {
     group, glow, trees: [],
@@ -97,6 +99,36 @@ export default function build() {
       }
       B.add(m.log, mergeGeometries(logs));
       B.add(m.daub, ...daub);
+    }
+    // ── a neighbourhood of Mississippian houses outside the palisade, as the
+    // excavations found them: rectangular pole-and-trench walls plastered with
+    // clay daub, steep roofs thatched with prairie grass, a hearth outside ──
+    {
+      const thatch = pbr('thatch_roof_angled', { scale: 1.6, tint: 0xd2b27a });
+      let seed = 1050;
+      const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const walls = [], poles = [], roofs = [], doors = [], hearth = [];
+      for (let i = 0; i < 14; i++) {
+        const x = 300 + (i % 4) * 24 + (rnd() - 0.5) * 9, z = -40 + Math.floor(i / 4) * 26 + (rnd() - 0.5) * 9;
+        if (inPlay(x, z)) continue;
+        const w = 4.6 + rnd() * 2, d = 3.6 + rnd() * 1.4, h = 1.9, ry = (rnd() - 0.5) * 0.5, y = gy(x, z) - 0.15;
+        walls.push(place(new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0), x, y, z, ry));
+        // the posts set in the wall trenches show at the corners and along the eaves
+        for (const [px, pz] of [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]]) poles.push(place(new THREE.CylinderGeometry(0.09, 0.11, h + 0.3, 7).translate(px, (h + 0.3) / 2, pz), x, y, z, ry));
+        // a hipped roof of thatch, deep at the eaves
+        roofs.push(place(new THREE.ConeGeometry(Math.SQRT1_2, 1, 4, 1, true).rotateY(Math.PI / 4).translate(0, 0.5, 0).scale(w + 1.1, 2.8 + rnd() * 0.6, d + 1.1), x, y + h - 0.15, z, ry));
+        doors.push(place(new THREE.BoxGeometry(0.8, 1.3, 0.12).translate(0, 0.65, d / 2 + 0.01), x, y, z, ry));
+        // the hearth in the yard: a ring of stones
+        const hx = x + Math.sin(ry) * (d / 2 + 2.4), hz = z + Math.cos(ry) * (d / 2 + 2.4);
+        for (let k = 0; k < 9; k++) { const a = (k / 9) * Math.PI * 2; hearth.push(new THREE.DodecahedronGeometry(0.16 + rnd() * 0.06, 1).translate(hx + Math.cos(a) * 0.55, gy(hx, hz) + 0.05, hz + Math.sin(a) * 0.55)); }
+      }
+      if (walls.length) {
+        B.add(m.daub, ...walls);
+        B.add(m.log, ...poles);
+        B.add(thatch, ...roofs);
+        B.add(m.rail, ...doors);
+        B.add(m.conc, ...hearth);
+      }
     }
     // ── the Interpretive Center on its footprint, and any other buildings off the field ──
     for (const b of D.buildings) {
