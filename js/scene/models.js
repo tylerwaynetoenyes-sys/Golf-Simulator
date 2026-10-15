@@ -26,6 +26,7 @@ const FILES = {
   zooAnimals: 'zoo_animals.glb', // giraffe, elephant, zebra, penguin, flamingo, polar bear, lion (one node each)
   zooRocks: 'zoo_rocks.glb', // two scanned boulders (spogna, 3dhdscan), 1 m across
   zooMarine: 'zoo_marine.glb', // California sea lion (zhaoqinzzq) and harbor seal (c4rn4g3)
+  zooMore: 'zoo_more.glb', // gorilla, orangutan (rt699448), hippo (psk98077)
   cahokiaPeople: 'cahokia_people.glb', // four Mississippian figures (MakeHuman, CC0), one node each
 };
 /** Which models each course uses. */
@@ -38,7 +39,7 @@ export const COURSE_MODELS = {
   confluence: ['peopleLo', 'zooAnimals', 'zooRocks', 'cahokiaPeople'], // the zoo hole's animals and boulders; the Monks Mound hole's villagers
   alton: ['peopleLo'],
   forestpark: ['peopleLo'],
-  stlzoo: ['zooAnimals', 'zooRocks', 'zooMarine', 'peopleLo'],
+  stlzoo: ['zooAnimals', 'zooRocks', 'zooMarine', 'zooMore', 'peopleLo'],
   cahokia: ['cahokiaPeople'],
 };
 

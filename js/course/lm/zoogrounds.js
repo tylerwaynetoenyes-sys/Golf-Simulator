@@ -92,16 +92,23 @@ export default function build() {
       const { T, atHole } = H;
       const free = (x, z, R) => !(D.buildings || []).some((b) => b.p.some(([bx2, bz]) => Math.hypot(bx2 - x, bz - z) < R + 8))
         && !(D.lakes || []).some((l) => l.p.some(([lx, lz]) => Math.hypot(lx - x, lz - z) < R + 6));
-      const kinds = [['giraffe', 3, 9, 14], ['zebra', 4, 8, 13], ['elephant', 2, 8, 14], ['lion', 2, 6, 11], ['polarbear', 2, 6, 11]];
-      const pick = kinds[Math.floor(T.length) % kinds.length];
-      const off = Math.max(T.fwHalf || 0, 14) + 12 + pick[3];
-      for (const f of [0.45, 0.65, 0.3, 0.8]) {
-        let done = false;
+      // the hole's own exhibit, named for what it is: [kind, count, spread, fence radius], extras
+      const name = T.hole?.name || '';
+      const theme = /Primate/.test(name) ? { kinds: [['gorilla', 2, 6], ['orangutan', 2, 5]], R: 13, climb: true }
+        : /Sea Lion/.test(name) ? { kinds: [['sealion', 4, 6], ['harborseal', 3, 5]], R: 13, pool: true }
+        : /River/.test(name) ? { kinds: [['hippo', 3, 5], ['elephant', 2, 8]], R: 16, pool: true }
+        : /Red Rocks/.test(name) ? { kinds: [['lion', 2, 5], ['giraffe', 2, 7]], R: 14 }
+        : /Penguin/.test(name) ? { kinds: [['polarbear', 2, 5]], R: 11, pool: true }
+        : { kinds: [[['giraffe', 'zebra', 'elephant', 'lion', 'polarbear'][Math.floor(T.length) % 5], 3, 7]], R: 13 };
+      const off = Math.max(T.fwHalf || 0, 14) + 10 + theme.R;
+      // toward the green, where the player looks: the nearest free spot either side
+      outer: for (const f of [0.62, 0.78, 0.48, 0.9, 0.35]) {
         for (const side of [1, -1]) {
           const [x, z] = atHole(T.length * f, side * off);
-          if (inZoo(x, z) && free(x, z, pick[3])) { ex.push([pick[0], pick[1], x, z, pick[2], pick[3]]); done = true; break; }
+          if (!inZoo(x, z) || !free(x, z, theme.R)) continue;
+          theme.kinds.forEach(([k, n, sp], i) => ex.push([k, n, x, z, sp, i === 0 ? theme.R : 0, i === 0 ? theme : null]));
+          break outer;
         }
-        if (done) break;
       }
     }
     const rnd = seeded(1904);
@@ -271,6 +278,8 @@ export default function build() {
         }
       });
       for (const c of set.children) proto[c.name] = c;
+      // the primates, hippos (zoo_more) and the sea lions and seals (zoo_marine)
+      for (const extra of [model('zooMore'), model('zooMarine')]) for (const c of extra?.children || []) proto[c.name] = c;
       const place1 = (kind, x, z, yaw, s = 1, dy = 0) => {
         const p = proto[kind];
         if (!p) return;
@@ -281,12 +290,35 @@ export default function build() {
         a.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
         group.add(a);
       };
-      for (const [kind, n, x0, z0, spread] of ex) {
+      const water = landmarkWater();
+      const bark = pbr('bark_brown_02', { scale: 1.2, tint: 0x9a7a5c });
+      for (const [kind, n, x0, z0, spread, , extra] of ex) {
+        const y0 = gy(x0, z0);
+        if (extra?.pool) {
+          // a pool in the middle of the yard: the swimmers in it, the rest round its rim
+          const pr = Math.max(4, spread);
+          const pool = new THREE.Mesh(new THREE.CircleGeometry(pr, 40).rotateX(-Math.PI / 2), water);
+          pool.position.set(x0, y0 + 0.12, z0);
+          group.add(pool);
+          extra.poolR = pr;
+        }
+        if (extra?.climb) {
+          // a climbing frame of logs and ropes for the apes
+          const parts = [];
+          for (let k = 0; k < 4; k++) { const a = (k / 4) * Math.PI * 2 + 0.4; parts.push(new THREE.CylinderGeometry(0.18, 0.24, 6, 8).translate(x0 + Math.cos(a) * 3, y0 + 3, z0 + Math.sin(a) * 3)); }
+          for (let k = 0; k < 4; k++) { const a = (k / 4) * Math.PI * 2 + 0.4, b = ((k + 1) / 4) * Math.PI * 2 + 0.4; parts.push(span(V(x0 + Math.cos(a) * 3, y0 + 5.2, z0 + Math.sin(a) * 3), V(x0 + Math.cos(b) * 3, y0 + 4.6, z0 + Math.sin(b) * 3), 0.2, 0.2)); }
+          parts.push(new THREE.BoxGeometry(4, 0.25, 4).translate(x0, y0 + 3.2, z0));
+          B2.add(bark, ...parts);
+        }
+        const swimmer = kind === 'hippo' || kind === 'harborseal';
         for (let i = 0; i < n; i++) {
-          const a = rnd() * Math.PI * 2, d = rnd() * spread;
+          const a = rnd() * Math.PI * 2;
+          const pr = ex.find((e) => e[2] === x0 && e[3] === z0 && e[6]?.poolR)?.[6]?.poolR;
+          const d = pr ? (swimmer ? rnd() * pr * 0.6 : pr + 1.2 + rnd() * 3) : rnd() * spread;
           const x = x0 + Math.cos(a) * d, z = z0 + Math.sin(a) * d;
           if (onField(x, z)) continue;
-          place1(kind, x, z, rnd() * Math.PI * 2, 0.85 + rnd() * 0.25);
+          // a hippo half under the water; the others on the bank, facing the walk
+          place1(kind, x, z, rnd() * Math.PI * 2, 0.85 + rnd() * 0.25, pr && swimmer ? -0.7 : 0);
         }
       }
       // sea lions and harbor seals hauled out on rocks along Sea Lion Sound's shore
@@ -357,6 +389,8 @@ export default function build() {
         }
       }
     }
+
+    if (B2.m.size) { const g3 = new THREE.Group(); B2.build(g3); group.add(g3); } // the climbing frame
 
     // ── visitors along the zoo's walks ──
     const spots = [];

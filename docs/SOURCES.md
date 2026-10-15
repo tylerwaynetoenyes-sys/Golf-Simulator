@@ -359,6 +359,9 @@ CC BY 4.0, decimated and re-textured at 1024 px (WebP) in Blender:
 | rockB | [Red Big Stone](https://sketchfab.com/3d-models/82ed6e8d09b140b9816c39dc17946932) | 3dhdscan |
 | sealion (`zoo_marine.glb`) | [sea lion 3d model](https://sketchfab.com/3d-models/97931d75f2154463920aa63d5a8c2388) | zhaoqinzzq |
 | harborseal (`zoo_marine.glb`) | [Spotted Harbor Seal](https://sketchfab.com/3d-models/eff1b6181eca4a8aaca2cb0a19a1df38) | c4rn4g3 |
+| gorilla (`zoo_more.glb`) | [Low poly Gorilla animal 3d model free](https://sketchfab.com/3d-models/20bbf9e673814a76ba207b8494f17939) | rt699448 |
+| orangutan (`zoo_more.glb`) | [Joyful Orangutan with Raised Arms](https://sketchfab.com/3d-models/512f3350727744c69ce46064cb45ac19) | rt699448 |
+| hippo (`zoo_more.glb`) | [Hippopotamus](https://sketchfab.com/3d-models/ccc15ba62e4e4536a61866173d51ff5d) | psk98077 |
 
 ### Cahokia's people
 
