@@ -357,3 +357,18 @@ CC BY 4.0, decimated and re-textured at 1024 px (WebP) in Blender:
 | lion | [low poly realistic lion 3d model free](https://sketchfab.com/3d-models/8d08b8ab84434e8fb1c857c2dc6dccd0) | rt699448 |
 | rockA | [Rock Stone 14 .::RAWscan::.](https://sketchfab.com/3d-models/3b8de09bc6344f46a493d86e4e4d9678) | spogna |
 | rockB | [Red Big Stone](https://sketchfab.com/3d-models/82ed6e8d09b140b9816c39dc17946932) | 3dhdscan |
+
+### Cahokia's people
+
+`assets/models/cahokia_people.glb`: four figures of the city about 1100 CE,
+built in Blender with MPFB 2 (MakeHuman for Blender, GPL; the generated
+bodies and the MakeHuman system, skins and hair assets are CC0) and dressed
+from the archaeological record: the Keller figurine's wrap-around skirt, the
+deerskin mantle, breechcloth and moccasins of Southeastern dress, marine-shell
+beads and copper ear spools as found in the Mound 72 and other burials, a cane
+basket of maize, a red-slipped long-necked bottle, a bundle of prairie grass
+for thatch, and a chunkey pole and stone. Clothing and props were modelled for
+the game; surfaces are Poly Haven CC0 (`brown_leather`, `rough_linen`,
+`brown_mud_dry`, `thatch_roof_angled`, `bark_brown_02`, `granite_wall`).
+No feather headdresses, war paint or weapons: those are later, Plains-derived
+stereotypes, not Cahokia.

@@ -17,6 +17,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { pbr } from '../../scene/pbr.js';
 import { place, bx, Batch, pavingMeshes } from './riverfront.js';
+import { model } from '../../scene/models.js';
 
 const BASE = new URL('../../../assets/landmarks/cahokia/', import.meta.url).href;
 let DATA = null;
@@ -108,6 +109,7 @@ export default function build() {
       let seed = 1050;
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
       const walls = [], poles = [], roofs = [], doors = [], hearth = [];
+      yards.length = 0;
       for (let i = 0; i < 14; i++) {
         const x = 300 + (i % 4) * 24 + (rnd() - 0.5) * 9, z = -40 + Math.floor(i / 4) * 26 + (rnd() - 0.5) * 9;
         if (inPlay(x, z)) continue;
@@ -120,6 +122,7 @@ export default function build() {
         doors.push(place(new THREE.BoxGeometry(0.8, 1.3, 0.12).translate(0, 0.65, d / 2 + 0.01), x, y, z, ry));
         // the hearth in the yard: a ring of stones
         const hx = x + Math.sin(ry) * (d / 2 + 2.4), hz = z + Math.cos(ry) * (d / 2 + 2.4);
+        yards.push([hx, hz, ry, x, z]);
         for (let k = 0; k < 9; k++) { const a = (k / 9) * Math.PI * 2; hearth.push(new THREE.DodecahedronGeometry(0.16 + rnd() * 0.06, 1).translate(hx + Math.cos(a) * 0.55, gy(hx, hz) + 0.05, hz + Math.sin(a) * 0.55)); }
       }
       if (walls.length) {
@@ -146,6 +149,49 @@ export default function build() {
     g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
     group.add(g);
     for (const mesh of pavingMeshes(D, gy, inPlay, { paths: true })) group.add(mesh);
+    people(gy, inPlay);
+  }
+  // ── the people of the city, about 1100 CE (assets/models/cahokia_people.glb):
+  // MakeHuman figures dressed from the archaeological record (the Keller and
+  // Birger figurines, excavated shell beads and copper ear spools): women in
+  // woven-fibre wrap skirts and deerskin mantles, men in breechcloths, all in
+  // moccasins; a basket of maize, a red-slipped bottle, grass for thatch, and
+  // chunkey, the city's great game, on the Grand Plaza ──
+  const yards = [];
+  function people(gy, inPlay) {
+    const set = model('cahokiaPeople');
+    if (!set) return;
+    const proto = {};
+    for (const c of set.children) proto[c.name] = c;
+    set.traverse((o) => {
+      if (!o.isMesh) return;
+      for (const mm of Array.isArray(o.material) ? o.material : [o.material]) {
+        // hair, brows and lashes are cut-out cards; everything else is opaque
+        const cut = mm.transparent || mm.alphaTest > 0;
+        mm.transparent = false; mm.depthWrite = true;
+        if (cut) { mm.alphaTest = 0.5; mm.side = THREE.DoubleSide; }
+      }
+    });
+    let seed = 1100;
+    const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const put = (kind, x, z, yaw) => {
+      if (!proto[kind] || inPlay(x, z)) return;
+      const f = proto[kind].clone(true);
+      f.position.set(x, gy(x, z) - 0.02, z);
+      f.rotation.y = yaw;
+      f.scale.setScalar(0.96 + rnd() * 0.08);
+      f.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      group.add(f);
+    };
+    // at home: beyond the hearths in the yards, turned back toward hearth and house
+    const home = ['woman_basket', 'woman_jar', 'man_thatch', 'woman_jar', 'woman_basket', 'man_thatch'];
+    yards.forEach(([hx, hz, ry], i) => {
+      if (i % 2) return;
+      const kind = home[(i / 2) % home.length], a = ry + (rnd() - 0.5) * 1.2, r = 1.4 + rnd() * 0.8;
+      put(kind, hx + Math.sin(a) * r, hz + Math.cos(a) * r, ry + Math.PI + (rnd() - 0.5) * 0.8);
+    });
+    // chunkey on the Grand Plaza, below the stair of Monks Mound: players, poles in hand, facing each other down the court
+    for (const [x, z, yaw] of [[-74, 300, 0.2], [-62, 304, -0.3], [-48, 360, Math.PI + 0.1], [-60, 364, Math.PI - 0.25]]) put('man_chunkey', x, z, yaw);
   }
   return res;
 }
