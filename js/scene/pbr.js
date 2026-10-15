@@ -12,6 +12,11 @@
 //     offset polygon offset (draped paving over the ground)
 //     bright albedo multiplier over the normalised mid (1.8 for white paint)
 //     vertex multiply by the geometry's vertex colours (per-building tints)
+//     facade windows drawn over the stone in the shader, from the geometry's
+//            uv in metres (u along the wall, v up from its foot):
+//            { bay, floor, win: [x0, x1, y0, y1] of a bay and floor,
+//              frame: colour, balcony: 0..1, shop: ground floor height m,
+//              lit: share of windows lit at night }
 import * as THREE from 'three';
 
 const BASE = new URL('../../assets/textures/pbr/', import.meta.url).href;
@@ -55,19 +60,26 @@ function set(id) {
 const ALIAS = { metal_plate: 'painted_steel', red_bricks_02: 'red_brick' };
 
 const cache = new Map();
-export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow = null, night = 0.5, side = THREE.FrontSide, offset = 0, bright = 1, vertex = false } = {}) {
+export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow = null, night = 0.5, side = THREE.FrontSide, offset = 0, bright = 1, vertex = false, facade = null } = {}) {
   id = ALIAS[id] || id;
-  const key = `${id}|${scale}|${tint}|${metal}|${rough}|${glow}|${side}|${offset}|${bright}|${vertex}`;
+  const key = `${id}|${scale}|${tint}|${metal}|${rough}|${glow}|${side}|${offset}|${bright}|${vertex}|${facade ? JSON.stringify(facade) : ''}`;
   if (cache.has(key)) return cache.get(key);
   const tx = set(id);
   const m = new THREE.MeshStandardMaterial({ color: tint, metalness: metal, roughness: 1, side, vertexColors: vertex });
   if (offset) Object.assign(m, { polygonOffset: true, polygonOffsetFactor: offset, polygonOffsetUnits: offset });
   if (glow != null) { m.emissive = new THREE.Color(glow); m.emissiveIntensity = 0; m.userData.night = night; }
+  const F = facade && { bay: 3, floor: 3.3, win: [0.28, 0.72, 0.18, 0.82], frame: 0xe8e2d6, balcony: 0, shop: 0, lit: 0.4, ...facade };
+  if (F && glow == null) { m.emissive = new THREE.Color(0xffd39a); m.emissiveIntensity = 0; m.userData.night = 1.1; }
   const uni = { uTriG: tx.gain, uTriD: { value: tx.diff }, uTriR: { value: tx.rough }, uTriN: { value: tx.nor }, uTriS: { value: 1 / scale }, uTriRough: { value: rough }, uTriK: { value: bright } };
+  if (F) Object.assign(uni, {
+    uFacCell: { value: new THREE.Vector2(F.bay, F.floor) }, uFacWin: { value: new THREE.Vector4(...F.win) },
+    uFacFrame: { value: new THREE.Color(F.frame) }, uFacBal: { value: F.balcony }, uFacShop: { value: F.shop }, uFacLit: { value: F.lit },
+  });
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uni);
     sh.vertexShader = sh.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying vec3 vTriW; varying vec3 vTriN;')
+      .replace('#include <common>', '#include <common>\nvarying vec3 vTriW; varying vec3 vTriN;' + (F ? '\nvarying vec2 vFac;' : ''))
+      .replace('#include <uv_vertex>', '#include <uv_vertex>' + (F ? '\nvFac = uv;' : ''))
       .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
         {
           vec4 tp = vec4(transformed, 1.0);
@@ -81,14 +93,61 @@ export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow
       .replace('#include <common>', `#include <common>
 varying vec3 vTriW; varying vec3 vTriN;
 uniform sampler2D uTriD; uniform sampler2D uTriR; uniform sampler2D uTriN; uniform float uTriS; uniform float uTriRough; uniform float uTriG; uniform float uTriK;
-vec3 triW() { vec3 w = pow(abs(normalize(vTriN)), vec3(4.0)); return w / (w.x + w.y + w.z); }`)
+vec3 triW() { vec3 w = pow(abs(normalize(vTriN)), vec3(4.0)); return w / (w.x + w.y + w.z); }` + (F ? `
+varying vec2 vFac;
+uniform vec2 uFacCell; uniform vec4 uFacWin; uniform vec3 uFacFrame; uniform float uFacBal; uniform float uFacShop; uniform float uFacLit;
+float facHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float facWin = 0.0, facLit = 0.0, facGlass = 0.0;` : ''))
       .replace('#include <map_fragment>', `
         vec3 tw = triW();
         vec3 tp = vTriW * uTriS;
         vec3 tc = texture2D(uTriD, tp.zy).rgb * tw.x + texture2D(uTriD, tp.xz).rgb * tw.y + texture2D(uTriD, tp.xy).rgb * tw.z;
-        diffuseColor.rgb *= min(tc * uTriG * uTriK, vec3(1.0));`)
+        diffuseColor.rgb *= min(tc * uTriG * uTriK, vec3(1.0));` + (F ? `
+        {
+          // the window grid: a cell per bay and floor; a taller shopfront on the ground floor
+          vec2 fp = vFac;
+          bool shop = uFacShop > 0.0 && fp.y < uFacShop;
+          vec2 cell = shop ? vec2(fp.x / uFacCell.x, 0.0) : vec2(fp.x / uFacCell.x, (fp.y - uFacShop) / uFacCell.y);
+          vec2 f = fract(cell), id = floor(cell);
+          vec4 W = shop ? vec4(0.12, 0.88, 0.06, 0.78) : uFacWin;
+          if (shop) f.y = fp.y / uFacShop;
+          float aa = fwidth(f.x) * 1.5 + 0.002, ab = fwidth(f.y) * 1.5 + 0.002;
+          float inX = smoothstep(W.x - aa, W.x + aa, f.x) * (1.0 - smoothstep(W.y - aa, W.y + aa, f.x));
+          float inY = smoothstep(W.z - ab, W.z + ab, f.y) * (1.0 - smoothstep(W.w - ab, W.w + ab, f.y));
+          // past a few pixels a window, the pattern averages out to a darker wall instead of shimmering
+          float far = smoothstep(0.3, 0.75, max(fwidth(cell.x), fwidth(cell.y)));
+          float win = inX * inY * (1.0 - far);
+          // the frame round it and the stone sill below
+          float fr = 0.035;
+          float outX = smoothstep(W.x - fr - aa, W.x - fr + aa, f.x) * (1.0 - smoothstep(W.y + fr - aa, W.y + fr + aa, f.x));
+          float outY = smoothstep(W.z - fr * 2.0 - ab, W.z - fr * 2.0 + ab, f.y) * (1.0 - smoothstep(W.w + fr - ab, W.w + fr + ab, f.y));
+          float frame = outX * outY * (1.0 - inX * inY) * (1.0 - far);
+          float sill = outX * smoothstep(W.z - fr * 3.0, W.z - fr * 2.0, f.y) * (1.0 - smoothstep(W.z - fr * 2.0, W.z - fr, f.y));
+          float h = facHash(id + floor(fp.x / 997.0));
+          // glass: dark, a little blue, curtains or blinds drawn in some; the reveal shades its top and one side
+          vec3 glass = mix(vec3(0.035, 0.045, 0.055), vec3(0.16, 0.14, 0.12), step(0.72, h) * smoothstep(W.w, W.z, f.y) * 0.8);
+          float reveal = smoothstep(W.w - 0.1, W.w, f.y) + smoothstep(W.x + 0.06, W.x, f.x);
+          glass *= 1.0 - 0.6 * clamp(reveal, 0.0, 1.0);
+          // mullions: a cross in the sash windows
+          float mul = (1.0 - smoothstep(0.006, 0.012, abs(f.x - (W.x + W.y) * 0.5))) + (1.0 - smoothstep(0.006, 0.012, abs(f.y - mix(W.z, W.w, 0.62))));
+          glass = mix(glass, uFacFrame * 0.8, clamp(mul, 0.0, 1.0) * (shop ? 0.0 : 1.0));
+          // wrought-iron balconies across the lower third (on the 2nd and 5th floors, all along)
+          float bal = uFacBal > 0.0 && !shop && (abs(id.y - 1.0) < 0.5 || abs(id.y - 4.0) < 0.5) ? 1.0 : uFacBal * step(0.5, h) * (shop ? 0.0 : 1.0);
+          float rail = bal * outX * step(W.z - 0.02, f.y) * (1.0 - step(W.z + 0.24, f.y)) * (step(0.6, fract(f.x * 36.0)) + step(W.z + 0.21, f.y));
+          diffuseColor.rgb *= mix(1.0, 0.55 + 0.45 * (1.0 - (W.y - W.x) * (W.w - W.z)), far);
+          rail *= 1.0 - far;
+          diffuseColor.rgb = mix(diffuseColor.rgb, glass, win);
+          diffuseColor.rgb = mix(diffuseColor.rgb, uFacFrame, frame * 0.85);
+          diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * 1.18, sill);
+          diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.03), clamp(rail, 0.0, 1.0));
+          facWin = win * (1.0 - clamp(rail, 0.0, 1.0));
+          facGlass = win;
+          facLit = step(h, uFacLit) * (shop ? 1.6 : 1.0) * (0.7 + 0.6 * facHash(id * 1.7 + 3.1));
+        }` : ''))
       .replace('#include <roughnessmap_fragment>', `
-        float roughnessFactor = roughness * uTriRough * (texture2D(uTriR, tp.zy).g * tw.x + texture2D(uTriR, tp.xz).g * tw.y + texture2D(uTriR, tp.xy).g * tw.z);`)
+        float roughnessFactor = roughness * uTriRough * (texture2D(uTriR, tp.zy).g * tw.x + texture2D(uTriR, tp.xz).g * tw.y + texture2D(uTriR, tp.xy).g * tw.z);` + (F ? `
+        roughnessFactor = mix(roughnessFactor, 0.06, facGlass);` : ''))
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>' + (F ? '\n metalnessFactor = mix(metalnessFactor, 0.4, facGlass);' : ''))
       .replace('#include <normal_fragment_maps>', `
         {
           // whiteout-blended triplanar normal, in world space, back to view space
@@ -101,10 +160,12 @@ vec3 triW() { vec3 w = pow(abs(normalize(vTriN)), vec3(4.0)); return w / (w.x + 
           nz = vec3(nz.xy + wn.xy, abs(nz.z) * wn.z);
           vec3 bn = normalize(nx.zyx * tw.x + ny.xzy * tw.y + nz.xyz * tw.z);
           vec3 vn = normalize((viewMatrix * vec4(bn, 0.0)).xyz);
-          normal = normalize(mix(normal, vn, 0.85));
+          normal = normalize(mix(normal, vn, 0.85${F ? ' * (1.0 - facGlass)' : ''}));
         }`);
+    // only the lit windows glow at night, warm and uneven
+    if (F) sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance *= facWin * facLit;');
   };
-  m.customProgramCacheKey = () => `pbrTri|${id}`;
+  m.customProgramCacheKey = () => `pbrTri|${id}|${F ? 'facade' : ''}`;
   cache.set(key, m);
   return m;
 }

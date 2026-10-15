@@ -6,6 +6,7 @@
 // Geometry is merged per 400 m cell so off-screen blocks are culled; lit
 // windows glow at night (the materials go in CourseWorld's glow list).
 import * as THREE from 'three';
+import { pbr } from '../scene/pbr.js';
 
 const CELL = 400;
 
@@ -86,6 +87,35 @@ const STYLE = {
   },
 };
 
+// Real surfaces: photographed stone, brick and slate (js/scene/pbr.js, triplanar at true
+// scale), with the windows drawn into the wall by the facade shader (recessed glass that
+// reflects the sky, frames, sills, balconies, lit at random after dark).
+const REAL = {
+  paris: {
+    walls: [
+      // cut limestone with a shopfront on the ground floor and the iron balconies on the 2nd and 5th
+      ['white_sandstone_bricks', { scale: 3.2, tint: 0xf4ead6 }, { bay: 3.4, floor: 3.2, win: [0.3, 0.7, 0.12, 0.86], frame: 0xece6da, balcony: 1, shop: 4.6, lit: 0.42 }],
+      ['white_sandstone_bricks', { scale: 3.2, tint: 0xe9dcc4 }, { bay: 3.4, floor: 3.2, win: [0.3, 0.7, 0.12, 0.86], frame: 0xf2ede4, balcony: 1, shop: 4.6, lit: 0.36 }],
+      ['white_plaster_02', { scale: 3, tint: 0xeee2cc }, { bay: 3.2, floor: 3.0, win: [0.3, 0.7, 0.14, 0.84], frame: 0xf4f0e8, balcony: 0.3, shop: 4.2, lit: 0.4 }],
+    ],
+    glass: null,
+    roof: ['roof_slates_02', { scale: 2, tint: 0x8892a0 }], // zinc and slate mansards
+    cap: ['concrete_wall_008', { scale: 4, tint: 0x8f8a84 }],
+  },
+  nyc: {
+    walls: [
+      ['white_sandstone_bricks', { scale: 3, tint: 0xe6dccb, bright: 1.4 }, { bay: 3, floor: 3.4, win: [0.27, 0.73, 0.2, 0.8], frame: 0xf0ece2, lit: 0.45 }],
+      ['white_sandstone_bricks', { scale: 2.6, tint: 0xdcc6a4, bright: 1.35 }, { bay: 3, floor: 3.3, win: [0.28, 0.72, 0.2, 0.8], frame: 0xece6da, lit: 0.45 }], // buff brick
+      ['red_brick', { scale: 2.4, tint: 0xb4a49c, bright: 1.3 }, { bay: 3, floor: 3.3, win: [0.28, 0.72, 0.2, 0.8], frame: 0x2a2f2c, lit: 0.45 }],
+      ['concrete_wall_008', { scale: 4, tint: 0xd4cfc6, bright: 1.35 }, { bay: 3, floor: 3.4, win: [0.2, 0.8, 0.22, 0.78], frame: 0x3a3e42, lit: 0.4 }],
+    ],
+    // curtain walls: a slim grid of mullions and spandrels round all but floor-to-ceiling glass
+    glass: ['painted_steel', { scale: 3, tint: 0x6a7378, metal: 0.5 }, { bay: 1.6, floor: 4, win: [0.04, 0.96, 0.1, 0.92], frame: 0x30363a, lit: 0.3 }],
+    roof: ['roof_slates_02', { scale: 2, tint: 0x6f6a66 }],
+    cap: ['gravel_stones', { scale: 3, tint: 0x9a958e }],
+  },
+};
+
 function windowsGlow(lampColor) {
   return tex(256, 256, (g, w, h) => {
     g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
@@ -107,17 +137,15 @@ function windowsGlow(lampColor) {
 export function buildCity(data, T, style = 'paris', pull = null) {
   const S = STYLE[style] || STYLE.paris;
   rs = 7;
-  const glowTex = windowsGlow(S.lamp);
-  const walls = (S.walls || [S.facade]).map((fn) => new THREE.MeshStandardMaterial({ map: tex(256, 256, fn), emissiveMap: glowTex, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.85 }));
+  const R = REAL[style] || REAL.paris;
+  const real = ([id, o, facade]) => pbr(id, { ...o, side: THREE.DoubleSide, ...(facade ? { facade } : {}) });
+  const walls = R.walls.map(real);
   const mats = {
     wall: walls[0],
-    glass: S.glass ? new THREE.MeshStandardMaterial({ map: tex(256, 256, S.glass), emissiveMap: windowsGlow(S.lamp), emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.22, metalness: 0.55 }) : null,
-    zinc: new THREE.MeshStandardMaterial({ color: S.zinc, roughness: 0.5, metalness: 0.5 }),
-    cap: new THREE.MeshStandardMaterial({ color: S.cap, roughness: 0.9 }),
+    glass: R.glass ? real(R.glass) : null,
+    zinc: real(R.roof),
+    cap: real(R.cap),
   };
-  for (const m of Object.values(mats)) if (m) m.side = THREE.DoubleSide;
-  for (const m of walls) { m.side = THREE.DoubleSide; m.userData.night = 1.0; }
-  if (mats.glass) mats.glass.userData.night = 1.2;
   const cells = new Map();
   const cell = (x, z) => {
     const k = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
@@ -163,11 +191,14 @@ export function buildCity(data, T, style = 'paris', pull = null) {
     const W = tall && mats.glass ? C.glass : C.wall[Math.floor(rnd() * walls.length)];
     // walls: u in bays round the perimeter, v in floors
     let run = 0;
+    const off = Math.floor(rnd() * 300) * 3.4 * 4;
     for (let i = 0; i < n; i++) {
       const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % n];
       const L = Math.hypot(x2 - x1, z2 - z1);
-      const u0 = run / (S.bay * 4), u1 = (run + L) / (S.bay * 4);
-      const v0 = 0, v1 = (wallTop - h0) / (S.floor * 2);
+      // facade coordinates in metres: along the wall (from a random whole bay, so
+      // neighbours' lit windows differ) and up from the foot
+      const u0 = off + run, u1 = off + run + L;
+      const v0 = 0, v1 = wallTop - h0;
       W.push([x1, h0, z1, u0, v0], [x2, h0, z2, u1, v0], [x2, wallTop, z2, u1, v1], [x1, h0, z1, u0, v0], [x2, wallTop, z2, u1, v1], [x1, wallTop, z1, u0, v1]);
       run += L;
     }
