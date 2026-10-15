@@ -357,10 +357,13 @@ CC BY 4.0, decimated and re-textured at 1024 px (WebP) in Blender:
 | lion | [low poly realistic lion 3d model free](https://sketchfab.com/3d-models/8d08b8ab84434e8fb1c857c2dc6dccd0) | rt699448 |
 | rockA | [Rock Stone 14 .::RAWscan::.](https://sketchfab.com/3d-models/3b8de09bc6344f46a493d86e4e4d9678) | spogna |
 | rockB | [Red Big Stone](https://sketchfab.com/3d-models/82ed6e8d09b140b9816c39dc17946932) | 3dhdscan |
+| sealion (`zoo_marine.glb`) | [sea lion 3d model](https://sketchfab.com/3d-models/97931d75f2154463920aa63d5a8c2388) | zhaoqinzzq |
+| harborseal (`zoo_marine.glb`) | [Spotted Harbor Seal](https://sketchfab.com/3d-models/eff1b6181eca4a8aaca2cb0a19a1df38) | c4rn4g3 |
 
 ### Cahokia's people
 
-`assets/models/cahokia_people.glb`: four figures of the city about 1100 CE,
+`assets/models/cahokia_people.glb`: seven figures of the city about 1100 CE
+(women, men, two elders and a girl),
 built in Blender with MPFB 2 (MakeHuman for Blender, GPL; the generated
 bodies and the MakeHuman system, skins and hair assets are CC0) and dressed
 from the archaeological record: the Keller figurine's wrap-around skirt, the

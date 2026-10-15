@@ -25,6 +25,7 @@ const FILES = {
   rubble: 'rubble_concrete.glb', // a scanned heap of broken concrete (albentan2012)
   zooAnimals: 'zoo_animals.glb', // giraffe, elephant, zebra, penguin, flamingo, polar bear, lion (one node each)
   zooRocks: 'zoo_rocks.glb', // two scanned boulders (spogna, 3dhdscan), 1 m across
+  zooMarine: 'zoo_marine.glb', // California sea lion (zhaoqinzzq) and harbor seal (c4rn4g3)
   cahokiaPeople: 'cahokia_people.glb', // four Mississippian figures (MakeHuman, CC0), one node each
 };
 /** Which models each course uses. */
@@ -37,7 +38,7 @@ export const COURSE_MODELS = {
   confluence: ['peopleLo'],
   alton: ['peopleLo'],
   forestpark: ['peopleLo'],
-  stlzoo: ['zooAnimals', 'zooRocks', 'peopleLo'],
+  stlzoo: ['zooAnimals', 'zooRocks', 'zooMarine', 'peopleLo'],
   cahokia: ['cahokiaPeople'],
 };
 

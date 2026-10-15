@@ -10,7 +10,9 @@
 //     assets/models/zoo_animals.glb
 //   exhibits, roughly where the zoo keeps them: giraffes, zebras and lions in
 //     Red Rocks; Asian elephants at River's Edge; polar bears by Peabody Hall;
-//     flamingos wading in Wood Duck Pond; penguins by the coast
+//     flamingos wading in Wood Duck Pond; California sea lions and harbor
+//     seals hauled out on the rocks of Sea Lion Sound (the zoo's penguins live
+//     indoors, in Penguin & Puffin Coast, so none stand out here)
 // Surfaces are photographed PBR sets (js/scene/pbr.js).
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -37,7 +39,6 @@ const EXHIBITS = [
   ['lion', 2, 214, 600, 6, 14],
   ['elephant', 3, -520, 420, 12, 24],
   ['polarbear', 2, -140, 350, 6, 13],
-  ['penguin', 9, -240, 618, 3, 7],
 ];
 
 /** A weathered boulder: a sphere pushed out of round by smooth lumps, flattened to sit low. */
@@ -93,6 +94,8 @@ export default function build() {
       rock: pbr('rock_face_03', { scale: 1.6, tint: 0xb48a72 }), // the red rock of Red Rocks
       grey: pbr('rock_face_03', { scale: 1.6 }),
       rail: pbr('wood_planks_grey', { scale: 1.5, tint: 0x9a8a74 }),
+      canvas: pbr('rough_linen', { scale: 1.2, tint: 0x2f6b4f, side: THREE.DoubleSide }), // the zoo's green awnings
+      iron: pbr('painted_steel', { scale: 1, tint: 0x2c3431, metal: 0.5 }),
     };
     const glass = new THREE.MeshStandardMaterial({ color: 0x1c2428, roughness: 0.08, metalness: 0.6, envMapIntensity: 1.2 });
     const inside = (p, x, z) => { let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const [xi, zi] = p[i], [xj, zj] = p[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; };
@@ -118,6 +121,27 @@ export default function build() {
       B.add(wall, up(new THREE.ExtrudeGeometry(shape, { depth: h + 0.4, bevelEnabled: false })).translate(0, y, 0));
       // tall windows in stone surrounds along every wall long enough, a band per storey, and a plinth
       const storeys = Math.max(1, Math.floor(h / 4));
+      // the kiosks and stands: a serving counter under a canvas awning on the longest wall, a door on the next
+      if (area < 120) {
+        let li = 0, lmax = 0;
+        for (let i = 0; i < p.length; i++) { const a = p[i], c = p[(i + 1) % p.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]); if (L > lmax) { lmax = L; li = i; } }
+        for (const [k, kind] of [[li, 'counter'], [(li + 1) % p.length, 'door']]) {
+          const a = p[k], c = p[(k + 1) % p.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]);
+          if (L < 1.6) continue;
+          const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L;
+          let nx = uz, nz = -ux;
+          if (inside(p, (a[0] + c[0]) / 2 + nx * 0.6, (a[1] + c[1]) / 2 + nz * 0.6)) { nx = -nx; nz = -nz; }
+          const ry = Math.atan2(nx, nz), mx = (a[0] + c[0]) / 2 + nx * 0.06, mz = (a[1] + c[1]) / 2 + nz * 0.06;
+          if (kind === 'door') { B.add(m.rail, bx(Math.min(1.0, L * 0.4), 2.1, 0.12, mx, y + 0.4, mz, ry)); continue; }
+          const w = Math.min(L - 0.8, 4.2);
+          B.add(m.rail, bx(w + 0.2, 0.12, 0.55, mx + nx * 0.22, y + 1.4, mz + nz * 0.22, ry)); // the counter
+          B.add(glass, bx(w, 1.15, 0.1, mx, y + 1.55, mz, ry));
+          // the awning: sloped canvas on its two iron brackets
+          const wy = y + Math.min(h, 3.1) + 0.1, d = 1.3;
+          B.add(m.canvas, span(V(mx - ux * (w / 2 + 0.2), wy, mz - uz * (w / 2 + 0.2)), V(mx + ux * (w / 2 + 0.2), wy, mz + uz * (w / 2 + 0.2)), d, 0.04, 0).translate(0, 0, 0).applyMatrix4(new THREE.Matrix4().makeTranslation(-mx, -wy, -mz)).applyMatrix4(new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(ux, 0, uz), -0.38)).applyMatrix4(new THREE.Matrix4().makeTranslation(mx + nx * d * 0.46, wy - 0.24, mz + nz * d * 0.46)));
+          for (const sgn of [-1, 1]) B.add(m.iron, span(V(mx + ux * sgn * w / 2, wy - 0.7, mz + uz * sgn * w / 2), V(mx + ux * sgn * w / 2 + nx * 1.1, wy - 0.45, mz + uz * sgn * w / 2 + nz * 1.1), 0.04, 0.04));
+        }
+      }
       for (let i = 0; i < p.length; i++) {
         const a = p[i], c = p[(i + 1) % p.length], L = Math.hypot(c[0] - a[0], c[1] - a[1]);
         const ux = (c[0] - a[0]) / L, uz = (c[1] - a[1]) / L;
@@ -211,6 +235,7 @@ export default function build() {
 
     // ── the animals ──
     const set = model('zooAnimals');
+    const B2 = new Batch();
     if (set) {
       const proto = {};
       set.traverse((o) => {
@@ -242,6 +267,38 @@ export default function build() {
           if (onField(x, z)) continue;
           place1(kind, x, z, rnd() * Math.PI * 2, 0.85 + rnd() * 0.25);
         }
+      }
+      // sea lions and harbor seals hauled out on rocks along Sea Lion Sound's shore
+      const sound = (D.lakes || []).find((l) => l.n === 'Sea Lion Sound');
+      const marine = model('zooMarine');
+      if (sound && marine) {
+        const mp = {}; for (const c of marine.children) mp[c.name] = c;
+        const q = sound.p, n = q.length, lvl = Math.min(...q.map(([x, z]) => gy(x, z)));
+        const cx = q.reduce((s2, r) => s2 + r[0], 0) / n, cz = q.reduce((s2, r) => s2 + r[1], 0) / n;
+        const scan = scanMeshes[1] || scanMeshes[0];
+        const wet = scan && scan.material.clone(); if (wet) { wet.color = new THREE.Color(0x8a8f92); wet.roughness = 0.55; } // wet granite at the waterline
+        for (let i = 0; i < 9; i++) {
+          const e = q[Math.floor((i + 0.3) * n / 9)], x = e[0] + (cx - e[0]) * 0.06, z = e[1] + (cz - e[1]) * 0.06;
+          if (onField(x, z, -16)) continue; // in the hazard is fine, on the fairway is not
+          const kind = i % 3 === 1 ? 'harborseal' : 'sealion';
+          const a = mp[kind]?.clone(true); if (!a) continue;
+          // a flat haul-out rock just at the waterline
+          const base = Math.max(gy(x, z), lvl) - 0.3;
+          let top = base + 0.5;
+          if (scan) {
+            scan.geometry.boundingBox || scan.geometry.computeBoundingBox();
+            const rk = new THREE.Mesh(scan.geometry, wet), k = 2.6 + rnd() * 1.2;
+            top = base + k * 0.55 * scan.geometry.boundingBox.max.y * 0.82;
+            rk.position.set(x, base, z); rk.rotation.y = rnd() * 6.3; rk.scale.set(k, k * 0.55, k);
+            rk.receiveShadow = true; group.add(rk);
+          } else B2.add(m.grey, boulder(1.3 + rnd() * 0.6, rnd).scale(1.2, 0.55, 1.2).translate(x, lvl - 0.25, z));
+          a.position.set(x, top, z);
+          a.rotation.y = Math.atan2(cx - x, cz - z) + (rnd() - 0.5) * 1.4;
+          a.scale.setScalar(0.85 + rnd() * 0.3);
+          a.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+          group.add(a);
+        }
+        if (B2.m.size) { const g2 = new THREE.Group(); B2.build(g2); group.add(g2); }
       }
       // flamingos wading at the edge of Wood Duck Pond, their feet in the water
       const pond = (D.lakes || []).find((l) => l.n === 'Wood Duck Pond');

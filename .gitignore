@@ -9,3 +9,7 @@ node_modules/
 
 # reference photos dropped in the project folder (personal; the repo is public)
 IMG_*
+
+# Blender working files (large; the exported GLBs are what the game uses)
+*.blend
+*.blend1
