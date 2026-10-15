@@ -244,6 +244,7 @@ export class Game {
       { putting: s.putting, lookAt: pin ? new THREE.Vector3(pin.x, w.groundFn(pin.x, pin.z) + 0.1, pin.z) : null });
     w.rig.setAim(this.aimDeg);
     w.rig.toAddress(immediate);
+    if (!m.course && !immediate && w.sceneMode === 'range' && w.range.deliverBall) this._rangeDelivery();
     this.aimLine.position.set(s.origin.x, w.ball.mesh.position.y - 0.02, s.origin.z);
     this.aimLine.visible = !s.putting;
     this._addressClub();
@@ -590,6 +591,38 @@ export class Game {
     this.handleLaunch(l, launch.source || 'r10');
   }
 
+  /**
+   * The range's moment between balls: the next one drops out of the dispenser and
+   * rolls onto the tee. On the first ball and every sixth, the camera starts inside
+   * the bay, looking back over the dispenser, the lounge and the screens, and swings
+   * round to the address view; every fourth, a crane shot of the whole venue first.
+   * Any swing or tap cuts straight to the address view.
+   */
+  _rangeDelivery() {
+    const w = this.world, V = THREE.Vector3;
+    const to = w.ball.mesh.position.clone();
+    const n = (this._rangeBalls = (this._rangeBalls || 0) + 1);
+    w.range.deliverBall(w.ball, to);
+    if (store.settings.rangeCinema === false) return;
+    const pose = w.rig.addressPose();
+    if (n === 1 || n % 6 === 0) {
+      w.rig.flyover([
+        { pos: new V(2.4, 1.5, -1.6), look: new V(0.2, 0.9, 3.2) },
+        { pos: new V(0.9, 1.7, 2.2), look: new V(0.3, 0.2, -0.2) }, // over the shoulder as the ball rolls onto the tee
+        { pos: pose.pos, look: pose.look },
+      ], 2.6, null, { fov: 52, toAddress: true });
+    } else if (n % 4 === 0) {
+      // the venue: out over the range, rising past the tiers, then home to the mat
+      w.rig.flyover([
+        { pos: new V(-34, 3, -26), look: new V(0, 5, 4) },
+        { pos: new V(-14, 10, -18), look: new V(0, 7, 4) },
+        { pos: new V(6, 16, -14), look: new V(0, 5, 6) },
+        { pos: new V(1.8, 2.6, -6), look: new V(0, 1.4, 3) }, // in toward the player's own bay
+        { pos: pose.pos, look: pose.look },
+      ], 5.2, null, { fov: 48, toAddress: true });
+    }
+  }
+
   /** Get from intro / hole summary / round summary to a playable state now. */
   _ensureReady() {
     if (this.state === 'intro') { this.world.rig.skipFlyover(); this._endIntro(); }
@@ -752,6 +785,7 @@ export class Game {
 
   skip() {
     if (this.state === 'intro') { this.world.rig.skipFlyover(); return; }
+    if (this.state === 'ready' && this.world.rig.mode === 'flyover') { this.world.rig.skipFlyover(); return; } // a range cutaway
     if (this.state !== 'flight' || !this.shot) return;
     this.shot.t = this.shot.result.duration;
   }

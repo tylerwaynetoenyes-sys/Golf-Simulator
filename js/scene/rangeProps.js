@@ -130,7 +130,7 @@ export function createRange(scene, river, quality) {
   const wood = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 0.8 });
   const steel = new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.5, metalness: 0.6 });
   const dayHooks = [];
-  buildVenue(group, { quality, updaters, dayHooks });
+  const venue = buildVenue(group, { quality, updaters, dayHooks });
   // tee peg in the player's bay
   const tee = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.002, 0.04, 8), new THREE.MeshStandardMaterial({ color: 0xf5d07a }));
   tee.position.set(0, 0.07, 0);
@@ -422,6 +422,8 @@ export function createRange(scene, river, quality) {
     bayLight,
     flags,
     ctp,
+    /** A new ball out of the dispenser onto the tee (the venue's chute). */
+    deliverBall(ball, to, done) { venue.deliver(ball, to, done); },
     setCtp(x, z, visible = true) {
       ctp.position.set(x, groundHeight(x, z), z);
       ctp.visible = visible;

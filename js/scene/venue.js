@@ -104,6 +104,43 @@ export function buildVenue(group, { quality, updaters, dayHooks }) {
   bld.add(name);
   group.add(bld);
 
+  // ── the ball dispenser at the front right of the player's mat: a cabinet, a hopper of
+  // balls behind glass, and a chute that rolls each ball out onto the tee ──
+  const disp = new THREE.Group();
+  {
+    const body = pbr('painted_steel', { scale: 1, tint: 0x30353b, metal: 0.4 });
+    const D = [];
+    D.push([body, box(0.42, 0.95, 0.42, 0, 0, 0)], [body, box(0.48, 0.06, 0.48, 0, 0.95, 0)]);
+    D.push([glass, box(0.34, 0.3, 0.34, 0, 1.01, 0)]);
+    D.push([led, box(0.3, 0.03, 0.02, 0, 0.82, -0.215)]);
+    // the chute: a shallow trough from the cabinet's mouth down to the mat
+    const ch = new THREE.CylinderGeometry(0.05, 0.05, 0.62, 10, 1, true, Math.PI / 2, Math.PI).rotateX(Math.PI / 2).rotateY(0.5);
+    ch.rotateX(-0.75);
+    D.push([steel, ch.translate(-0.24, 0.42, -0.3)]);
+    batch(disp, D);
+    // the hopper's balls
+    const hb = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.0214, 1), new THREE.MeshStandardMaterial({ color: 0xf2f2ee, roughness: 0.35 }), 40);
+    for (let i = 0; i < 40; i++) hb.setMatrixAt(i, new THREE.Matrix4().makeTranslation((rnd() - 0.5) * 0.28, 1.04 + rnd() * 0.18, (rnd() - 0.5) * 0.28));
+    disp.add(hb);
+    disp.position.set(1.15, 0, 0.55);
+    group.add(disp);
+  }
+  // a ball out of the dispenser: down the chute, a little roll across the mat, onto the tee
+  const deliver = (ball, to, done) => {
+    const P = [new THREE.Vector3(1.15, 0.92, 0.55), new THREE.Vector3(0.95, 0.62, 0.32), new THREE.Vector3(0.72, 0.1, 0.08), new THREE.Vector3(0.3, 0.035, 0.02), new THREE.Vector3(to.x, to.y, to.z)];
+    const curve = new THREE.CatmullRomCurve3(P);
+    let t = 0;
+    const f = (tt, dt) => {
+      t += dt / 1.25;
+      const k = Math.min(1, t), e = 1 - Math.pow(1 - k, 2.2);
+      const p = curve.getPointAt(e);
+      ball.mesh.position.copy(p);
+      ball.mesh.rotation.z -= dt * 14 * (1 - k);
+      if (k >= 1) { updaters.splice(updaters.indexOf(f), 1); ball.mesh.position.set(to.x, to.y, to.z); done?.(); }
+    };
+    updaters.push(f);
+  };
+
   // ── netting down both sides of the range ──
   const netTex = canvasTex(64, 64, (c, w, h) => { c.clearRect(0, 0, w, h); c.strokeStyle = 'rgba(30,34,36,0.9)'; c.lineWidth = 1.2; for (let i = 0; i <= w; i += 8) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, h); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(w, i); c.stroke(); } });
   netTex.wrapS = netTex.wrapT = THREE.RepeatWrapping; netTex.repeat.set(70, 12);
@@ -150,7 +187,8 @@ export function buildVenue(group, { quality, updaters, dayHooks }) {
   // ── other golfers' shots out of the bays ──
   const flying = [];
   const flyM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, emissive: 0xffffff, emissiveIntensity: 0.15 });
-  const flyGeo = new THREE.SphereGeometry(0.06, 10, 8); // drawn a touch large so a far ball reads
+  const flyGeo = new THREE.SphereGeometry(0.07, 10, 8); // drawn a touch large so a far ball reads
+  const trailM = new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 });
   let nextShot = 1;
   updaters.push((t, dt) => {
     nextShot -= dt;
@@ -162,7 +200,11 @@ export function buildVenue(group, { quality, updaters, dayHooks }) {
       const m = new THREE.Mesh(flyGeo, flyM);
       m.position.set(x, y, z);
       group.add(m);
-      flying.push({ m, vx: Math.sin(aim) * Math.cos(la) * sp, vy: Math.sin(la) * sp, vz: -Math.cos(aim) * Math.cos(la) * sp, curve: (rnd() - 0.5) * 6, t: 0 });
+      // a short tracer behind it so a ball from another bay reads from the mat
+      const tg = new THREE.BufferGeometry(); const tp = new Float32Array(30 * 3); for (let k = 0; k < 30; k++) tp.set([x, y, z], k * 3);
+      tg.setAttribute('position', new THREE.BufferAttribute(tp, 3));
+      const tl = new THREE.Line(tg, trailM); tl.frustumCulled = false; group.add(tl);
+      flying.push({ tl, tp, m, vx: Math.sin(aim) * Math.cos(la) * sp, vy: Math.sin(la) * sp, vz: -Math.cos(aim) * Math.cos(la) * sp, curve: (rnd() - 0.5) * 6, t: 0 });
     }
     for (let i = flying.length - 1; i >= 0; i--) {
       const f = flying[i];
@@ -171,8 +213,10 @@ export function buildVenue(group, { quality, updaters, dayHooks }) {
       const sp = Math.hypot(f.vx, f.vy, f.vz);
       f.vx += (-0.012 * sp * f.vx + f.curve * 0.08) * dt; f.vz += -0.012 * sp * f.vz * dt; f.vy += (-9.8 + 0.006 * sp * sp * 0.35 - 0.012 * sp * f.vy) * dt;
       f.m.position.x += f.vx * dt; f.m.position.y += f.vy * dt; f.m.position.z += f.vz * dt;
+      f.tp.copyWithin(3, 0, f.tp.length - 3); f.tp.set([f.m.position.x, f.m.position.y, f.m.position.z], 0);
+      f.tl.geometry.attributes.position.needsUpdate = true;
       const gy = groundHeight(f.m.position.x, f.m.position.z);
-      if (f.m.position.y < gy + 0.03 || f.t > 12) { group.remove(f.m); flying.splice(i, 1); }
+      if (f.m.position.y < gy + 0.03 || f.t > 12) { group.remove(f.m); group.remove(f.tl); f.tl.geometry.dispose(); flying.splice(i, 1); }
     }
   });
 
@@ -222,5 +266,5 @@ export function buildVenue(group, { quality, updaters, dayHooks }) {
     for (const m of ringMats) m.emissiveIntensity = 0.06 + 0.42 * n;
     conc.emissiveIntensity = 0.32 * n;
   });
-  return { building: bld };
+  return { building: bld, deliver };
 }

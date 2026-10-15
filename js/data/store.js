@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS = {
   display: 'standard', // standard | tv
   timeOfDay: 'night', // night | day
   weather: 'clear', // clear | cloudy | breezy | windy | rain
+  rangeCinema: true, // the range: the ball out of the dispenser with the camera turning in, and venue cutaways
   rings: 'putt', // on the green: putt (putt it out, optional) | tight | standard | generous (rings settle it)
   r10Putts: 'radar', // paired: radar (putt on the mat) | screen (putts on screen, the R10 for full swings only)
   gimme: 'two', // putting it out: picked up inside off | two | three | five feet
