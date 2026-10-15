@@ -340,7 +340,7 @@ export function seine() {
       for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
       for (let i = 0; i < path.length - 1; i++) ang.push(Math.atan2(path[i + 1][1] - path[i][1], path[i + 1][0] - path[i][0]));
       const hullM = mat(0xf2f1ec, { roughness: 0.5 }), trim = mat(0x1d3a5a, { roughness: 0.6 });
-      const glass = new THREE.MeshStandardMaterial({ color: 0x9fb4bf, roughness: 0.08, metalness: 0.6, transparent: true, opacity: 0.55 });
+      const glass = new THREE.MeshStandardMaterial({ color: 0x4c5c64, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.28, depthWrite: false });
       for (let k = 0; k < 4; k++) {
         const boat = new THREE.Group();
         const hull = new THREE.BoxGeometry(36, 2, 7, 12, 1, 1);
@@ -353,9 +353,9 @@ export function seine() {
         boat.add(new THREE.Mesh(new THREE.BoxGeometry(26.2, 0.15, 6.4).translate(-2, 3.15, 0), hullM));
         boat.add(new THREE.Mesh(new THREE.BoxGeometry(4, 2.4, 3).translate(13, 2.2, 0), hullM)); // the wheelhouse
         boat.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-        // passengers on the open upper deck
+        // passengers in the glass cabin, on its floor, looking out at the city
         const on = [];
-        for (let i = 0; i < 26; i++) on.push([-14 + rnd() * 24, 3.25, (rnd() - 0.5) * 5, rnd() * 6.28]);
+        for (let i = 0; i < 30; i++) { const sd = rnd() < 0.5 ? -1 : 1; on.push([-14 + rnd() * 23, 1.0, sd * (1.6 + rnd() * 1.2), sd > 0 ? 0 : Math.PI]); }
         const crew = crowdAt(on, rnd); if (crew) boat.add(crew);
         boat.userData = { path, cum, ang, len: cum[cum.length - 1], d0: k * cum[cum.length - 1] * 0.5 + rnd() * 100, v: 3.2 + rnd() * 1.2, side: (k % 2 ? 1 : -1) * 12, y: wl + 0.9 };
         group.add(boat); live.boats.push(boat);
