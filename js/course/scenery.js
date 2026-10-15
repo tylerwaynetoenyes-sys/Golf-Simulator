@@ -6,41 +6,58 @@
 //            shoreline
 //   crowds   spectators on the mounds round the greens (tournament courses)
 import * as THREE from 'three';
-import { person as figure } from './streetlife.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { crowdAt } from '../scene/crowd.js';
 import { mergeByMaterial } from '../scene/merge.js';
+import { pbr } from '../scene/pbr.js';
+import { boulderGeometry, seeded } from './lm/kit.js';
 
-function sailboat(rand) {
-  const g = new THREE.Group();
-  const hull = new THREE.Mesh(new THREE.CapsuleGeometry(1.2, 6.5, 4, 10).rotateZ(Math.PI / 2), new THREE.MeshStandardMaterial({ color: rand() < 0.7 ? 0xf3f1ea : 0x1f3550, roughness: 0.4 }));
-  hull.scale.set(1, 0.6, 0.9);
-  hull.position.y = 0.3;
-  g.add(hull);
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 11, 6), new THREE.MeshStandardMaterial({ color: 0xd8d8d8, metalness: 0.6, roughness: 0.3 }));
-  mast.position.set(0.6, 6, 0);
-  g.add(mast);
-  const sailM = new THREE.MeshStandardMaterial({ color: 0xfbfaf5, roughness: 0.7, side: THREE.DoubleSide });
-  const main = new THREE.Shape(); main.moveTo(0, 0); main.lineTo(-3.6, 0); main.lineTo(0, 10.2); main.closePath();
-  const ms = new THREE.Mesh(new THREE.ShapeGeometry(main), sailM);
-  ms.position.set(0.55, 1.2, 0);
-  ms.rotation.y = 0.25;
-  g.add(ms);
-  const jib = new THREE.Shape(); jib.moveTo(0, 0); jib.lineTo(3.2, 0); jib.lineTo(0, 9.4); jib.closePath();
-  const js = new THREE.Mesh(new THREE.ShapeGeometry(jib), sailM);
-  js.position.set(0.65, 1.2, 0);
-  js.rotation.y = -0.2;
-  g.add(js);
-  g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
-  return g;
+// a cruising sloop, ~11 m on deck (Sketchfab "Sailboat" by sergeif, CC BY;
+// docs/SOURCES.md): one textured mesh, waterline at y = 0, length along Z
+let sloop = null;
+function loadSloop() {
+  if (sloop) return sloop;
+  const l = new GLTFLoader();
+  l.setDRACOLoader(new DRACOLoader().setDecoderPath(new URL('../../vendor/three/addons/libs/draco/gltf/', import.meta.url).href));
+  sloop = l.loadAsync(new URL('../../assets/models/boats/sailboat_lo.glb', import.meta.url).href).then((g) => {
+    let mesh = null;
+    g.scene.traverse((o) => { if (o.isMesh && !mesh) mesh = o; });
+    mesh.updateWorldMatrix(true, false);
+    const geo = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+    geo.computeBoundingSphere();
+    // the sails are single sheets: both faces
+    const material = new THREE.MeshStandardMaterial({ map: mesh.material.map, roughness: 0.45, side: THREE.DoubleSide });
+    return { geo, material };
+  }).catch(() => null);
+  return sloop;
 }
 
-function tumbleweed(rand) {
-  const geo = new THREE.IcosahedronGeometry(0.45 + rand() * 0.25, 1);
-  return new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0x9a8457, wireframe: true }));
+// a tumbleweed: a dry Russian thistle, a ball of thin twigs curling round
+// and through each other, ~0.5 m across; one shared tangle
+let weedGeo = null;
+function tumbleweedGeo() {
+  if (weedGeo) return weedGeo;
+  const r = seeded(77), parts = [];
+  for (let i = 0; i < 36; i++) {
+    const pts = [];
+    let p = new THREE.Vector3().randomDirection().multiplyScalar(0.2 + r() * 0.3);
+    const axis = new THREE.Vector3(r() - 0.5, r() - 0.5, r() - 0.5).normalize();
+    for (let k = 0; k < 6; k++) {
+      pts.push(p.clone().normalize().multiplyScalar(0.25 + 0.75 * Math.min(1, p.length() / 0.5 + r() * 0.2)));
+      p = p.clone().applyAxisAngle(axis, 0.45 + r() * 0.3);
+    }
+    parts.push(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 6, 0.008 + r() * 0.008, 3, false));
+  }
+  weedGeo = mergeGeometries(parts.map((g) => { g.deleteAttribute('uv'); return g; }));
+  return weedGeo;
 }
 
 /**
  * @returns {{group, update(dt, t, wind)}}
  */
+const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _v = new THREE.Vector3(), _s = new THREE.Vector3();
 export function dressScenery(T, hole, rand, ground, buildLandmark) {
   const group = new THREE.Group();
   const movers = [];
@@ -85,25 +102,43 @@ export function dressScenery(T, hole, rand, ground, buildLandmark) {
     if (rand() < 0.7) { const at = spot(T.oobLateral + 60, T.oobLateral + 220); if (at) glow.push(...(lm('windmill', at).glow || [])); }
     if (rand() < 0.5) { const at = spot(T.oobLateral + 80, T.oobLateral + 260); if (at) glow.push(...(lm('sodhouse', at).glow || [])); }
     // tumbleweeds, rolling downwind and wrapping round
+    const weedM = pbr('bark_brown_02', { scale: 0.3, tint: 0xf0d8b0, bright: 1.6 }); // sun-bleached dry stems
     for (let i = 0; i < 10; i++) {
       const at = spot(T.fwHalf + 25, T.oobLateral + 120, { tries: 12 });
       if (!at) continue;
-      const tw = put(tumbleweed(rand), at);
-      movers.push({ kind: 'weed', o: tw, home: { x: at.x, z: at.z }, phase: rand() * 100, r: tw.geometry.parameters.radius });
+      const r = 0.45 + rand() * 0.25;
+      const tw = put(new THREE.Mesh(tumbleweedGeo(), weedM), at);
+      tw.scale.setScalar(r);
+      tw.castShadow = true;
+      movers.push({ kind: 'weed', o: tw, home: { x: at.x, z: at.z }, phase: rand() * 100, r });
     }
   }
 
   if (T.seaLevel != null && (hole.theme === 'coastal' || hole.theme === 'harbor')) {
     // sailboats well offshore, bobbing
+    const boats = [];
     for (let i = 0; i < 9; i++) {
       const at = spot(T.oobLateral + 120, T.oobLateral + 1400, { sea: true, tries: 40 });
-      if (!at) continue;
-      const b = put(mergeByMaterial(sailboat(rand), 2), at, rand() * Math.PI * 2);
-      b.scale.setScalar(0.9 + rand() * 0.6);
-      movers.push({ kind: 'boat', o: b, y: at.y, phase: rand() * 10 });
+      if (at) boats.push({ ...at, yaw: rand() * Math.PI * 2, k: 0.8 + rand() * 0.45, phase: rand() * 10 });
+    }
+    if (boats.length) {
+      const holder = new THREE.Group();
+      group.add(holder);
+      loadSloop().then((m) => {
+        if (!m) return;
+        const inst = new THREE.InstancedMesh(m.geo, m.material, boats.length);
+        inst.castShadow = false; inst.receiveShadow = true;
+        inst.frustumCulled = false; // they bob every frame; nine boats
+        holder.add(inst);
+        movers.push({ kind: 'fleet', inst, boats });
+      });
     }
     // sea stacks and boulders along the shore
-    const rock = new THREE.MeshStandardMaterial({ color: hole.theme === 'coastal' ? 0x7d7468 : 0x6f6c66, roughness: 0.95, flatShading: true });
+    // weathered stone (a photographed rock face on noise-shaped boulders), a
+    // few shapes instanced
+    const rock = pbr('rock_face_03', { scale: 2.5, tint: hole.theme === 'coastal' ? 0xd8ccc0 : 0xc4c4c8 });
+    const rr = seeded(hole.n * 13 + 5), shapes = [0, 1, 2].map(() => boulderGeometry(1, rr, { detail: 3, flat: 1 }));
+    const stacks = shapes.map(() => []);
     let n = 0;
     for (let k = 0; k < 600 && n < 26; k++) {
       const s = rand() * L, p = T.pointAt(s), side = rand() < 0.5 ? -1 : 1;
@@ -114,41 +149,47 @@ export function dressScenery(T, hole, rand, ground, buildLandmark) {
       const h = T.meshHeight(x, z);
       if (h > T.seaLevel + 0.6 || h < T.seaLevel - 3) continue; // the surf line
       const r = 1.5 + rand() * (rand() < 0.2 ? 6 : 2.5);
-      const stack = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), rock);
-      stack.scale.set(1, 0.6 + rand() * (r > 4 ? 1.6 : 0.6), 1);
-      stack.position.set(x, T.seaLevel - 0.6 + r * 0.25, z);
-      stack.rotation.set(rand(), rand() * 6, rand());
-      stack.castShadow = stack.receiveShadow = true;
-      group.add(stack);
+      const sy = r * (0.6 + rand() * (r > 4 ? 1.6 : 0.6));
+      stacks[n % 3].push(new THREE.Matrix4().compose(new THREE.Vector3(x, T.seaLevel - 0.6 + sy * 0.25, z),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler((rand() - 0.5) * 0.4, rand() * 6, (rand() - 0.5) * 0.4)), new THREE.Vector3(r, sy, r * (0.8 + rand() * 0.4))));
       n++;
     }
+    stacks.forEach((list, k) => {
+      if (!list.length) return;
+      const inst = new THREE.InstancedMesh(shapes[k], rock, list.length);
+      list.forEach((m, i) => inst.setMatrixAt(i, m));
+      inst.castShadow = inst.receiveShadow = true;
+      inst.computeBoundingSphere();
+      group.add(inst);
+    });
   }
 
   if (hole.crowds) {
     // spectators round the back and sides of the green, on the mounds
     const G = T.green;
-    const n = 60 + Math.floor(rand() * 40);
+    const n = 60 + Math.floor(rand() * 40), spots = [];
     for (let i = 0; i < n; i++) {
       const a = Math.atan2(T.finalDir.z, T.finalDir.x) + (rand() - 0.5) * Math.PI * 1.5;
       const r = T.greenR + 18 + rand() * 14;
       const x = G.x + Math.cos(a) * r, z = G.z + Math.sin(a) * r;
       if (T.terrain(x, z).surface === 'water') continue;
-      const p = figure(rand);
-      p.position.set(x, ground(x, z), z);
-      // figures look down their +X: turn each to face the green
-      p.rotation.y = Math.atan2(-(G.z - z), G.x - x);
-      group.add(p);
+      // scanned people (instanced), each turned to face the green
+      spots.push([x, ground(x, z), z, Math.atan2(G.x - x, G.z - z)]);
     }
+    const crowd = crowdAt(spots, rand);
+    if (crowd) group.add(crowd);
   }
 
   return {
     group, glow,
     update(dt, t, wind = { x: 0.6, z: 0 }) {
       for (const m of movers) {
-        if (m.kind === 'boat') {
-          m.o.position.y = m.y + Math.sin(t * 0.9 + m.phase) * 0.18;
-          m.o.rotation.z = Math.sin(t * 0.7 + m.phase) * 0.05;
-          m.o.rotation.x = Math.sin(t * 0.55 + m.phase * 1.3) * 0.04;
+        if (m.kind === 'fleet') {
+          m.boats.forEach((b, i) => {
+            _e.set(Math.sin(t * 0.55 + b.phase * 1.3) * 0.04, b.yaw, Math.sin(t * 0.7 + b.phase) * 0.05 + 0.08); // heeling a little under sail
+            m.inst.setMatrixAt(i, _m.compose(_v.set(b.x, b.y + Math.sin(t * 0.9 + b.phase) * 0.18, b.z), _q.setFromEuler(_e), _s.setScalar(b.k)));
+          });
+          m.inst.instanceMatrix.needsUpdate = true;
         } else if (m.kind === 'weed') {
           // roll downwind for ~60 m, then start again from home
           const sp = 1.2 + Math.hypot(wind.x, wind.z) * 0.9;

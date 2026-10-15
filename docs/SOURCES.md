@@ -249,7 +249,9 @@ corrugated_iron, asphalt_02, granite_wall, red_bricks_02, white_plaster_02,
 roof_slates_02, and for the landmark pass cobblestone_floor_08,
 gravel_stones, rock_face_03, rusty_metal_02, box_profile_metal_sheet,
 thatch_roof_angled, white_stucco, wood_planks_grey (1K colour, 512 px
-roughness and normal), gray_rocks and rock_boulder_dry (the riprap). Laid on
+roughness and normal), gray_rocks and rock_boulder_dry (the riprap),
+grass_ground (mown earthworks at Cahokia), rough_linen (wagon canvas) and
+brown_mud_dry (sod). Laid on
 in world space by `js/scene/pbr.js`. From ambientCG (https://ambientcg.com,
 CC0): painted_steel (Metal032) and red_brick (Bricks059), which pbr.js draws
 for the `metal_plate` and `red_bricks_02` ids (a tread plate and a weathered
@@ -286,8 +288,19 @@ Draco-compressed (`assets/models/cars/`, `assets/models/boats/`):
   "2001 Honda Odyssey EX" by BHP3D (sketchfab.com/BHP3D)
 - "BAYCRUISER" by d2u (sketchfab.com/d2u)
 - "«Progress» motorboat" by isiosiusin (sketchfab.com/isiosiusin)
+- "Sailboat" by sergeif (sketchfab.com/sergeif): the sloops offshore on the
+  coastal courses (`sailboat_lo.glb`, 2.5k triangles, its own texture)
 
 The crowds use the scanned people already credited above (people_lo.glb).
+
+## Prairie animals
+
+From Sketchfab, CC BY 4.0; posed, reduced in Blender to one ~3k-triangle
+mesh with its coat texture, Draco-compressed (`assets/models/animals/`):
+
+- "Animated Free Bison" by AneesAnimates (sketchfab.com/AneesAnimates)
+- "Brown Cow 3d model" by rt699448 (sketchfab.com/rt699448), drawn as the
+  wagon trains' oxen
 
 ## Confluence Point
 
