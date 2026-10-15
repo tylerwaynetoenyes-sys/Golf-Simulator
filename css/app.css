@@ -869,3 +869,5 @@ body.tv .callout .co-text { font-size: 17px; } body.tv .callout .co-text b { fon
 .club-rail { max-height: calc(100vh - 200px); overflow-y: auto; scrollbar-width: none; }
 .club-rail::-webkit-scrollbar { display: none; }
 .club-rail .club { padding: 7px 12px; }
+
+.club-set .set-spec { display: block; margin-top: 6px; font-variant-numeric: tabular-nums; color: var(--text-2); letter-spacing: 0.02em; }

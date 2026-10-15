@@ -99,6 +99,52 @@ export const BALLS = [
   },
 ];
 
+// ── branded sets: how players actually buy clubs ──
+// Tongue-in-cheek brands (a wink at the real makers, not them), each modelled on
+// a real kind of bag and its published specs
+// (lofts, lengths, head designs). The names live here alone, so licensed names
+// could replace them. iron/finish/wood are the look (js/scene/club.js);
+// ironLofts: degrees stronger than traditional (game-improvement irons are
+// jacked: a 28° 7-iron); woods: 'persimmon' plays as the old wooden heads did.
+export const SETS = [
+  {
+    id: 'tour', brand: 'Titlewest', model: 'Pro V-Neck MB', blurb: 'A tour player\'s bag: forged chrome muscle-backs, a low-spin 9° titanium driver, three wedges.',
+    spec: 'DR 9° tour · 3W · 3H · 4–PW forged blades · 50/56/60', driverHead: 'tour', ironHead: 'blade', ironLofts: 0,
+    bag: ['DR9', '3W', '3H', '4I', '5I', '6I', '7I', '8I', '9I', 'PW', 'GW', 'SW', 'LW'],
+    iron: 'blade', finish: 'chrome', wood: 'titanium',
+  },
+  {
+    id: 'cavity', brand: 'Pong', model: 'i-Ish CB', blurb: 'The good amateur\'s bag: satin players\' cavity-backs, a neutral driver, a 4-hybrid for the long irons.',
+    spec: 'DR 10.5° · 3W · 5W · 4H · 5–PW cavity backs · 50/56/60', driverHead: 'std', ironHead: 'players', ironLofts: 0,
+    bag: ['DR', '3W', '5W', '4H', '5I', '6I', '7I', '8I', '9I', 'PW', 'GW', 'SW', 'LW'],
+    iron: 'cavity', finish: 'satin', wood: 'titanium',
+  },
+  {
+    id: 'gi', brand: 'Callaweigh', model: 'Big Birdie OS', blurb: 'Built to be easy: a 12° max-forgiveness driver, high-launching woods and hybrids, wide-soled irons with strong lofts.',
+    spec: 'DR 12° max · 5W · 7W · 3H · 4H · 6–PW game improvement (7i 28°) · 50/56', driverHead: 'max', ironHead: 'gi', ironLofts: 3,
+    bag: ['DR12', '5W', '7W', '3H', '4H', '6I', '7I', '8I', '9I', 'PW', 'GW', 'SW'],
+    iron: 'cavity', finish: 'satin', wood: 'titanium',
+  },
+  {
+    id: 'black', brand: 'TaylerMaid', model: 'Stealthy Black', blurb: 'The same tour bag in black PVD with stealth shafts.',
+    spec: 'DR 10.5° tour · 3W · 5W · 4–PW forged blades · 50/56/60', driverHead: 'tour', ironHead: 'blade', ironLofts: 0,
+    bag: ['DR', '3W', '5W', '4I', '5I', '6I', '7I', '8I', '9I', 'PW', 'GW', 'SW', 'LW'],
+    iron: 'blade', finish: 'black', wood: 'carbon',
+  },
+  {
+    id: 'persimmon', brand: 'MacGreggor', model: 'Tourney 1975', blurb: 'Persimmon woods with brass sole plates, chrome blades and leather grips. The woods are small and slow off the face, as they were.',
+    spec: 'DR 11° persimmon · 3W · 4W · 2–9 blades · PW · SW', driverHead: 'std', ironHead: 'blade', ironLofts: -2, woods: 'persimmon',
+    bag: ['DR', '3W', '5W', '3I', '4I', '5I', '6I', '7I', '8I', '9I', 'PW', 'SW'],
+    iron: 'blade', finish: 'chrome', wood: 'persimmon',
+  },
+  {
+    id: 'hockey', brand: 'Happy Gilmour', model: 'Hockey Stick', blurb: 'One taped wooden hockey stick for every shot. Plays like the stock bag; looks like nothing else.',
+    spec: 'Stock numbers, a hockey stick to look at', driverHead: 'std', ironHead: 'players', ironLofts: 0,
+    bag: ['DR', '3W', '5W', '4H', '5I', '6I', '7I', '8I', '9I', 'PW', 'GW', 'SW', 'LW'], hockey: true,
+  },
+];
+export const setById = (id) => SETS.find((x) => x.id === id) || SETS[1];
+
 export const ballById = (id) => BALLS.find((b) => b.id === id) || BALLS[0];
 export const headById = (kind, id) => (HEADS[kind] || []).find((h) => h.id === id) || (HEADS[kind] || [])[1] || null;
 

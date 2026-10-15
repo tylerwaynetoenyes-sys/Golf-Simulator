@@ -32,8 +32,6 @@ const DEFAULT_SETTINGS = {
   weather: 'clear', // clear | cloudy | breezy | windy | rain
   // equipment (js/data/equipment.js): the bag, head designs and balls
   bag: ['DR', '3W', '5W', '4H', '5I', '6I', '7I', '8I', '9I', 'PW', 'GW', 'SW', 'LW'],
-  driverHead: 'std', // max | std | tour
-  ironHead: 'players', // gi | players | blade
   ball: 'tour', // on the course
   rangeBall: 'range', // on the driving range
   rangeCinema: true, // the range: the ball out of the dispenser with the camera turning in, and venue cutaways
@@ -43,7 +41,7 @@ const DEFAULT_SETTINGS = {
   mulligans: 'nine', // off | nine | hole | free
   courseLength: 9,
   courseStart: 1,
-  clubSet: 'tour', // see CLUB_SETS in js/scene/club.js
+  clubSet: 'cavity', // the branded set (js/data/equipment.js SETS): its heads, lofts, bag and look
   showClub: true, // the club at address and through the strike
   partyMode: false, // drinking-game prompts (js/game/party.js); off unless asked for
 };

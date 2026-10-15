@@ -9,6 +9,7 @@
 // Frame (local to the ball): -Z toward the target, +X away from the golfer
 // (a right-handed player stands on -X, facing +X), +Y up.
 import * as THREE from 'three';
+import { SETS } from '../data/equipment.js';
 
 // Club length (in), lie (°) and loft (°): typical modern specs
 const SPEC = {
@@ -43,13 +44,8 @@ const ease = (t) => t * t * (3 - 2 * t);
  * launch comes from the R10 or the swing meter), so this is purely visual.
  * Each is modelled on a well-known style of club rather than a brand.
  */
-export const CLUB_SETS = [
-  { id: 'tour', name: 'Tour Blades', blurb: 'Forged chrome muscle-backs, a black titanium driver: the classic tour bag.', iron: 'blade', finish: 'chrome', wood: 'titanium' },
-  { id: 'cavity', name: 'Players Cavity', blurb: 'Satin cavity-back irons with a wide sole, the modern game-improvement look.', iron: 'cavity', finish: 'satin', wood: 'titanium' },
-  { id: 'black', name: 'Black Tour', blurb: 'All-black PVD heads and stealth shafts.', iron: 'blade', finish: 'black', wood: 'carbon' },
-  { id: 'persimmon', name: 'Persimmon Classic', blurb: '1970s persimmon woods with brass sole plates, chrome blades, steel shafts and leather grips.', iron: 'blade', finish: 'chrome', wood: 'persimmon' },
-  { id: 'hockey', name: 'Hockey Stick', blurb: 'One taped wooden hockey stick for every shot, after Happy Gilmore.', hockey: true },
-];
+// the look of each branded set (js/data/equipment.js SETS)
+export const CLUB_SETS = SETS.map((x) => ({ ...x, name: `${x.brand} ${x.model}` }));
 export const clubSet = (id) => CLUB_SETS.find((x) => x.id === id) || CLUB_SETS[0];
 
 function headMesh(spec, mats, set) {

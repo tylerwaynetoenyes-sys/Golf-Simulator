@@ -182,17 +182,14 @@ export function openSettings(game) {
     <div class="setting"><div><label>Putting with the R10</label><div class="hint">Radar: putt on your mat; the prompt gives the ball speed for hole pace. The R10 can miss very slow putts, so Auto putt, Hold to putt and Skip stay available. Screen: the R10 handles full swings and you putt on screen.</div></div>${seg('r10Putts', [['radar', 'Radar'], ['screen', 'Screen']])}</div>
     <div class="setting"><div><label>Party mode</label><div class="hint">Drinking-game prompts: water, OB and three-putts drink, birdies hand them out, and every Zoo hole has its own rule. Any drink counts, water too; drink responsibly, and only if you're of age.</div></div>${tog('partyMode')}</div>
     <h3>Equipment</h3>
-    <div class="setting"><div><label>Your bag</label><div class="hint">Up to ${BAG_LIMIT} clubs for the course. On the range every club is out.</div></div></div>
+    <div class="setting"><div><label>Club set</label><div class="hint">Pick a set the way you'd buy one: each plays as its kind of club does (head design, lofts, forgiveness) and comes with its own bag.</div></div></div>
+    <div class="club-sets">${CLUB_SETS.map((c) => `<button class="club-set" data-set="${c.id}" aria-pressed="${(s.clubSet || 'cavity') === c.id}"><b>${esc(c.name)}</b><small>${esc(c.blurb)}</small><small class="set-spec">${esc(c.spec)}</small></button>`).join('')}</div>
+    <div class="setting" style="margin-top:10px"><div><label>Your bag</label><div class="hint">Up to ${BAG_LIMIT} clubs for the course. On the range every club is out.</div></div></div>
     <div class="bag-picks">${CATALOGUE.map((c) => `<button class="bag-pick" data-bag="${c.id}" aria-pressed="${(s.bag || []).includes(c.id)}"><b>${esc(c.short)}</b><small>${c.loft}°</small></button>`).join('')}</div>
-    <div class="setting"><div><label>Driver head</label><div class="hint">${HEADS.driver.map((h) => `${esc(h.name)}: ${esc(h.note)}`).join('. ')}.</div></div>${seg('driverHead', HEADS.driver.map((h) => [h.id, h.name]))}</div>
-    <div class="setting"><div><label>Irons</label><div class="hint">${HEADS.iron.map((h) => `${esc(h.name)}: ${esc(h.note)}`).join('. ')}.</div></div>${seg('ironHead', HEADS.iron.map((h) => [h.id, h.name]))}</div>
     <div class="setting"><div><label>Ball on the course</label><div class="hint">Cover, compression and dimples change spin, speed, flight and how it stops on the green. With the R10 your real launch is kept and the ball's flight and bite are applied.</div></div></div>
     <div class="club-sets">${BALLS.map((b) => `<button class="club-set ball-pick" data-ball="${b.id}" aria-pressed="${(s.ball || 'tour') === b.id}"><b>${esc(b.name)}</b><small>${esc(b.sub)}</small></button>`).join('')}</div>
     <div class="setting" style="margin-top:10px"><div><label>Ball on the range</label></div>${seg('rangeBall', BALLS.map((b) => [b.id, b.name]))}</div>
-    <h3>Clubs</h3>
     <div class="setting"><div><label>Show the club</label><div class="hint">The club at address and through the strike. Off: just the ball.</div></div>${tog('showClub')}</div>
-    <div class="club-sets">${CLUB_SETS.map((c) => `<button class="club-set" data-set="${c.id}" aria-pressed="${(s.clubSet || 'tour') === c.id}"><b>${esc(c.name)}</b><small>${esc(c.blurb)}</small></button>`).join('')}</div>
-    <div class="hint" style="margin:6px 2px 0">Every set flies the same: the numbers come from your swing.</div>
     <h3>Sound</h3>
     <div class="setting"><label>Master volume</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-range="volume" /></div>
     <div class="setting"><label>Night ambience</label><input type="range" min="0" max="1" step="0.05" value="${s.ambience}" data-range="ambience" /></div>
@@ -227,6 +224,11 @@ export function openSettings(game) {
   el.querySelectorAll('.club-set:not(.ball-pick)').forEach((b) => b.addEventListener('click', () => {
     el.querySelectorAll('.club-set:not(.ball-pick)').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     audio.tick();
+    const set = CLUB_SETS.find((x) => x.id === b.dataset.set);
+    if (set) {
+      el.querySelectorAll('.bag-pick').forEach((x) => x.setAttribute('aria-pressed', String(set.bag.includes(x.dataset.bag))));
+      game.applySetting('bag', set.bag.slice(), true);
+    }
     game.applySetting('clubSet', b.dataset.set);
   }));
   el.querySelectorAll('[data-range]').forEach((r) => r.addEventListener('input', () => game.applySetting(r.dataset.range, Number(r.value))));

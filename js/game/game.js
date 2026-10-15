@@ -222,7 +222,7 @@ export class Game {
   /** The bag and ball for this mode: the whole catalogue and the range ball on the range, the player's bag on a course. */
   refreshEquipment() {
     const st = store.settings, course = this.mode?.id === 'course';
-    rebuildClubs({ bag: st.bag, all: !course, driverHead: st.driverHead, ironHead: st.ironHead, ball: course ? st.ball : st.rangeBall });
+    rebuildClubs({ set: st.clubSet, bag: st.bag, all: !course, ball: course ? st.ball : st.rangeBall });
     this.club = clubById(this.club?.id);
     this.hud.renderClubs(this.club.id);
   }
@@ -552,7 +552,7 @@ export class Game {
         this.updatePrompt();
         break;
       case 'camera': this.world.rig.setStyle(value); break;
-      case 'bag': case 'driverHead': case 'ironHead': case 'ball': case 'rangeBall': this.refreshEquipment(); this._updateHelper?.(); break;
+      case 'bag': case 'ball': case 'rangeBall': this.refreshEquipment(); this._updateHelper?.(); break;
       case 'quality': this.world.setQuality(value); break;
       case 'volume': audio.setVolume(value); break;
       case 'ambience': audio.setAmbience(value); break;
@@ -562,6 +562,7 @@ export class Game {
       case 'timeOfDay': this.setTimeOfDay(value); break;
       case 'weather': this.setWeather(value); break;
       case 'clubSet':
+        this.refreshEquipment();
         this.world.club.setSet(value);
         if (this.state === 'ready') this._addressClub();
         break;

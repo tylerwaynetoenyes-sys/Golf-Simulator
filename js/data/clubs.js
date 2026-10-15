@@ -3,7 +3,7 @@
 // Trackman tour averages (tour: DR 171 mph / 10.4° / 2545 rpm, 7i 123 / 16.3 / 7124).
 import { MPH } from '../core/physics.js';
 
-import { CATALOGUE, STOCK_BAG, HEADS, ballById, headById, ballSpeedFactor, ballSpinFactor } from './equipment.js';
+import { CATALOGUE, STOCK_BAG, HEADS, ballById, headById, setById, ballSpeedFactor, ballSpinFactor } from './equipment.js';
 
 /**
  * The clubs in play: the player's bag (or the whole catalogue on the range),
@@ -14,22 +14,31 @@ export const CLUBS = [];
 let _ball = ballById('tour');
 export const currentBall = () => _ball;
 
-export function rebuildClubs({ bag = STOCK_BAG, all = false, driverHead = 'std', ironHead = 'players', ball = 'tour' } = {}) {
+export function rebuildClubs({ set = 'cavity', bag = null, all = false, ball = 'tour' } = {}) {
   _ball = ballById(ball);
+  const S = setById(set);
+  bag = bag || S.bag;
+  const driverHead = S.driverHead, ironHead = S.ironHead;
   const ids = all ? CATALOGUE.map((c) => c.id) : CATALOGUE.map((c) => c.id).filter((id) => bag.includes(id));
   CLUBS.length = 0;
   for (const id of ids) {
     const c = CATALOGUE.find((k) => k.id === id);
     const head = c.kind === 'driver' ? headById('driver', driverHead) : c.kind === 'iron' ? headById('iron', ironHead) : null;
     const h = head || { smash: 0, launch: 0, spin: 1, forgive: 1, work: 1 };
-    const speed = ((c.smash + h.smash) / c.smash) * ballSpeedFactor(_ball, c.clubMph);
+    // the set's loft scheme (irons only): stronger lofts launch lower and spin less, and go farther
+    const dl = c.kind === 'iron' || c.id === 'PW' ? S.ironLofts || 0 : 0; // the PW is part of the iron set
+    // persimmon: about 190 cc of wood, far less COR than titanium; slower and spinnier
+    const old = S.woods === 'persimmon' && (c.kind === 'driver' || c.kind === 'wood');
+    const smash = c.smash + h.smash - (old ? 0.09 : 0);
+    const speed = (smash / c.smash) * (1 + 0.009 * dl) * ballSpeedFactor(_ball, c.clubMph);
     const ballMph = c.ballMph * speed;
     CLUBS.push({
       ...c,
+      loft: c.loft - dl,
       ballMph,
-      smash: c.smash + h.smash,
-      launch: c.launch + h.launch,
-      spin: c.spin * h.spin * ballSpinFactor(_ball, c.loft),
+      smash,
+      launch: c.launch + h.launch - 0.55 * dl + (old ? 0.6 : 0),
+      spin: c.spin * h.spin * (1 - 0.03 * dl) * (old ? 1.18 : 1) * ballSpinFactor(_ball, c.loft - dl),
       forgive: h.forgive,
       work: h.work,
       // carry grows a little faster than ball speed; less spin flies a touch farther
@@ -37,7 +46,7 @@ export function rebuildClubs({ bag = STOCK_BAG, all = false, driverHead = 'std',
       head: head?.id || null,
     });
   }
-  if (!CLUBS.length) rebuildClubs({ all: true, ball });
+  if (!CLUBS.length) rebuildClubs({ set, all: true, ball });
   return CLUBS;
 }
 rebuildClubs();
