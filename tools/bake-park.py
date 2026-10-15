@@ -38,7 +38,7 @@ nodes = {}
 out = {'note': 'OpenStreetMap contributors, ODbL. Local frame as ground.json.', 'parks': [], 'buildings': [], 'areas': [], 'lines': [], 'points': []}
 POINT = {('leisure', 'picnic_table'), ('amenity', 'bench'), ('amenity', 'drinking_water'), ('leisure', 'fitness_station'),
          ('tourism', 'information'), ('tourism', 'artwork'), ('amenity', 'waste_basket'), ('historic', 'memorial'),
-         ('historic', 'monument'), ('highway', 'street_lamp'), ('man_made', 'flagpole'), ('amenity', 'fountain')}
+         ('historic', 'monument'), ('highway', 'street_lamp'), ('man_made', 'flagpole'), ('amenity', 'fountain'), ('man_made', 'monitoring_station')}
 for n in root.iter('node'):
     nodes[n.get('id')] = (float(n.get('lat')), float(n.get('lon')))
     tags = {t.get('k'): t.get('v') for t in n.iter('tag')}

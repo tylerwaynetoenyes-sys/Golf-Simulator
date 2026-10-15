@@ -256,6 +256,18 @@ for the `metal_plate` and `red_bricks_02` ids (a tread plate and a weathered
 mixed brick, wrong for the painted steel and red brick their callers mean);
 `assets/textures/fence/chainlink_*` (Fence003), the riverfront's chain-link.
 
+## Houses
+
+From Sketchfab, CC BY 4.0; joined, reduced in Blender to ~1.6-2.4k
+triangles and baked to one 2K texture atlas each (`assets/models/houses/`,
+`js/scene/houses.js`), placed on Alton's mapped house footprints:
+
+- "Americ an Football House" (the gable-front frame house) by davylyn4 (sketchfab.com/davylyn4)
+- "Foursquare House" by srlandry00 (sketchfab.com/srlandry00)
+- "Small Brick House" by jimbogies (sketchfab.com/jimbogies)
+- "Old brick house" by Kiiba (sketchfab.com/Kiiba)
+- "Low-poly Old American brick building with shop." by Orzechu (sketchfab.com/Orzechu)
+
 ## Alton parks
 
 `assets/landmarks/alton/park.json` (`tools/bake-park.py`, the riverfront's

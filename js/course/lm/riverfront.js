@@ -37,6 +37,7 @@ import { pbr } from '../../scene/pbr.js';
 import { carsAt } from '../../scene/cars.js';
 import { crowdAt } from '../../scene/crowd.js';
 import { boatFleet } from '../../scene/boats.js';
+import { loadHouses, housesLoaded, housesAt } from '../../scene/houses.js';
 
 // the baked map, fetched as soon as the module loads (long before a hole is built)
 const BASE = new URL('../../../assets/landmarks/alton/', import.meta.url).href;
@@ -45,7 +46,7 @@ let PARK = null;
 const parkReady = fetch(`${BASE}park.json`).then((r) => (r.ok ? r.json() : null)).then((j) => (PARK = j)).catch(() => null);
 let DATA = null;
 const ready = Promise.all([
-  parkReady,
+  parkReady.then(() => loadHouses()),
   fetch(`${BASE}ground.json`).then((r) => (r.ok ? r.json() : Promise.reject(r.status))),
   fetch(`${BASE}ground.bin`).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))),
 ]).then(([, j, bin]) => {
@@ -802,7 +803,80 @@ function groundMeshes(D, Hf, cut, blend, glow) {
 /** Downtown Alton and West Alton: OSM footprints extruded on the ground.
  * Brick and limestone commercial blocks with flat roofs, frame houses with
  * pitched ones, churches with spires. Merged per 400 m cell. */
-export function townMeshes(D, gy, skip, glow, rnd) {
+/**
+ * The real houses (scene/houses.js) for the town's house footprints near the
+ * riverfront: the type that suits each footprint, scaled to it and turned to
+ * face its nearest street. Returns the footprints it took (by index).
+ */
+function townHouses(D, gy, skip, rnd, out, { near = 480, cap = 110 } = {}) {
+  const taken = new Set();
+  if (!housesLoaded()) return taken;
+  // street points on a 30 m grid, for "which way is the street"
+  const cells = new Map(), key = (x, z) => `${Math.floor(x / 30)},${Math.floor(z / 30)}`;
+  for (const r of D.roads) {
+    if (!STREETS.has(r.k)) continue;
+    for (let i = 0; i < r.p.length - 1; i++) {
+      const [ax, az] = r.p[i], [bx2, bz2] = r.p[i + 1], n = Math.max(1, Math.ceil(Math.hypot(bx2 - ax, bz2 - az) / 5));
+      for (let k = 0; k <= n; k++) { const x = ax + ((bx2 - ax) * k) / n, z = az + ((bz2 - az) * k) / n, kk = key(x, z); if (!cells.has(kk)) cells.set(kk, []); cells.get(kk).push(x, z); }
+    }
+  }
+  const street = (x, z) => {
+    let best = null, bd = 45 * 45;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) {
+      const c = cells.get(`${Math.floor(x / 30) + i},${Math.floor(z / 30) + j}`);
+      if (c) for (let k = 0; k < c.length; k += 2) { const d = (c[k] - x) ** 2 + (c[k + 1] - z) ** 2; if (d < bd) { bd = d; best = [c[k], c[k + 1]]; } }
+    }
+    return best;
+  };
+  const cand = [];
+  D.buildings.forEach((b, idx) => {
+    let pts = b.p;
+    if (pts.length > 2 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]) pts = pts.slice(0, -1);
+    if (pts.length < 4 || pts.length > 10) return;
+    const cx = pts.reduce((s2, q) => s2 + q[0], 0) / pts.length, cz = pts.reduce((s2, q) => s2 + q[1], 0) / pts.length;
+    const dist = Math.hypot(cx, cz);
+    if (dist > near || skip(cx, cz, b)) return;
+    let area = 0;
+    for (let i = 0; i < pts.length; i++) { const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % pts.length]; area += x1 * z2 - x2 * z1; }
+    const A = Math.abs(area / 2), k = b.k;
+    const homey = ['house', 'detached', 'residential', 'semidetached_house', 'terrace', 'bungalow'].includes(k) || (k === 'yes' && A < 350);
+    const shop = ['commercial', 'retail'].includes(k);
+    if (!homey && !shop) return;
+    cand.push({ idx, pts, cx, cz, A, dist, shop });
+  });
+  cand.sort((a, b) => a.dist - b.dist);
+  for (const c of cand.slice(0, cap)) {
+    const st = street(c.cx, c.cz);
+    if (!st) continue;
+    // the footprint's oriented box, along its longest side
+    let best = 0, ang = 0;
+    for (let i = 0; i < c.pts.length; i++) { const [x1, z1] = c.pts[i], [x2, z2] = c.pts[(i + 1) % c.pts.length]; const l = Math.hypot(x2 - x1, z2 - z1); if (l > best) { best = l; ang = Math.atan2(z2 - z1, x2 - x1); } }
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
+    for (const [x, z] of c.pts) { const a = (x - c.cx) * ca + (z - c.cz) * sa, bb = -(x - c.cx) * sa + (z - c.cz) * ca; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, bb); b1 = Math.max(b1, bb); }
+    const mx = c.cx + ((a0 + a1) / 2) * ca - ((b0 + b1) / 2) * sa, mz = c.cz + ((a0 + a1) / 2) * sa + ((b0 + b1) / 2) * ca;
+    // face the street: the box axis nearer the street direction is the house's depth
+    let rx = st[0] - mx, rz = st[1] - mz;
+    const alongA = Math.abs(rx * ca + rz * sa) > Math.abs(-rx * sa + rz * ca);
+    const ux = alongA ? ca : -sa, uz = alongA ? sa : ca, sgn = Math.sign(rx * ux + rz * uz) || 1;
+    rx = ux * sgn; rz = uz * sgn;
+    const d = alongA ? a1 - a0 : b1 - b0, w = alongA ? b1 - b0 : a1 - a0;
+    const r = rnd();
+    let type;
+    if (c.shop || (c.A > 150 && w / Math.max(d, 1) > 2)) type = 'brick_shop';
+    else if (c.A >= 140 && Math.max(w, d) / Math.min(w, d) < 1.5) type = 'foursquare';
+    else if (c.A < 95) type = c.dist < 300 ? (r < 0.55 ? 'brick_narrow' : 'frame_gable') : (r < 0.75 ? 'frame_gable' : 'brick_narrow');
+    else type = r < 0.5 ? 'brick_cottage' : r < 0.8 ? 'frame_gable' : 'foursquare';
+    const y = Math.min(...c.pts.map(([x, z]) => gy(x, z)));
+    out.push({ type, x: mx, y, z: mz, yaw: Math.atan2(rx, rz), w, d });
+    taken.add(c.idx);
+  }
+  return taken;
+}
+
+export function townMeshes(D, gy, skip, glow, rnd, houses = null) {
+  // near the riverfront the houses are the real models; the rest stay extruded
+  const taken = houses ? townHouses(D, gy, skip, rnd, houses) : new Set();
   const facade = canvasTex(256, 256, (c, w, h) => {
     c.fillStyle = '#e6e2da'; c.fillRect(0, 0, w, h);
     c.fillStyle = 'rgba(0,0,0,0.06)';
@@ -847,7 +921,9 @@ export function townMeshes(D, gy, skip, glow, rnd) {
     const l = Math.hypot(...n) || 1;
     for (const p of [a, b, c]) { R.p.push(...p); R.n.push(n[0] / l, n[1] / l, n[2] / l); R.c.push(color.r, color.g, color.b); }
   };
+  D.buildings.forEach((b, bi) => { if (taken.has(bi)) b._model = true; });
   for (const b of D.buildings) {
+    if (b._model) { delete b._model; continue; }
     let pts = b.p;
     if (pts.length > 2 && pts[0][0] === pts[pts.length - 1][0] && pts[0][1] === pts[pts.length - 1][1]) pts = pts.slice(0, -1);
     if (pts.length < 3) continue;
@@ -1106,8 +1182,8 @@ function riprap(B, line, wy, rnd, { base = 12, crest = 1.6, boulders = true } = 
     g.computeVertexNormals();
     B.add(pile, g);
     if (!boulders) continue;
-    for (let t = 0; t < L; t += 1.6) for (let k = 0; k < 3; k++) {
-      const o = (rnd() - 0.5) * base * 0.8, c = A.clone().addScaledVector(d, t + rnd() * 1.6).addScaledVector(nrm, o);
+    for (let t = 0; t < L; t += 2.6) for (let k = 0; k < 2; k++) {
+      const o = (rnd() - 0.5) * base * 0.8, c = A.clone().addScaledVector(d, t + rnd() * 2.6).addScaledVector(nrm, o);
       const r = 0.45 + rnd() * 0.6, y = wy + crest * Math.max(0, 1 - Math.abs(o) / (base * 0.5)) * 0.9;
       B.add(rock, place(boulderGeometry(r, rnd, { detail: 1, flat: 0.65 }), c.x, y, c.y, rnd() * 6.28));
     }
@@ -1137,12 +1213,10 @@ function parkDressing(PK, B, gy, skipAt, glow) {
   const park = PK.parks.find((p) => p.n === 'Riverfront Park');
   if (!park) return;
   // ── the flood wall: the park runs level to its edge, where a concrete wall
-  // drops straight into the river; a tall galvanised chain-link fence along its top ──
+  // drops straight into the river; a black picket fence on a curb along its top ──
   const wallM = pbr('concrete_wall_008', { scale: 3, tint: 0xc4cee4, bright: 1.15 });
   const capM = pbr('brushed_concrete', { scale: 2, tint: 0xd8e0ee, bright: 1.25 });
   const walkM = pbr('brushed_concrete', { scale: 3, tint: 0xe4e6ea, bright: 1.15 });
-  const galv = pbr('metal_plate', { scale: 0.5, tint: 0xd8dee4, bright: 1.6, metal: 0.35, rough: 0.8 }); // galvanised, dull grey
-  const mesh = chainLink();
   const edge = park.p, fence = [];
   for (let i = 0; i < edge.length - 1; i++) {
     const [x1, z1] = edge[i], [x2, z2] = edge[i + 1];
@@ -1161,35 +1235,49 @@ function parkDressing(PK, B, gy, skipAt, glow) {
       fence.push([P.clone().setY(P.y + 0.12), Q.clone().setY(Q.y + 0.12)]);
     }
   }
-  // posts every 3 m, a top rail and a bottom tension wire, the mesh between
-  const FH = 2.4, quads = [], uvs = [];
-  let run = 0;
+  // the modern black steel picket fence on a low concrete curb along the wall's edge:
+  // square posts every 2.4 m, top and bottom rails, pickets at 11 cm
+  const black = pbr('metal_plate', { scale: 0.5, tint: 0x2a2c2e, metal: 0.5, rough: 0.7 });
+  const galv = pbr('metal_plate', { scale: 0.5, tint: 0xd8dee4, bright: 1.6, metal: 0.35, rough: 0.8 }); // galvanised, dull grey
   for (const [P, Q] of fence) {
     const L = P.distanceTo(Q);
-    for (let t = 0; t < L; t += 3) {
-      const X = P.clone().lerp(Q, t / L);
-      B.add(galv, cy(0.045, 0.045, FH + 0.1, X.x, X.y, X.z, 8));
+    B.add(capM, span(P.clone().setY(P.y + 0.45), Q.clone().setY(Q.y + 0.45), 0.4, 0.45, 0.1));
+    const y0 = 0.45;
+    for (let t = 0; t < L; t += 0.11) {
+      const X = P.clone().lerp(Q, t / L), post = (t % 2.4) < 0.11;
+      B.add(black, bx(post ? 0.08 : 0.02, post ? 1.32 : 1.2, post ? 0.08 : 0.02, X.x, X.y + y0, X.z, -Math.atan2(Q.z - P.z, Q.x - P.x)));
     }
-    B.add(galv, rod(P.clone().setY(P.y + FH), Q.clone().setY(Q.y + FH), 0.03, 6), rod(P.clone().setY(P.y + 0.05), Q.clone().setY(Q.y + 0.05), 0.008, 3));
-    const u0 = run / 0.35, u1 = (run + L) / 0.35, v1 = FH / 0.35; // ~5 cm diamonds
-    quads.push(P.x, P.y, P.z, Q.x, Q.y, Q.z, Q.x, Q.y + FH, Q.z, P.x, P.y, P.z, Q.x, Q.y + FH, Q.z, P.x, P.y + FH, P.z);
-    uvs.push(u0, 0, u1, 0, u1, v1, u0, 0, u1, v1, u0, v1);
-    run += L;
+    for (const h of [y0 + 0.1, y0 + 1.12]) B.add(black, span(P.clone().setY(P.y + h + 0.04), Q.clone().setY(Q.y + h + 0.04), 0.05, 0.04));
   }
-  if (quads.length) {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(quads, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-    g.computeVertexNormals();
-    B.add(mesh, g);
-  }
-  // acorn lamp standards along the walk, a few metres in from the wall
+  // the river walk's lamps: tall black poles with dome shades
   for (let i = 0; i < fence.length; i += 4) {
     const [P] = fence[i], x = P.x + 5, z = P.z;
     if (!ok(x, z)) continue;
     const y = gy(x, z);
-    B.add(iron, cy(0.07, 0.11, 3.8, x, y, z, 8), cy(0.16, 0.12, 0.25, x, y + 3.8, z, 8));
-    B.add(lampM, place(new THREE.SphereGeometry(0.22, 10, 8).scale(1, 1.35, 1), x, y + 4.3, z));
+    B.add(black, cy(0.07, 0.1, 5.2, x, y, z, 8), bx(0.06, 0.06, 0.5, x, y + 5.1, z));
+    B.add(black, place(new THREE.SphereGeometry(0.32, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.55, 1), x, y + 5.0, z + 0.45));
+    B.add(lampM, place(new THREE.CircleGeometry(0.28, 12).rotateX(Math.PI / 2), x, y + 4.99, z + 0.45));
+  }
+  // the USGS river gauge by the walk: a raised concrete pad in a chain-link cage
+  for (const pt of PK.points) {
+    if (pt.k !== 'man_made=monitoring_station' || !ok(pt.p[0], pt.p[1])) continue;
+    const [x, z] = pt.p, y = gy(x + 8, z) + 0.05, s2 = 3.2, H = 2.4;
+    B.add(wallM, bx(s2 * 2, 1.1, s2 * 2, x, y - 0.4, z));
+    const cage = [], uvs = [];
+    const C = [[x - s2, z - s2], [x + s2, z - s2], [x + s2, z + s2], [x - s2, z + s2]];
+    let run = 0;
+    for (let k = 0; k < 4; k++) {
+      const [x1, z1] = C[k], [x2, z2] = C[(k + 1) % 4], y1 = y + 0.7, L = s2 * 2;
+      cage.push(x1, y1, z1, x2, y1, z2, x2, y1 + H, z2, x1, y1, z1, x2, y1 + H, z2, x1, y1 + H, z1);
+      uvs.push(run / 0.35, 0, (run + L) / 0.35, 0, (run + L) / 0.35, H / 0.35, run / 0.35, 0, (run + L) / 0.35, H / 0.35, run / 0.35, H / 0.35);
+      run += L;
+      B.add(galv, cy(0.04, 0.04, H, x1, y1, z1, 8), rod(new THREE.Vector3(x1, y1 + H, z1), new THREE.Vector3(x2, y1 + H, z2), 0.025, 5));
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(cage, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    g.computeVertexNormals();
+    B.add(chainLink(), g);
   }
   // ── the park buildings: two open picnic pavilions, the brick restroom ──
   for (const b of PK.buildings) {
@@ -1505,7 +1593,10 @@ export default function build() {
     const parks = (PARK?.parks || []).map((p) => p.p);
     const inPark = (x, z) => parks.some((p) => inPoly(x, z, p));
     const skipB = (x, z, b) => edge(x, z) < 70 || b.k === 'casino' || b.k === 'silo' || inPark(x, z) || keep.some(([a, bb, c, d]) => x > a && x < bb && z > c && z < d);
-    for (const m of townMeshes(D, gy, skipB, glow, rnd)) ext.add(m);
+    const houseSpots = [];
+    for (const m of townMeshes(D, gy, skipB, glow, rnd, houseSpots)) ext.add(m);
+    const homes = housesAt(houseSpots, rnd);
+    if (homes) ext.add(homes);
     for (const m of pavingMeshes(D, gy, skipAt, { sidewalks: true })) ext.add(m);
 
     const EB = new Batch();
@@ -1550,7 +1641,7 @@ export default function build() {
     const boats = [];
     {
       const dock = pbr('brushed_concrete', { scale: 2.5, tint: 0xe4dccb });
-      const roofs = [pbr('corrugated_iron', { scale: 1.4, tint: 0x9cbbe0, metal: 0.4 }), pbr('corrugated_iron', { scale: 1.4, tint: 0xf0f2f4, metal: 0.4 })];
+      const roofs = [pbr('corrugated_iron', { scale: 1.4, tint: 0x5a8ed8, metal: 0.4 }), pbr('corrugated_iron', { scale: 1.4, tint: 0x4a7cc8, metal: 0.4 })]; // the slips' blue metal roofs
       const post = pbr('metal_plate', { scale: 1, tint: 0xa0a4a8, metal: 0.4 });
       let r = 0;
       for (const p of D.piers) {
@@ -1584,7 +1675,7 @@ export default function build() {
         const cx = p[0][0], cz = p[0][1];
         if (Math.hypot(cx, cz) > 1300 || p.length < 2) continue;
         const marina = Math.abs(cx + 167) < 5 && Math.abs(cz - 219) < 5;
-        riprap(RB, p, WY, rnd, marina ? { base: 13, crest: 1.8 } : { base: 8, crest: 0.4, boulders: Math.hypot(cx, cz) < 700 });
+        riprap(RB, p, WY, rnd, marina ? { base: 13, crest: 1.8 } : { base: 8, crest: 0.4, boulders: false });
       }
       for (const mesh of RB.build(ext, false)) mesh.userData.noShadow = true;
     }
