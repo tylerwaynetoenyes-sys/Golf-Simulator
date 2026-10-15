@@ -21,6 +21,10 @@ export default {
   // the pool above Melvin Price Locks and Dam reads 126.9 m on the DEM
   waterLevel: 127.3,
   waterTint: 0x4f5240,
+  // the channel off Riverfront Park and upstream past the sternwheeler: the
+  // tiles leave a false bar there (the real breakwater starts where the park
+  // ends and runs along the marina; lm/riverfront.js draws it)
+  riverbed: [[[-273, -96], [-465, -247], [-564, -316], [-701, -416], [-784, -311], [-362, 19]]],
   far: [
     // the whole riverfront, laid out from the amphitheater in its own frame
     // (+x inland to the north-east, +z downstream): a turn of 0.907 rad

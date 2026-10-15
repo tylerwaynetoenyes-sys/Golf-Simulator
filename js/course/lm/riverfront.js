@@ -40,11 +40,15 @@ import { boatFleet } from '../../scene/boats.js';
 
 // the baked map, fetched as soon as the module loads (long before a hole is built)
 const BASE = new URL('../../../assets/landmarks/alton/', import.meta.url).href;
+// the parks and what's in them (tools/bake-park.py), optional
+let PARK = null;
+const parkReady = fetch(`${BASE}park.json`).then((r) => (r.ok ? r.json() : null)).then((j) => (PARK = j)).catch(() => null);
 let DATA = null;
 const ready = Promise.all([
+  parkReady,
   fetch(`${BASE}ground.json`).then((r) => (r.ok ? r.json() : Promise.reject(r.status))),
   fetch(`${BASE}ground.bin`).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(r.status))),
-]).then(([j, bin]) => {
+]).then(([, j, bin]) => {
   const n = j.grid.nx * j.grid.nz;
   DATA = { ...j, H: new Int16Array(bin, 0, n), C: new Uint8Array(bin, n * 2, n) };
   return DATA;
@@ -833,9 +837,13 @@ export function townMeshes(D, gy, skip, glow, rnd) {
     return cells.get(k);
   };
   const col = new THREE.Color();
+  let core = null; // a point inside the building: roof faces turn away from it
   const tri = (R, a, b, c, color) => {
-    const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    const n = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
+    let ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ac = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    let n = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
+    if (core && n[0] * ((a[0] + b[0] + c[0]) / 3 - core[0]) + n[1] * ((a[1] + b[1] + c[1]) / 3 - core[1]) + n[2] * ((a[2] + b[2] + c[2]) / 3 - core[2]) < 0) {
+      [b, c] = [c, b]; n = n.map((v) => -v);
+    }
     const l = Math.hypot(...n) || 1;
     for (const p of [a, b, c]) { R.p.push(...p); R.n.push(n[0] / l, n[1] / l, n[2] / l); R.c.push(color.r, color.g, color.b); }
   };
@@ -850,7 +858,7 @@ export function townMeshes(D, gy, skip, glow, rnd) {
     if (area < 0) pts = [...pts].reverse(); // counter-clockwise in x/z
     const A = Math.abs(area), k = b.k;
     let h = b.h;
-    const house = ['house', 'detached', 'residential', 'semidetached_house', 'terrace', 'bungalow'].includes(k) || (k === 'yes' && A < 220);
+    const house = ['house', 'detached', 'residential', 'semidetached_house', 'terrace', 'bungalow'].includes(k) || (k === 'yes' && A < 350);
     if (!h) {
       if (['garage', 'garages', 'shed', 'carport', 'roof'].includes(k)) h = 3;
       else if (house) h = 5.5 + rnd() * 2.5;
@@ -863,6 +871,7 @@ export function townMeshes(D, gy, skip, glow, rnd) {
     for (const [x, z] of pts) { const y = gy(x, z); lo = Math.min(lo, y); hi = Math.max(hi, y); }
     const y0 = lo - 0.6, top = hi + h;
     const C = cell(cx, cz);
+    core = [cx, top - 1, cz];
     col.set(house ? SIDING[Math.floor(rnd() * SIDING.length)] : BRICK[Math.floor(rnd() * BRICK.length)]);
     // walls, with the facade tile scaled to 3.3 m bays and floors
     let run = 0;
@@ -874,7 +883,8 @@ export function townMeshes(D, gy, skip, glow, rnd) {
       const u0 = run / 13.2, u1 = (run + len) / 13.2, v0 = 0, v1 = (top - y0) / 6.8;
       run += len;
       const W = C.wall;
-      const quad = [[x1, y0, z1, u0, v0], [x2, y0, z2, u1, v0], [x2, top, z2, u1, v1], [x1, y0, z1, u0, v0], [x2, top, z2, u1, v1], [x1, top, z1, u0, v1]];
+      // wound to face outward (the footprint is counter-clockwise in x/z), so every wall shows from outside
+      const quad = [[x1, y0, z1, u0, v0], [x2, top, z2, u1, v1], [x2, y0, z2, u1, v0], [x1, y0, z1, u0, v0], [x1, top, z1, u0, v1], [x2, top, z2, u1, v1]];
       for (const [x, y, z, u, vv] of quad) { W.p.push(x, y, z); W.n.push(nxv, 0, nzv); W.u.push(u, vv); W.c.push(col.r, col.g, col.b); }
     }
     // roofs: pitched over the small houses, flat (with a parapet look) on the rest
@@ -929,6 +939,7 @@ export function townMeshes(D, gy, skip, glow, rnd) {
   return meshes;
 }
 
+const STREETS = new Set(['residential', 'tertiary', 'secondary', 'primary', 'unclassified', 'living_street']);
 /** Wind every triangle of a flat list counter-clockwise seen from above. */
 function faceUp(a) {
   for (let i = 0; i < a.length; i += 9) {
@@ -937,13 +948,14 @@ function faceUp(a) {
   }
 }
 /** Streets and paths draped on the ground; the lots as flat asphalt. */
-export function pavingMeshes(D, gy, skipAt, { paths = true } = {}) {
+export function pavingMeshes(D, gy, skipAt, { paths = true, sidewalks = false } = {}) {
   const { x0, z0, step, nx, nz } = D.grid;
   const onMap = (x, z) => x > x0 + 6 && x < x0 + (nx - 1) * step - 6 && z > z0 + 6 && z < z0 + (nz - 1) * step - 6;
   const asphalt = pbr('asphalt_02', { scale: 6, tint: 0xd8d8d8, offset: -2 });
   const pathM = pbr('brushed_concrete', { scale: 4, tint: 0xe8e2d6, offset: -2 });
   const lotM = pbr('asphalt_02', { scale: 6, tint: 0xc8c8c8, offset: -1 });
   const roads = { [asphalt.uuid]: [], [pathM.uuid]: [] };
+  const walks = [];
   for (const r of D.roads) {
     if (r.b) continue; // bridges and ramps: the Clark Bridge is modelled, the rest are lost in the trees
     const path = ['footway', 'path', 'cycleway'].includes(r.k);
@@ -958,16 +970,22 @@ export function pavingMeshes(D, gy, skipAt, { paths = true } = {}) {
       for (let k = 0; k < n; k++) pts.push([ax + ((bxx - ax) * k) / n, az + ((bz - az) * k) / n]);
     }
     pts.push(r.p[r.p.length - 1]);
+    // town streets get a sidewalk each side, a grass verge between
+    const walkSides = sidewalks && STREETS.has(r.k);
     for (let i = 0; i < pts.length - 1; i++) {
       const [ax, az] = pts[i], [bxx, bz] = pts[i + 1];
       if (skipAt((ax + bxx) / 2, (az + bz) / 2) || !onMap(ax, az) || !onMap(bxx, bz)) continue;
-      const L = Math.hypot(bxx - ax, bz - az) || 1, nx = -(bz - az) / L * w, nz = (bxx - ax) / L * w;
+      const L = Math.hypot(bxx - ax, bz - az) || 1, ux = -(bz - az) / L, uz = (bxx - ax) / L, nx = ux * w, nz = uz * w;
       const ya = gy(ax, az) + 0.15, yb = gy(bxx, bz) + 0.15;
       list.push(ax - nx, ya, az - nz, bxx - nx, yb, bz - nz, bxx + nx, yb, bz + nz, ax - nx, ya, az - nz, bxx + nx, yb, bz + nz, ax + nx, ya, az + nz);
+      if (walkSides) for (const s of [-1, 1]) {
+        const o0 = s * (w + 1.0), o1 = s * (w + 2.5), yA = ya + 0.08, yB = yb + 0.08;
+        walks.push(ax + ux * o0, yA, az + uz * o0, bxx + ux * o0, yB, bz + uz * o0, bxx + ux * o1, yB, bz + uz * o1, ax + ux * o0, yA, az + uz * o0, bxx + ux * o1, yB, bz + uz * o1, ax + ux * o1, yA, az + uz * o1);
+      }
     }
   }
   const meshes = [];
-  for (const [m, list] of [[asphalt, roads[asphalt.uuid]], [pathM, roads[pathM.uuid]]]) {
+  for (const [m, list] of [[asphalt, roads[asphalt.uuid]], [pathM, roads[pathM.uuid]], [pathM, walks]]) {
     if (!list.length) continue;
     faceUp(list);
     const g = new THREE.BufferGeometry();
@@ -1024,6 +1042,188 @@ function parkedCars(D, gy, skipAt, rnd, near) {
 }
 
 
+
+/** Point in polygon (x/z). */
+function inPoly(x, z, p) {
+  let c = false;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+    const [x1, z1] = p[i], [x2, z2] = p[j];
+    if ((z1 > z) !== (z2 > z) && x < ((x2 - x1) * (z - z1)) / (z2 - z1) + x1) c = !c;
+  }
+  return c;
+}
+
+/**
+ * Riverfront Park as it is (OpenStreetMap, park.json): the black ornamental
+ * fence along the river walk, lamp standards along it, the two picnic
+ * pavilions, the restroom, the playground, picnic tables, benches, drinking
+ * fountains, the fitness station, the interpretive signs on the walk and the
+ * "Sail" sculpture. Built into the batch on the course's ground.
+ */
+function parkDressing(PK, B, gy, skipAt, glow) {
+  const iron = pbr('metal_plate', { scale: 0.6, tint: 0x24272a, metal: 0.6 });
+  const slab = pbr('brushed_concrete', { scale: 2.5, tint: 0xe8e2d6, bright: 1.2 });
+  const brick = pbr('red_bricks_02', { scale: 1.4, tint: 0xf0d8cc });
+  const roofM = pbr('corrugated_iron', { scale: 1, tint: 0x4f6a58, metal: 0.4 });
+  const timber = pbr('brown_planks_08', { scale: 1.2, tint: 0xd8c0a0 });
+  const steel = pbr('metal_plate', { scale: 0.8, tint: 0xc8ccd0, metal: 0.85, rough: 0.5 });
+  const green = pbr('metal_plate', { scale: 0.8, tint: 0x2f6a4a, metal: 0.35 });
+  const mulch = pbr('bark_brown_02', { scale: 1, tint: 0xb08868, offset: -2 });
+  const plastic = { y: mat(0xe8b830, { roughness: 0.45 }), r: mat(0xc0402e, { roughness: 0.45 }), b: mat(0x2f62a8, { roughness: 0.45 }), k: mat(0x1c1c1e, { roughness: 0.6 }) };
+  const lampM = lit(0xfff4dc, 0xffd59a, { night: 2.2, roughness: 0.3 });
+  glow.push(lampM);
+  const ok = (x, z) => !skipAt(x, z);
+  const park = PK.parks.find((p) => p.n === 'Riverfront Park');
+  if (!park) return;
+  // ── the fence along the river walk: the park's river edge, posts every 2.4 m, pickets, rails ──
+  const edge = park.p;
+  for (let i = 0; i < edge.length - 1; i++) {
+    const [x1, z1] = edge[i], [x2, z2] = edge[i + 1];
+    if (x1 > -140 || x2 > -140 || Math.abs(z2 - z1) < Math.abs(x2 - x1)) continue; // the shore side only
+    const L = Math.hypot(x2 - x1, z2 - z1), ry = -Math.atan2(z2 - z1, x2 - x1);
+    for (let t = 0; t <= L; t += 0.13) {
+      const x = x1 + ((x2 - x1) * t) / L, z = z1 + ((z2 - z1) * t) / L;
+      if (!ok(x, z)) continue;
+      const y = gy(x, z), post = Math.abs((t / 2.4) - Math.round(t / 2.4)) < 0.03;
+      B.add(iron, bx(post ? 0.08 : 0.022, post ? 1.32 : 1.15, post ? 0.08 : 0.022, x, y, z, ry));
+      if (post) B.add(iron, place(new THREE.SphereGeometry(0.06, 6, 4), x, y + 1.36, z));
+    }
+    for (const h of [0.12, 1.0, 1.12]) {
+      const n = Math.ceil(L / 8);
+      for (let k = 0; k < n; k++) {
+        const a = k / n, b = (k + 1) / n;
+        const P = new THREE.Vector3(x1 + (x2 - x1) * a, 0, z1 + (z2 - z1) * a), Q = new THREE.Vector3(x1 + (x2 - x1) * b, 0, z1 + (z2 - z1) * b);
+        if (!ok(P.x, P.z)) continue;
+        P.y = gy(P.x, P.z) + h; Q.y = gy(Q.x, Q.z) + h;
+        B.add(iron, span(P, Q, 0.04, 0.04));
+      }
+    }
+    // acorn lamp standards along the walk, a few metres in from the fence
+    for (let t = 6; t < L; t += 26) {
+      const x = x1 + ((x2 - x1) * t) / L + 4, z = z1 + ((z2 - z1) * t) / L;
+      if (!ok(x, z)) continue;
+      const y = gy(x, z);
+      B.add(iron, cy(0.07, 0.11, 3.8, x, y, z, 8), cy(0.16, 0.12, 0.25, x, y + 3.8, z, 8));
+      B.add(lampM, place(new THREE.SphereGeometry(0.22, 10, 8).scale(1, 1.35, 1), x, y + 4.3, z));
+    }
+  }
+  // ── the park buildings: two open picnic pavilions, the brick restroom ──
+  for (const b of PK.buildings) {
+    let p = b.p;
+    if (p.length > 2 && p[0][0] === p[p.length - 1][0] && p[0][1] === p[p.length - 1][1]) p = p.slice(0, -1);
+    const cx = p.reduce((s, q) => s + q[0], 0) / p.length, cz = p.reduce((s, q) => s + q[1], 0) / p.length;
+    if (!inPoly(cx, cz, park.p) || !ok(cx, cz)) continue;
+    const ang = Math.atan2(p[1][1] - p[0][1], p[1][0] - p[0][0]);
+    const w = Math.hypot(p[1][0] - p[0][0], p[1][1] - p[0][1]), d = Math.hypot(p[2][0] - p[1][0], p[2][1] - p[1][1]);
+    const y = Math.min(...p.map(([x, z]) => gy(x, z)));
+    const ry = -ang, c = Math.cos(ang), sn = Math.sin(ang);
+    const at = (u, v) => [cx + u * c - v * sn, cz + u * sn + v * c];
+    if (b.k === 'shelter') {
+      B.add(slab, bx(w + 1, 0.25, d + 1, cx, y - 0.1, cz, ry));
+      for (const u of [-w / 2 + 0.4, 0, w / 2 - 0.4]) for (const v of [-d / 2 + 0.4, d / 2 - 0.4]) { const [x, z] = at(u, v); B.add(timber, bx(0.3, 3, 0.3, x, y, z, ry)); }
+      B.add(timber, bx(w + 0.4, 0.35, d + 0.4, cx, y + 3, cz, ry));
+      B.add(roofM, place(hipRoofGeo(w + 1.2, d + 1.2, 2.2), cx, y + 3.35, cz, ry));
+      for (const v of [-1.6, 1.6]) { const [x, z] = at(0, v); picnicTable(B, timber, iron, x, y, z, ry); }
+    } else {
+      B.add(brick, bx(w, 3.2, d, cx, y - 0.2, cz, ry));
+      B.add(slab, bx(w + 0.3, 0.3, d + 0.3, cx, y + 3.0, cz, ry));
+      B.add(roofM, place(hipRoofGeo(w + 1, d + 1, 1.8), cx, y + 3.3, cz, ry));
+      for (const u of [-w / 4, w / 4]) { const [x, z] = at(u, d / 2 + 0.03); B.add(green, bx(1, 2.1, 0.06, x, y, z, ry)); }
+    }
+  }
+  // ── the playground: rubber-mulch bed, a play structure with decks, slides and a climber, swings ──
+  for (const a of PK.areas) {
+    if (a.k !== 'playground') continue;
+    const cx = a.p.reduce((s, q) => s + q[0], 0) / a.p.length, cz = a.p.reduce((s, q) => s + q[1], 0) / a.p.length;
+    if (!inPoly(cx, cz, park.p) || !ok(cx, cz)) continue;
+    const y = gy(cx, cz);
+    const tris = THREE.ShapeUtils.triangulateShape(a.p.map(([x, z]) => new THREE.Vector2(x, z)), []);
+    const pos = [];
+    for (const t of tris) for (const k of t) pos.push(a.p[k][0], gy(a.p[k][0], a.p[k][1]) + 0.12, a.p[k][1]);
+    faceUp(pos);
+    B.add(mulch, new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)));
+    // the structure: two decks at 1.2 m and 1.8 m on posts, roofs, a tube slide and a wave slide, a ladder
+    for (const [dx, dz, h] of [[-2, 0, 1.2], [1.6, 0, 1.8]]) {
+      for (const [ox, oz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) B.add(green, cy(0.06, 0.06, h + 1.6, cx + dx + ox * 1.1, y, cz + dz + oz * 1.1, 8));
+      B.add(steel, bx(2.2, 0.08, 2.2, cx + dx, y + h, cz + dz));
+      B.add(plastic.b, place(new THREE.ConeGeometry(1.7, 0.9, 4).rotateY(Math.PI / 4).translate(0, 0.45, 0), cx + dx, y + h + 1.6, cz + dz));
+      for (const s of [-1, 1]) B.add(green, bx(2.2, 0.05, 0.05, cx + dx, y + h + 0.9, cz + dz + s * 1.1));
+    }
+    B.add(plastic.y, span(new THREE.Vector3(cx - 3.1, y + 1.2, cz), new THREE.Vector3(cx - 6.4, y + 0.3, cz), 0.7, 0.06));
+    for (const s of [-1, 1]) B.add(plastic.y, span(new THREE.Vector3(cx - 3.1, y + 1.45, cz + s * 0.35), new THREE.Vector3(cx - 6.4, y + 0.55, cz + s * 0.35), 0.05, 0.25));
+    const tube = [];
+    for (let k = 0; k <= 12; k++) { const t = k / 12, an = t * Math.PI * 1.2; tube.push(new THREE.Vector3(cx + 2.7 + Math.sin(an) * 1.8, y + 1.8 - t * 1.4, cz + 1.1 + (1 - Math.cos(an)) * 1.8)); }
+    B.add(plastic.r, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(tube), 24, 0.45, 10, false));
+    for (let k = 0; k < 6; k++) B.add(steel, bx(0.6, 0.04, 0.04, cx - 2, y + 0.2 * k, cz - 1.3));
+    // a swing set: an A-frame beam with four seats on chains
+    const sx = cx + 1, sz = cz - 5;
+    for (const e of [-3, 3]) for (const s of [-1, 1]) B.add(green, span(new THREE.Vector3(sx + e, y + 2.6, sz), new THREE.Vector3(sx + e, y, sz + s * 1.2), 0.08, 0.08));
+    B.add(green, bx(6.2, 0.1, 0.1, sx, y + 2.55, sz));
+    for (const e of [-2.1, -0.7, 0.7, 2.1]) {
+      for (const s of [-0.22, 0.22]) B.add(steel, bx(0.02, 2.0, 0.02, sx + e + s, y + 0.55, sz));
+      B.add(plastic.k, bx(0.5, 0.05, 0.2, sx + e, y + 0.5, sz));
+    }
+  }
+  // ── the things on the lawn and the walk ──
+  for (const pt of PK.points) {
+    const [x, z] = pt.p;
+    if (!inPoly(x, z, park.p) || !ok(x, z)) continue;
+    const y = gy(x, z), ry = (x * 7 + z * 13) % 6.28;
+    if (pt.k === 'leisure=picnic_table') picnicTable(B, timber, iron, x, y, z, ry);
+    else if (pt.k === 'amenity=bench') { B.add(timber, bx(1.8, 0.06, 0.45, x, y + 0.45, z, ry), bx(1.8, 0.4, 0.05, x, y + 0.55, z - 0.2, ry)); for (const s of [-0.8, 0.8]) B.add(iron, bx(0.06, 0.45, 0.45, x + s, y, z, ry)); }
+    else if (pt.k === 'amenity=drinking_water') { B.add(steel, cy(0.16, 0.2, 0.95, x, y, z, 12), cy(0.26, 0.2, 0.12, x, y + 0.95, z, 12)); }
+    else if (pt.k === 'leisure=fitness_station') { for (const s of [-1, 0, 1]) B.add(green, cy(0.06, 0.06, 2.2, x + s * 1.2, y, z, 8)); B.add(steel, bx(2.4, 0.05, 0.05, x, y + 2.1, z), bx(1.2, 0.05, 0.05, x - 0.6, y + 1.4, z)); }
+    else if (pt.k === 'tourism=information') infoBoard(B, iron, pt.n, x, y, z, glow);
+    else if (pt.k === 'tourism=artwork' && pt.n === 'Sail') {
+      // a stainless sail on its mast, catching the light off the river
+      const sail = new THREE.BufferGeometry();
+      const v = [];
+      for (let i = 0; i < 8; i++) {
+        const a = i / 8, b = (i + 1) / 8, bulge = (t) => Math.sin(t * Math.PI) * 0.6 * (1 - t);
+        const P = (t, h) => [x + bulge(h) + 0.1, y + 1 + h * 6, z + (1 - h) * 3.2 * t];
+        for (const [p, q, r] of [[P(0, a), P(1, a), P(1, b)], [P(0, a), P(1, b), P(0, b)]]) v.push(...p, ...q, ...r, ...p, ...r, ...q);
+      }
+      sail.setAttribute('position', new THREE.Float32BufferAttribute(v, 3)); sail.computeVertexNormals();
+      B.add(steel, sail, cy(0.08, 0.1, 7.4, x, y, z, 10), bx(1.2, 0.5, 1.2, x, y, z + 0.8));
+    }
+  }
+}
+
+/** A hipped roof w × d (x × z), ridge height h, eaves at y = 0. */
+function hipRoofGeo(w, d, h) {
+  const W = w / 2, D = d / 2, r = Math.max(0, W - D);
+  const a = [-W, 0, -D], b = [W, 0, -D], c = [W, 0, D], e = [-W, 0, D], p = [-r, h, 0], q = [r, h, 0];
+  const t = [...e, ...c, ...q, ...e, ...q, ...p, ...b, ...a, ...p, ...b, ...p, ...q, ...c, ...b, ...q, ...a, ...e, ...p];
+  const g = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(t, 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+/** A plank picnic table on a steel frame, seats both sides. */
+function picnicTable(B, wood, iron, x, y, z, ry) {
+  const c = Math.cos(ry), s = Math.sin(ry);
+  const at = (u, v) => [x + u * c + v * s, z - u * s + v * c];
+  B.add(wood, bx(1.9, 0.06, 0.8, x, y + 0.74, z, ry));
+  for (const v of [-0.62, 0.62]) { const [px, pz] = at(0, v); B.add(wood, bx(1.9, 0.05, 0.28, px, y + 0.44, pz, ry)); }
+  for (const u of [-0.7, 0.7]) { const [px, pz] = at(u, 0); B.add(iron, bx(0.05, 0.74, 1.5, px, y, pz, ry)); }
+}
+
+/** An interpretive sign: a dark framed panel on two posts, its title lettered on. */
+function infoBoard(B, iron, name, x, y, z, glow) {
+  const tex = canvasTex(256, 160, (c, w, h) => {
+    c.fillStyle = '#1f3a4a'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#e8e2d0'; c.fillRect(10, 40, w - 20, h - 50);
+    c.fillStyle = '#f4efe2'; c.font = '600 18px Georgia'; c.textAlign = 'center'; c.fillText(name || 'Riverfront Park', w / 2, 27);
+    c.fillStyle = '#6a7a80';
+    for (let i = 0; i < 7; i++) c.fillRect(20, 52 + i * 13, (w - 40) * (i % 3 === 2 ? 0.6 : 1), 4);
+  });
+  const m = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.6 });
+  // lectern style: the panel faces the walk (+X, inland) and leans back
+  B.add(iron, cy(0.05, 0.05, 1.0, x, y, z - 0.6, 6), cy(0.05, 0.05, 1.0, x, y, z + 0.6, 6));
+  B.add(iron, place(new THREE.BoxGeometry(0.08, 0.9, 1.5), x - 0.02, y + 1.15, z, 0, 1, 1, 1, 0, -0.5));
+  B.add(m, place(new THREE.PlaneGeometry(1.4, 0.85).rotateY(Math.PI / 2), x + 0.03, y + 1.17, z, 0, 1, 1, 1, 0, -0.5));
+}
+
 export default function build() {
   const group = new THREE.Group(); // the park round the amphitheater, in the hole's footprint
   const ext = new THREE.Group(); // everything else on the map: laid out by fit()
@@ -1054,7 +1254,8 @@ export default function build() {
       c.fillStyle = '#b9ad96'; c.fillRect(0, 0, w, h);
       for (let y = 0; y < h; y += 16) for (let x = (y / 16) % 2 ? -16 : 0; x < w; x += 32) { const v = 165 + r() * 40; c.fillStyle = `rgb(${v},${v - 8},${v - 24})`; c.fillRect(x + 1, y + 1, 30, 14); }
     }, [1, 3]);
-    const stone = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 1 });
+    void stoneTex;
+    const stone = pbr('sandstone_blocks_08', { scale: 1.2, tint: 0xf0e2c8, bright: 1.2 }); // split-face limestone
     const pylons = [[SC.x - 9, SC.z - 19], [SC.x + 3, SC.z - 19], [SC.x - 9, SC.z + 19], [SC.x + 3, SC.z + 19]];
     for (const [x, z] of pylons) B.add(stone, bx(2.6, 10, 2.6, x, 0, z), bx(3.2, 0.6, 3.2, x, 10, z));
     // the membrane: a long barrel vault, highest along its centre line,
@@ -1216,11 +1417,20 @@ export default function build() {
     }
     // set-piece areas the town keeps out of
     const keep = [[-240, -80, -905, -565], [-262, -135, -615, -380], [-75, 75, -75, 75]];
-    const skipB = (x, z, b) => edge(x, z) < 70 || b.k === 'casino' || b.k === 'silo' || keep.some(([a, bb, c, d]) => x > a && x < bb && z > c && z < d);
+    // the parks keep their own buildings (pavilions, restrooms: parkDressing), not the town's houses
+    const parks = (PARK?.parks || []).map((p) => p.p);
+    const inPark = (x, z) => parks.some((p) => inPoly(x, z, p));
+    const skipB = (x, z, b) => edge(x, z) < 70 || b.k === 'casino' || b.k === 'silo' || inPark(x, z) || keep.some(([a, bb, c, d]) => x > a && x < bb && z > c && z < d);
     for (const m of townMeshes(D, gy, skipB, glow, rnd)) ext.add(m);
-    for (const m of pavingMeshes(D, gy, skipAt)) ext.add(m);
+    for (const m of pavingMeshes(D, gy, skipAt, { sidewalks: true })) ext.add(m);
 
     const EB = new Batch();
+    // Riverfront Park's fence, pavilions, restroom, playground and furniture (flat clutter: no shadow pass)
+    if (PARK) {
+      const PB = new Batch();
+      parkDressing(PARK, PB, gy, (x, z) => skipAt(x, z) || Math.hypot(x - SC.x, z - SC.z) < 24, glow);
+      for (const mesh of PB.build(ext, false)) mesh.userData.noShadow = true;
+    }
     const bulbPts = [], navPts = [], carSpots = [];
     // the Argosy: the pavilion barge on its footprint, the boats upstream of it
     {

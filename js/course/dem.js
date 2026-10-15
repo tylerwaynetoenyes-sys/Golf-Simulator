@@ -148,7 +148,34 @@ const YD = 0.9144;
  * standard hole shape (centre line in yards, tee at the origin, first
  * segment straight ahead) with its `demFrame` attached.
  */
+/**
+ * Drown false bars in a river: the Terrarium tiles smear the bank into the
+ * channel, and with the pool drawn at its true level a strip of ground can
+ * stand just above it, a "dike" that isn't there. `riverbed` polygons (DEM
+ * metres) hold the ground at least `depth` below the water level, once.
+ */
+function carveRiverbed(d, polys, level, depth = 1.5) {
+  if (d.carved || !polys?.length || level == null) return;
+  d.carved = true;
+  const inPoly = (x, z, p) => {
+    let c = false;
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const [x1, z1] = p[i], [x2, z2] = p[j];
+      if ((z1 > z) !== (z2 > z) && x < ((x2 - x1) * (z - z1)) / (z2 - z1) + x1) c = !c;
+    }
+    return c;
+  };
+  for (const g of [d.dem, d.far]) {
+    const { n, step } = g.meta;
+    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
+      const x = -g.half + i * step, z = -g.half + j * step, k = j * n + i;
+      if (g.h[k] > level - depth && polys.some((p) => inPoly(x, z, p))) g.h[k] = level - depth;
+    }
+  }
+}
+
 export function prepareDemHoles(course, d) {
+  carveRiverbed(d, course.riverbed, course.waterLevel);
   // far landmarks may be given by latitude/longitude: convert to DEM metres
   const { lat, lon } = d.dem.meta;
   const mLat = (Math.PI / 180) * 6378137, mLon = mLat * Math.cos((lat * Math.PI) / 180);

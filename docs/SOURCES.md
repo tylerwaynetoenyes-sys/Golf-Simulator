@@ -251,6 +251,14 @@ gravel_stones, rock_face_03, rusty_metal_02, box_profile_metal_sheet,
 thatch_roof_angled, white_stucco, wood_planks_grey (1K colour, 512 px
 roughness and normal). Laid on in world space by `js/scene/pbr.js`.
 
+## Alton parks
+
+`assets/landmarks/alton/park.json` (`tools/bake-park.py`, the riverfront's
+frame): Riverfront Park and the other parks' outlines, shelters, restrooms,
+playground, picnic tables, benches, drinking water, fitness station,
+interpretive signs and the "Sail" artwork, from OpenStreetMap (main API map
+call, October 2026), © OpenStreetMap contributors, ODbL.
+
 ## Cars and boats
 
 From Sketchfab, CC BY 4.0; reduced in Blender to one mesh each (parts'
