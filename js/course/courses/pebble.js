@@ -10,6 +10,7 @@ export default {
   place: "Pebble Beach Golf Links · Monterey Peninsula, California",
   theme: 'coastal',
   dem: true,
+  sky: { night: 'milkyway' }, // a dark site's night (js/scene/sky.js)
   origin: [36.56423, -121.93958],
   blurb: "Pebble Beach Golf Links' front nine as mapped on OpenStreetMap, on real ground, out to the cliffs of Carmel Bay at the 6th, 7th, 8th and 9th.",
   // Carmel Bay

@@ -25,6 +25,17 @@ uniform vec3 uSunDir;
 uniform float uDay;     // 0 night .. 1 day
 uniform float uCloud;   // 0 clear .. 1 overcast
 uniform vec2 uDrift;    // wind-driven cloud offset
+uniform float uStorm;   // 0 .. 1: the photographed storm sky takes over (rain)
+uniform sampler2D uStormTex;
+uniform float uStormTurn; // the storm's clouds wheel slowly overhead
+uniform sampler2D uDayTex; uniform float uDayAmt;     // a photographed day sky for this place (or none)
+uniform sampler2D uNightTex; uniform float uNightAmt; // a photographed night sky: the Milky Way over a dark site
+uniform float uSkyTurn;
+vec3 photo(sampler2D t, vec3 d, float turn) {
+  float u = atan(d.z, d.x) / 6.2831853 + 0.5 + turn;
+  float v = 0.5 + asin(clamp(d.y, -1.0, 1.0)) / 3.1415927;
+  return pow(texture2D(t, vec2(u, v)).rgb, vec3(2.2));
+}
 varying vec3 vDir;
 
 float hash(vec2 p) { p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -99,7 +110,26 @@ void main() {
   }
   if (el < 0.0) day = mix(dh * 0.8, vec3(0.3, 0.36, 0.4), clamp(-el * 4.0, 0.0, 1.0));
 
+  // this place's own skies, photographed. By day the sky above the haze; by night the
+  // sky above the hills in the photograph (its lower band is somewhere else's horizon)
+  if (uDayAmt > 0.001) day = mix(day, photo(uDayTex, d, uSkyTurn) * 1.05, uDayAmt * smoothstep(0.0, 0.06, el) * (1.0 - uCloud * 0.6));
+  if (uNightAmt > 0.001) {
+    vec3 mw = photo(uNightTex, d, uSkyTurn) * 0.9;
+    night = mix(night, mw + night * 0.25, uNightAmt * smoothstep(0.14, 0.4, el) * (1.0 - uCloud * 0.85));
+  }
   vec3 col = mix(night, day, uDay);
+  // the storm: a photographed sky of heavy rolling cloud (Poly Haven, CC0), darker
+  // by night, where only the city's glow lights its underside
+  if (uStorm > 0.001) {
+    float u = atan(d.z, d.x) / 6.2831853 + 0.5 + uStormTurn;
+    float v = 0.5 + asin(clamp(el, -1.0, 1.0)) / 3.1415927;
+    vec3 st = texture2D(uStormTex, vec2(u, v)).rgb;
+    st = pow(st, vec3(2.2)); // the photograph is sRGB
+    vec3 stormDay = st * 0.72; // a storm is darker than the photograph's exposure
+    vec3 stormNight = st * 0.035 + vec3(0.42, 0.21, 0.09) * dome * 0.3;
+    vec3 storm = mix(stormNight, stormDay, uDay);
+    col = mix(col, storm, uStorm * smoothstep(-0.08, 0.02, el));
+  }
   gl_FragColor = vec4(col, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -116,6 +146,12 @@ export function createSky() {
       uDay: { value: 0 },
       uCloud: { value: 0.2 },
       uDrift: { value: new THREE.Vector2() },
+      uStorm: { value: 0 },
+      uStormTex: { value: null },
+      uStormTurn: { value: 0 },
+      uDayTex: { value: null }, uDayAmt: { value: 0 },
+      uNightTex: { value: null }, uNightAmt: { value: 0 },
+      uSkyTurn: { value: 0 },
     },
     side: THREE.BackSide,
     depthWrite: false,
@@ -126,8 +162,34 @@ export function createSky() {
   mesh.renderOrder = -1000;
   mesh.frustumCulled = false;
   mesh.onBeforeRender = (_r, _s, camera) => { mesh.position.copy(camera.position); mesh.updateMatrixWorld(); };
+  // the storm photograph, loaded once (2048 x 1024 tonemapped from overcast_soil_puresky)
+  if (typeof window !== 'undefined') {
+    new THREE.TextureLoader().load(new URL('../../assets/hdri/storm_sky_4k.jpg', import.meta.url).href, (t) => {
+      t.colorSpace = THREE.NoColorSpace; // linearised in the shader
+      t.wrapS = THREE.RepeatWrapping;
+      mat.uniforms.uStormTex.value = t;
+    });
+  }
+  // this place's skies (a course's `sky`: { day: 'prairie' | 'mediterranean', night: 'milkyway' })
+  const PHOTOS = { prairie: 'sky_prairie_4k.jpg', mediterranean: 'sky_mediterranean_4k.jpg', milkyway: 'milkyway_4k.jpg' };
+  const cache = {};
+  const photoTex = (id, cb) => {
+    if (!id || typeof window === 'undefined') { cb(null); return; }
+    if (cache[id]) { cb(cache[id]); return; }
+    new THREE.TextureLoader().load(new URL(`../../assets/hdri/${PHOTOS[id]}`, import.meta.url).href, (t) => {
+      t.colorSpace = THREE.NoColorSpace; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4;
+      cb((cache[id] = t));
+    });
+  };
+  const setPlace = ({ day = null, night = null, turn = 0 } = {}) => {
+    mat.uniforms.uSkyTurn.value = turn;
+    mat.uniforms.uDayAmt.value = 0; mat.uniforms.uNightAmt.value = 0;
+    photoTex(day, (t) => { mat.uniforms.uDayTex.value = t; mat.uniforms.uDayAmt.value = t ? 1 : 0; });
+    photoTex(night, (t) => { mat.uniforms.uNightTex.value = t; mat.uniforms.uNightAmt.value = t ? 1 : 0; });
+  };
   return {
     mesh,
+    setPlace,
     uniforms: mat.uniforms,
     update(t) { mat.uniforms.uTime.value = t; },
   };

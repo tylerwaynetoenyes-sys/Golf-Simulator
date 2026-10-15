@@ -77,6 +77,14 @@ export class Game {
     const day = store.settings.timeOfDay === 'day';
     world.env.setTime(day ? 'day' : 'night', true);
     world.env.setWeather(store.settings.weather || 'clear', { immediate: true });
+    // the weather moving on by itself ('changing'): the sound follows, and a word about it
+    world.env.onWeatherChange((id) => {
+      audio.setWind(world.env.weather.windMph);
+      audio.setRain(world.env.weather.rain || 0);
+      const say = { clear: ['Clearing up', 'The cloud breaks'], cloudy: ['Clouding over', 'The light goes flat'], breezy: ['A breeze gets up', `${Math.round(world.env.weather.windMph)} mph`], windy: ["The wind's picking up", `${Math.round(world.env.weather.windMph)} mph, gusting`], rain: ['Rain moving in', 'Soft turf: less bounce and roll'] }[id];
+      if (say) toast(say[0], { kind: 'info', sub: say[1], ms: 3200 });
+      this.hud.setMode?.(this.mode.status());
+    });
     this._syncEnvUI();
     audio.setDaytime(day);
     audio.windMph = world.env.weather.windMph;
@@ -180,7 +188,7 @@ export class Game {
     const day = env.isDay;
     document.body.classList.toggle('day', day);
     document.querySelectorAll('#envTime [data-time]').forEach((b) => b.setAttribute('aria-pressed', String((b.dataset.time === 'day') === day)));
-    document.querySelectorAll('#envWeather [data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.weather === env.weatherId)));
+    document.querySelectorAll('#envWeather [data-weather]').forEach((b) => b.setAttribute('aria-pressed', String(env.auto ? b.dataset.weather === 'changing' : b.dataset.weather === env.weatherId)));
     const sub = document.getElementById('brandSub');
     // where you're playing: the course's place on a course, the bluffs on the range
     const where = this.mode?.course && this.mode.def?.place ? this.mode.def.place.split(' · ').pop() : 'Mississippi bluffs';
@@ -536,6 +544,14 @@ export class Game {
 
   setWeather(id) {
     store.setSetting('weather', id);
+    if (id === 'changing') {
+      this.world.env.setWeather('changing', this.mode.course ? { windFromDeg: this.world.env.windFromDeg } : {});
+      this._syncEnvUI();
+      audio.setWind(this.world.env.weather.windMph);
+      audio.setRain(this.world.env.weather.rain || 0);
+      toast('Changing weather', { kind: 'info', sub: `Rain and wind come and go · now ${this.world.env.weather.label.toLowerCase()}`, ms: 2400 });
+      return;
+    }
     // keep the course's per-hole wind direction; the range uses the preset's
     this.world.env.setWeather(id, this.mode.course ? { windFromDeg: this.world.env.windFromDeg } : {});
     this._syncEnvUI();

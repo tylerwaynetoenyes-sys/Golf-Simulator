@@ -15,6 +15,7 @@ export default {
   place: 'Cahokia Mounds State Historic Site · Collinsville, Illinois',
   theme: 'parkland',
   dem: true,
+  sky: { day: 'prairie', night: 'milkyway' }, // a dark site's night (js/scene/sky.js)
   life: 'none', // js/course/courseLife.js
   enrich: true,
   blurb: 'Nine holes through the heart of the Mississippian city: across the Grand Plaza, under Monks Mound, past the Twin Mounds, Woodhenge and the stockade, on the surveyed ground of a World Heritage Site.',

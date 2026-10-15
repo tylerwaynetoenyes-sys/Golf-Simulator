@@ -95,6 +95,7 @@ export class World {
     this.skyline.setNearVisible?.(!course);
     this.course.setVisible(course);
     if (!course) {
+      this.sky.setPlace?.({}); // the range: the St. Louis glow, the generated sky
       this.terrainFn = rangeTerrain;
       this.groundFn = rangeGround;
       this.ball.setGround(rangeGround);
@@ -125,6 +126,8 @@ export class World {
     // Mississippi valley haze
     this.fogScale = { western: 0.5, coastal: 0.6, harbor: 0.8, urban: 0.85, paris: 0.8, industrial: 0.9 }[hole.theme] ?? 1;
     this.theme = hole.theme || 'parkland';
+    // the place's own skies: the Milky Way over a dark site, a prairie or Mediterranean day
+    this.sky.setPlace?.(hole.sky || {});
     // the St. Louis skyline belongs to the Confluence Course only
     this.skyline.group.visible = !hole.course || hole.course === 'confluence';
     // a hole can turn the skyline about the tee, to sit where it reads from there (Chain of Rocks)

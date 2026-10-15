@@ -9,6 +9,7 @@ export default {
   place: 'Calanques · Cassis, Provence',
   theme: 'coastal',
   dem: true,
+  sky: { day: 'mediterranean', night: 'milkyway' }, // a dark site's night (js/scene/sky.js)
   enrich: true, // design pass: bunkering, greenside sand, shaping (js/course/design.js)
   blurb: 'Nine holes across the vineyard plateau and down to the old town, with Cap Canaille, the Calanques and the Mediterranean below.',
   credit: 'Elevation: Mapzen terrain tiles (EU-DEM, produced using Copernicus data; SRTM, USGS); landmark positions © OpenStreetMap contributors; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',

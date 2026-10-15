@@ -77,6 +77,7 @@ function skyEnvironment(renderer, { zenith, horizon, glow, glowDir, ground }) {
 const HDRI = {
   day: 'kloofendal_48d_partly_cloudy_puresky_1k.hdr',
   overcast: 'kloofendal_overcast_puresky_1k.hdr',
+  storm: 'overcast_soil_puresky_1k.hdr', // heavy rolling storm cloud (Poly Haven, CC0)
   night: 'moonless_golf_1k.hdr',
 };
 
@@ -151,10 +152,10 @@ export class Environment {
     try {
       const loader = new HDRLoader().setDataType(THREE.FloatType);
       const base = new URL('../../assets/hdri/', import.meta.url).href;
-      const [day, overcast, night] = await Promise.all([HDRI.day, HDRI.overcast, HDRI.night].map((f) => loader.loadAsync(base + f)));
+      const [day, overcast, night, storm] = await Promise.all([HDRI.day, HDRI.overcast, HDRI.night, HDRI.storm].map((f) => loader.loadAsync(base + f)));
       const pm = new THREE.PMREMGenerator(renderer);
       const make = (t, align) => { t.mapping = THREE.EquirectangularReflectionMapping; const rt = pm.fromEquirectangular(prepareHdri(t, align)); t.dispose(); return rt.texture; };
-      this.hdri = { day: make(day, SUN_DIR), overcast: make(overcast, null), night: make(night, MOON_DIR) };
+      this.hdri = { day: make(day, SUN_DIR), overcast: make(overcast, null), night: make(night, MOON_DIR), storm: make(storm, null) };
       pm.dispose();
       this.apply();
     } catch (e) { console.warn('HDRI sky lighting unavailable; using the generated sky', e); }
@@ -171,7 +172,18 @@ export class Environment {
     this._emit();
   }
 
+  /**
+   * 'changing': the weather looks after itself. Every few minutes it moves on
+   * (clear skies cloud over, the wind gets up, a shower blows through and
+   * clears), and the wind's direction wanders a little all the while.
+   */
   setWeather(id, { immediate = false, windFromDeg = null } = {}) {
+    this.auto = id === 'changing';
+    if (this.auto) {
+      const pick = [['clear', 0.3], ['cloudy', 0.25], ['breezy', 0.25], ['windy', 0.1], ['rain', 0.1]];
+      let r = Math.random(); id = pick.find(([, p]) => (r -= p) < 0)?.[0] || 'cloudy';
+      this._next = 150 + Math.random() * 240;
+    }
     if (!WEATHER[id]) id = 'clear';
     this.weatherId = id;
     if (windFromDeg != null) this.windFromDeg = windFromDeg;
@@ -183,6 +195,29 @@ export class Environment {
   setWindDirection(fromDeg) { this.windFromDeg = ((fromDeg % 360) + 360) % 360; this.apply(); this._emit(); }
 
   get weather() { return WEATHER[this.weatherId]; }
+
+  /** The weather director's next move from where it is (rain never lasts long). */
+  _advance() {
+    const next = {
+      clear: [['clear', 0.3], ['cloudy', 0.35], ['breezy', 0.35]],
+      cloudy: [['clear', 0.25], ['breezy', 0.2], ['windy', 0.15], ['rain', 0.4]],
+      breezy: [['clear', 0.3], ['cloudy', 0.3], ['windy', 0.3], ['rain', 0.1]],
+      windy: [['breezy', 0.45], ['cloudy', 0.25], ['rain', 0.3]],
+      rain: [['cloudy', 0.6], ['breezy', 0.25], ['rain', 0.15]],
+    }[this.weatherId] || [['clear', 1]];
+    let r = Math.random();
+    const id = next.find(([, p]) => (r -= p) < 0)?.[0] || next[0][0];
+    this._next = id === 'rain' ? 120 + Math.random() * 180 : 180 + Math.random() * 300;
+    if (id !== this.weatherId) {
+      this.weatherId = id;
+      // a front swings the wind round a little
+      this.windFromDeg = ((this.windFromDeg + (Math.random() - 0.5) * 70) % 360 + 360) % 360;
+      this.apply();
+      this._emit();
+      for (const f of this.weatherListeners || []) f(id);
+    }
+  }
+  onWeatherChange(fn) { (this.weatherListeners ||= []).push(fn); }
 
   /** How soaked the turf is (0–1), for the bounce and roll. */
   get wet() { return this.weather.rain || 0; }
@@ -205,6 +240,12 @@ export class Environment {
 
   update(dt) {
     this.t += dt;
+    if (this.auto) {
+      this._next -= dt;
+      if (this._next <= 0) this._advance();
+      // the wind never quite settles
+      this.windFromDeg = (this.windFromDeg + Math.sin(this.t * 0.013) * dt * 0.6 + 360) % 360;
+    }
     const k = 1 - Math.exp(-dt * 1.6);
     const prev = this.day + this.cloud + this.sunAmt;
     this.day += (this.targetDay - this.day) * k;
@@ -212,7 +253,11 @@ export class Environment {
     const w = this.weather;
     this.cloud += (w.cloud - this.cloud) * k;
     this.sunAmt += (w.sun - this.sunAmt) * k;
-    if (Math.abs(prev - (this.day + this.cloud + this.sunAmt)) > 1e-5) this.apply();
+    // the storm sky comes in with the rain, a little slower than the cloud
+    this.storm = (this.storm || 0) + ((w.rain ? 1 : 0) - (this.storm || 0)) * (1 - Math.exp(-dt * 0.6));
+    this.w.sky.uniforms.uStorm.value = this.storm;
+    this.w.sky.uniforms.uStormTurn.value += dt * (0.0004 + w.windMph * 0.00006);
+    if (Math.abs(prev - (this.day + this.cloud + this.sunAmt)) > 1e-5 || Math.abs((this._lastStorm ?? -1) - this.storm) > 0.02) { this._lastStorm = this.storm; this.apply(); }
 
     // clouds drift with the wind
     const ws = 0.0006 + w.windMph * 0.00045;
@@ -252,6 +297,7 @@ export class Environment {
     // sky + water
     w.sky.uniforms.uDay.value = d;
     w.sky.uniforms.uCloud.value = c;
+    w.sky.uniforms.uStorm.value = this.storm || 0;
     for (const m of waterMaterials) { m.uniforms.uDay.value = d; m.uniforms.uCloud.value = c; }
 
     // key light: moon at night, sun by day (dimmer through cloud)
@@ -281,7 +327,7 @@ export class Environment {
     const scn = w.scene;
     if (this.hdri) {
       // photographed skies: overcast takes over as the cloud thickens
-      scn.environment = d > 0.5 ? (c > 0.6 ? this.hdri.overcast : this.hdri.day) : this.hdri.night;
+      scn.environment = d > 0.5 ? (this.storm > 0.5 ? this.hdri.storm : c > 0.6 ? this.hdri.overcast : this.hdri.day) : this.hdri.night;
       scn.environmentIntensity = d > 0.5
         ? THREE.MathUtils.lerp(0.16, 0.34, (d - 0.5) * 2) * (c > 0.6 ? 1.1 : 1 - c * 0.25) * (this.envScale ?? 1)
         : THREE.MathUtils.lerp(0.025, 0.08, d * 2) * (w.sceneMode === 'course' ? 1.5 : 1) * (this.envScale ?? 1);

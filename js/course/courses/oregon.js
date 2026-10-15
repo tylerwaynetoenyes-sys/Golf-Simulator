@@ -8,6 +8,7 @@ export default {
   place: 'Scotts Bluff, Nebraska',
   theme: 'western',
   dem: true,
+  sky: { day: 'prairie', night: 'milkyway' }, // a dark site's night (js/scene/sky.js)
   life: 'none', // js/course/courseLife.js
   enrich: true, // design pass: bunkering, greenside sand, shaping (js/course/design.js)
   blurb: 'Nine holes on the real ground below Scotts Bluff, where wagon trains crossed Mitchell Pass.',

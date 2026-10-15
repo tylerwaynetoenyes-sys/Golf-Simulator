@@ -173,7 +173,7 @@ export function openSettings(game) {
     <h3>Display</h3>
     <div class="setting"><div><label>Screen</label><div class="hint">TV makes everything readable from the couch. Same as adding <code>?tv</code> to the address.</div></div>${seg('display', [['standard', 'Standard'], ['tv', 'TV / projector']])}</div>
     <div class="setting"><div><label>Time of day</label></div>${seg('timeOfDay', [['night', 'Night'], ['day', 'Afternoon']])}</div>
-    <div class="setting"><div><label>Weather</label><div class="hint">Wind moves the ball in every mode.</div></div>${seg('weather', [['clear', 'Clear'], ['cloudy', 'Cloudy'], ['breezy', 'Light wind'], ['windy', 'Strong wind'], ['rain', 'Rain']])}</div>
+    <div class="setting"><div><label>Weather</label><div class="hint">Wind moves the ball in every mode. Changing: the weather moves on by itself every few minutes, showers and all.</div></div>${seg('weather', [['clear', 'Clear'], ['cloudy', 'Cloudy'], ['breezy', 'Light wind'], ['windy', 'Strong wind'], ['rain', 'Rain'], ['changing', 'Changing']])}</div>
     <div class="setting"><div><label>Units</label></div>${seg('units', [['imperial', 'Yards · mph'], ['metric', 'Metres · km/h']])}</div>
     <div class="setting"><div><label>Camera</label><div class="hint">Cinematic cuts to a landing camera on longer shots.</div></div>${seg('camera', [['cinematic', 'Cinematic'], ['follow', 'Follow'], ['tee', 'Tee']])}</div>
     <div class="setting"><div><label>Graphics quality</label><div class="hint">Lower it if the frame rate dips.</div></div>${seg('quality', [['high', 'High'], ['medium', 'Medium'], ['low', 'Low']])}</div>

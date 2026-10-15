@@ -273,6 +273,19 @@ CC BY 4.0; scaled to 2.4 m and exported with Draco in Blender. The cart
 paths, tee signs, ball washers and benches are modelled in
 `js/course/courseLife.js`.
 
+## Skies
+
+From Poly Haven (CC0), photographed for 3D environments:
+- storm: "Overcast Soil (Pure Sky)" by Jarod Guest and Sergej Majboroda:
+  `overcast_soil_puresky_1k.hdr` for the light, a 4096×2048 tonemapped
+  `storm_sky_4k.jpg` for the visible sky in rain
+- night over dark sites: "Rogland Clear Night" by Greg Zaal
+  (`milkyway_4k.jpg`, the sky above the photograph's horizon)
+- prairie day: "Rustig Koppie (Pure Sky)" by Greg Zaal and Jarod Guest
+  (`sky_prairie_4k.jpg`)
+- Mediterranean day: "Pizzo Pernice (Pure Sky)" by Andreas Mischok and
+  Jarod Guest (`sky_mediterranean_4k.jpg`)
+
 ## Built surfaces
 
 `assets/textures/pbr/` (Poly Haven, CC0; colour, roughness and normal,
