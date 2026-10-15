@@ -9,12 +9,13 @@ import { createWaterMaterial, waterMaterials } from '../scene/river.js';
 import { makeFlag, lightConeMaterial } from '../scene/rangeProps.js';
 import { CUP } from '../core/physics.js';
 import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
-import { plantTrees, updateTrees, THEME_TREES, treesFor } from '../scene/trees.js';
+import { plantTrees, updateTrees, THEME_TREES, treesFor, slotHasModel } from '../scene/trees.js';
 import { tuftGeometry, grassMaterial, GRASS } from './grass.js';
 
 /** Rough-grass tufts and shrubs are drawn out to these distances from the camera (m). */
 const GRASS_FAR = 110;
 const SHRUB_FAR = 260;
+const FESCUE_FAR = 220;
 import { buildCity } from './buildings.js';
 import { dressLots } from './streetlife.js';
 import { dressScenery } from './scenery.js';
@@ -49,8 +50,17 @@ const PALETTES = {
     shore: C(0.5, 0.47, 0.4) },
   // a links-style harbor course: wispy fescue beyond the short grass
   harbor: { grass: C(0.52, 0.53, 0.31), scrub: C(0.4, 0.45, 0.27), rock: C(0.56, 0.54, 0.5), rockSlope: 0.5,
-    rough: C(0.3, 0.46, 0.2), deep: C(0.5, 0.52, 0.3), shore: C(0.58, 0.55, 0.47) },
+    rough: C(0.3, 0.46, 0.2), deep: C(0.5, 0.52, 0.3), shore: C(0.58, 0.55, 0.47), fescue: C(0.6, 0.56, 0.36) },
 };
+
+/** Links fescue grows in drifts: 0..1, a low-frequency field over the ground. */
+const fescueDrift = (x, z) => 0.5 + 0.5 * Math.sin(x * 0.045 + Math.sin(z * 0.03) * 2.2) * Math.cos(z * 0.05 - x * 0.017);
+/** How far into the fescue (x, z) is: 0 at the edge of the deep rough, 1 out in the dunes. */
+function fescueDepth(T, x, z) {
+  const pr = T.project(x, z);
+  const edge = T.fwHalf > 0 && pr.s > T.fwStart && pr.s < T.length ? T.fairwayHalf(pr.s) : 0;
+  return THREE.MathUtils.smoothstep(Math.abs(pr.d) - edge, 6, 30) * THREE.MathUtils.smoothstep(T.greenEdge(x, z), 8, 22);
+}
 
 /** Scale the scene fog on one material (distant landmarks that should still read). */
 function hazeLess(m, k) {
@@ -380,6 +390,18 @@ diffuseColor.rgb *= stripes * turf;`);
     holder.rotation.y = Math.atan2(-T.finalDir.x, -T.finalDir.z) + (lmSpec.rot || 0);
     holder.scale.setScalar(lmSpec.scale || 1);
     g.add(holder);
+    // the landmark's own trees, planted with the course's real models below
+    const lmTrees = [];
+    const takeTrees = (lm, h, far) => {
+      if (!lm.trees?.length) return;
+      h.updateMatrix(); lm.group.updateMatrix();
+      const M = h.matrix.clone().multiply(lm.group.matrix), k = M.getMaxScaleOnAxis(), v = new THREE.Vector3();
+      for (const t of lm.trees) {
+        v.set(t.x, t.y, t.z).applyMatrix4(M);
+        lmTrees.push({ ...t, x: v.x, y: v.y, z: v.z, h: t.h * k, crown: t.crown * k, far });
+      }
+    };
+    takeTrees(this.landmark, holder, false);
 
     // far landmarks on their true bearing. One beyond ~2 km would be a
     // speck lost in the haze, so it is drawn at 2 km on the same bearing
@@ -402,6 +424,7 @@ diffuseColor.rgb *= stripes * turf;`);
         if (f.scale) h.scale.setScalar(f.scale);
         for (const m of lm.haze || []) hazeLess(m, 0.55);
         g.add(h);
+        takeTrees(lm, h, true);
         this.farLms.push(lm);
       }
     }
@@ -569,6 +592,13 @@ diffuseColor.rgb *= stripes * turf;`);
           scale: 0.75 + rand() * 0.5, squash: 0.85 + rand() * 0.3, hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(), far: true });
       }
     }
+    // landmark trees: the species the builder asked for when its model is
+    // loaded, else one of the course's own
+    for (const t of lmTrees) {
+      const variant = t.slot != null && slotHasModel(t.slot) ? t.slot : t.conifer ? pickConifer() : pickBroad();
+      treeSpots.push({ x: t.x, z: t.z, y: t.y - 0.1, variant, rot: rand() * 6.28, height: t.h, crown: t.crown,
+        scale: 1, squash: 1, hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(), far: t.far });
+    }
     const forest = plantTrees(treeSpots);
     g.add(forest.group);
     for (const t of forest.records) {
@@ -610,6 +640,7 @@ diffuseColor.rgb *= stripes * turf;`);
 
     // ── long grass in the rough: tufts thicken away from the fairway ──
     this._buildRoughGrass(T, g, rand, b);
+    if (hole.theme === 'harbor') this._buildFescue(T, g, rand);
     if (hole.theme === 'western' || hole.theme === 'coastal') this._buildShrubs(T, g, rand, hole.theme);
 
     // ── yardage stakes: 100 red, 150 white, 200 blue, 250 yellow (to the green) ──
@@ -814,6 +845,8 @@ diffuseColor.rgb *= 0.5 + 0.62 * mix(bd, bd2, 0.45);
           const w = THREE.MathUtils.smoothstep(Math.min(Math.abs(pr.d) - Math.max(T.fwHalf, 12), gd) + wob, 10, 46);
           if (w > 0) c.lerp(this._backColor(T, x, z, T.baseGround(x, z), 4, this._c3 || (this._c3 = new THREE.Color())), w);
         }
+        // links: straw ground showing through the fescue drifts
+        if (P.fescue) c.lerp(P.fescue, fescueDepth(T, x, z) * (0.3 + 0.6 * fescueDrift(x, z)));
       }
     }
     const n = 0.92 + 0.12 * Math.sin(x * 0.21 + z * 0.13) * Math.cos(z * 0.17);
@@ -1196,6 +1229,44 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       n++;
     }
     this._chunked(g, placed, this.tuftGeo, this.tuftGeoLo, tint ? this.tuftMats[tint] : this.tuftMat, { lodAt: 45, far: GRASS_FAR });
+  }
+
+  /**
+   * Links fescue: knee-high, fine and mostly straw-coloured, in drifts beyond
+   * the first cut and out over the native ground, thickening away from play.
+   * Chunked like the rough tufts, with a thinner clump past 50 m.
+   */
+  _buildFescue(T, g, rand) {
+    if (!this.fescue) {
+      const geo = tuftGeometry(56, 11, { width: 0.75, lean: 0.4, dry: 0.7, root: 0.5 });
+      const lo = tuftGeometry(18, 11, { width: 1.3, lean: 0.4, dry: 0.7, segs: 2, root: 0.5 });
+      geo.userData.shared = lo.userData.shared = true;
+      this.fescue = { geo, lo, mat: grassMaterial(0xd9c58e) };
+    }
+    const { geo, lo, mat } = this.fescue;
+    const b = T.bounds(70);
+    const N = Math.round(14000 * (this.treeDensity ?? 1));
+    const placed = [];
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    let n = 0;
+    for (let i = 0; i < N * 5 && n < N; i++) {
+      const x = b.minx + rand() * (b.maxx - b.minx), z = b.minz + rand() * (b.maxz - b.minz);
+      const sf = T.terrain(x, z).surface;
+      if (sf !== 'rough' && sf !== 'oob') continue;
+      if (sf === 'rough' && T.roughDepth(x, z) !== 'deep') continue;
+      // thin at the edge of the deep rough, full drifts out in the dunes
+      const k = fescueDepth(T, x, z), f = fescueDrift(x, z);
+      if (rand() > (0.12 + 0.88 * k) * (0.2 + 0.8 * f)) continue;
+      if (T.greenEdge(x, z) < 8 || Math.hypot(x, z) < 14 || this._mownCarry(x, z)) continue;
+      const y = this._coarseH(x, z);
+      if (T.seaLevel != null && y < T.seaLevel + 0.8) continue;
+      const h = 0.45 + rand() * 0.35 + f * 0.2;
+      const spread = 1.5 + rand() * 1.1;
+      q.setFromAxisAngle(up, rand() * 6.28);
+      placed.push(m4.compose(p.set(x, y - 0.03, z), q, sc.set(spread, h, spread)).clone());
+      n++;
+    }
+    this._chunked(g, placed, geo, lo, mat, { lodAt: 50, far: FESCUE_FAR });
   }
 
   /**

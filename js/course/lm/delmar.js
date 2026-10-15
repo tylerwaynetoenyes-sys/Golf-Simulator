@@ -6,7 +6,7 @@
 // storefronts face +X, toward the golf hole.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat as baseMat, lit, box, cyl, sphere, seeded, canvasTex, facadeMaterial, person } from './kit.js';
+import { mat as baseMat, lit, box, cyl, sphere, seeded, canvasTex, facadeMaterial, person, tree, SLOT } from './kit.js';
 
 // share one material per colour/options so the block stays cheap to draw
 const matCache = new Map();
@@ -258,13 +258,10 @@ export default function build() {
   const uplight = lit(0x222222, 0xfff0d0, { night: 2 });
   glow.push(uplight);
   for (const a of [0.8, 2.4, 4.0, 5.6]) plaza.add(cyl(0.12, 0.12, 0.1, uplight, Math.cos(a) * 1.5, 0.22, Math.sin(a) * 1.5, 8));
-  for (const [x, zz] of [[-3.6, -4.6], [3.6, -4.6], [-3.6, 4.6], [3.6, 4.6]]) {
-    plaza.add(cyl(0.18, 0.24, 3.2, mat(0x4d3a28), x, 0.2, zz, 8));
-    const crown = sphere(1.8, mat(0x4f7a2e, { roughness: 0.9 }), x, 4.4, zz, 10);
-    crown.scale.y = 0.85;
-    plaza.add(crown);
-  }
   plaza.position.set(STREET_X + 15, 0, bz - 1);
+  // street trees: honey locusts round the plaza and along the sidewalk
+  const treeList = [];
+  for (const [x, zz] of [[-3.6, -4.6], [3.6, -4.6], [-3.6, 4.6], [3.6, 4.6]]) treeList.push(tree(plaza.position.x + x, 0.2, plaza.position.z + zz, 6.2, 2.0, { slot: SLOT.youngOak }));
   g.add(plaza);
 
   // ── street lamps, trees, overhead wire poles ──
@@ -286,15 +283,7 @@ export default function build() {
   const poleMesh = new THREE.Mesh(mergeGeometries(poles), iron);
   poleMesh.castShadow = true;
   g.add(poleMesh);
-  const leaf = mat(0x4b7230, { roughness: 0.9 });
-  const trunk = mat(0x4d3a28);
-  for (let zz = -95; zz <= 95; zz += 16) {
-    const x = STREET_X + 10.4;
-    g.add(cyl(0.14, 0.2, 2.6, trunk, x, 0.18, zz, 6));
-    const c = sphere(1.6 + rnd() * 0.5, leaf, x, 3.8, zz, 9);
-    c.scale.y = 0.9;
-    g.add(c);
-  }
+  for (let zz = -95; zz <= 95; zz += 16) treeList.push(tree(STREET_X + 10.4, 0.18, zz, 5.8 + rnd() * 1.2, 1.8 + rnd() * 0.5, { slot: SLOT.youngOak }));
 
   // ── people on the sidewalks ──
   const shirts = [0x2d5d8a, 0x9a3b30, 0xdedad0, 0x2f6e4c, 0xd9a43a, 0x3a3a46, 0x7a4a8c];
@@ -331,6 +320,7 @@ export default function build() {
   return {
     group: g,
     glow,
+    trees: treeList,
     update(t, dt) {
       // trolley: runs the block, pauses at each end
       if (wait > 0) wait -= dt;

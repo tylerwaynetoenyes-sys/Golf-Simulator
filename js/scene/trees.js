@@ -19,6 +19,9 @@ const SLOT_MODEL = [
   'palm', 'oldtree', // sabal palm, a dead snag
 ];
 
+/** Whether a species slot's model is loaded (else it draws procedurally). */
+export const slotHasModel = (slot) => !!species(SLOT_MODEL[slot >= 100 ? 10 : slot]);
+
 /** Index of the scanned olive (kept for older THEME_TREES lists). */
 export const HERO = () => 10;
 

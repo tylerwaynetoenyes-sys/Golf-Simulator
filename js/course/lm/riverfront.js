@@ -6,7 +6,7 @@
 // white tensile canopy, the marina and the river-walk promenade.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, seeded, canvasTex } from './kit.js';
+import { mat, lit, seeded, canvasTex, tree, SLOT } from './kit.js';
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 const _o = new THREE.Object3D();
@@ -90,19 +90,6 @@ function crowd(group, spots, rnd) {
     head.setColorAt(i, c.set(skins[Math.floor(rnd() * skins.length)]));
   });
   for (const m of [legs, body, head]) { m.castShadow = false; group.add(m); }
-}
-function trees(group, list, rnd) {
-  const n = list.length;
-  const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.26, 1, 5).translate(0, 0.5, 0), mat(0x4e4034, { roughness: 0.9 }), n);
-  const crown = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 9, 6), mat(0xffffff, { roughness: 0.85 }), n);
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), v = new THREE.Vector3(), s = new THREE.Vector3();
-  list.forEach(([x, y, z, r], i) => {
-    const th = r * 1.1;
-    trunk.setMatrixAt(i, m4.compose(v.set(x, y, z), q.identity(), s.set(1, th, 1)));
-    crown.setMatrixAt(i, m4.compose(v.set(x, y + th + r * 0.85, z), q, s.set(r, r * 1.15, r)));
-    crown.setColorAt(i, c.setHSL(0.23 + rnd() * 0.06, 0.38 + rnd() * 0.15, 0.24 + rnd() * 0.07));
-  });
-  group.add(trunk, crown);
 }
 /** A flag that waves by vertex displacement (no allocation per frame). */
 function flag(tex, w, h) {
@@ -692,7 +679,7 @@ export default function build() {
 
   // ── trees, people, flags ──
   const tl = [];
-  for (let z = -200; z <= 80; z += 11) if (Math.abs(z + 40) > 16 && Math.abs(z - 40) > 22) tl.push([-40.5 + (rnd() - 0.5), 0, z, 2.6 + rnd()]);
+  for (let z = -200; z <= 80; z += 11) if (Math.abs(z + 40) > 16 && Math.abs(z - 40) > 22) { const r = 2.6 + rnd(); tl.push(tree(-40.5 + (rnd() - 0.5), 0, z, r * 3.1, r, { slot: SLOT.maple })); }
   for (let i = 0; i < 40; i++) {
     const x = -30 + rnd() * 85, z = -200 + rnd() * 330;
     const dB = Math.abs((x - S0.x) * N.x + (z - S0.z) * N.z);
@@ -701,9 +688,9 @@ export default function build() {
     if (dB < 18 && alongB > -5 && alongB < 140) continue;
     if (x < 10 && z > 80) continue;
     if (Math.abs(z + 40) < 18 && x < -20) continue;
-    tl.push([x, 0, z, 3 + rnd() * 1.6]);
+    const r = 3 + rnd() * 1.6;
+    tl.push(tree(x, 0, z, r * 3.1, r));
   }
-  trees(group, tl, rnd);
   const people = [];
   for (let i = 0; i < 46; i++) people.push([-50 + (rnd() - 0.5) * 7, QY, -200 + rnd() * 320]);
   for (let i = 0; i < 70; i++) {
@@ -762,5 +749,5 @@ export default function build() {
     for (let i = 0; i < flags.length; i++) flags[i].userData.wave(t, i * 1.3);
   };
   update(3, 0, 1);
-  return { group, glow, update };
+  return { group, glow, update, trees: tl };
 }

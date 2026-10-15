@@ -5,7 +5,7 @@
 // Front faces +Z (toward the golfer). Footprint x -140..140, z -50..12.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, seeded, canvasTex } from './kit.js';
+import { mat, seeded, canvasTex, tree, SLOT } from './kit.js';
 import { piasaCanvas, piasaEngravedCanvas } from '../../ui/piasa.js';
 
 // ---- small deterministic noise --------------------------------------------
@@ -289,36 +289,15 @@ export default function build() {
     g.add(talus);
   }
 
+  const treeList = [];
   // ---- vegetation: oak-hickory crown, cedars and shrubs on the ledges -------
   {
-    const leaf = [], wood = [];
+    const leaf = [];
     const r = seeded(5150);
     const greens = [0x3e5a2b, 0x47622f, 0x35502a, 0x566a33, 0x2f4724, 0x4f6a3a, 0x5f6f34];
-    function broadleaf(x, y, z, s) {
-      const h = (4.5 + r() * 3) * s;
-      const tr = new THREE.CylinderGeometry(0.22 * s, 0.4 * s, h, 5).translate(x, y + h / 2, z);
-      wood.push(paint(tr, 0x4a3d2e));
-      const n = 4 + Math.floor(r() * 4);
-      const base = greens[Math.floor(r() * greens.length)];
-      for (let k = 0; k < n; k++) {
-        const rr = (2.8 + r() * 2.4) * s;
-        const a = r() * 6.28, d = (k === 0 ? 0 : 1.6 + r() * 2.6) * s;
-        const sg = lumpy(rr, 7, 5, 0.28, i++);
-        sg.translate(x + Math.cos(a) * d, y + h + (r() - 0.3) * 2.6 * s + (k === 0 ? 1.5 * s : 0), z + Math.sin(a) * d);
-        const cc = new THREE.Color(base).offsetHSL((r() - 0.5) * 0.03, (r() - 0.5) * 0.1, (r() - 0.5) * 0.06);
-        leaf.push(paint(sg, cc, 0.18, null, 0.45));
-      }
-    }
-    function cedar(x, y, z, s) {
-      const h = (4 + r() * 4) * s;
-      wood.push(paint(new THREE.CylinderGeometry(0.1 * s, 0.2 * s, h * 0.4, 5).translate(x, y + h * 0.2, z), 0x4f3a2a));
-      const cg = new THREE.ConeGeometry(h * 0.26, h, 7, 2);
-      const p = cg.attributes.position;
-      for (let k = 0; k < p.count; k++) { const q = 1 + (hash2(p.getX(k) * 9 + x, p.getY(k) * 7 + z) - 0.5) * 0.4; p.setX(k, p.getX(k) * q); p.setZ(k, p.getZ(k) * q); }
-      cg.computeVertexNormals();
-      cg.translate(x, y + h * 0.62, z);
-      leaf.push(paint(cg, new THREE.Color(0x2c4026).offsetHSL(0, 0, (r() - 0.5) * 0.05), 0.15, null, 0.4));
-    }
+    // white and black oak, shagbark hickory on the crown; eastern red cedar on the ledges
+    const broadleaf = (x, y, z, s) => treeList.push(tree(x, y, z, (8.5 + r() * 3) * s, 4.3 * s, { slot: r() < 0.65 ? SLOT.oak : SLOT.youngOak }));
+    const cedar = (x, y, z, s) => { const h = (4 + r() * 4) * s; treeList.push(tree(x, y, z, h, h * 0.26, { slot: SLOT.cedar })); };
     let i = 0;
     // crown forest: dense along the brow, thinning behind
     for (let n = 0; n < 108; n++) {
@@ -375,9 +354,8 @@ export default function build() {
       leaf.push(paint(sg, greens[Math.floor(r() * greens.length)], 0.2, null, 0.45));
     }
     const lm = new THREE.Mesh(mergeGeometries(leaf), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
-    const wm = new THREE.Mesh(mergeGeometries(wood), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
     lm.receiveShadow = true;
-    g.add(lm, wm);
+    g.add(lm);
   }
 
   // ---- the Piasa mural -------------------------------------------------------
@@ -570,6 +548,7 @@ export default function build() {
   return {
     group: g,
     glow,
+    trees: treeList,
     update(t, dt, day) {
       washMat.opacity = 0.6 * (1 - day);
       wash.visible = day < 0.98;

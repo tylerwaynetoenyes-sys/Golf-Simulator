@@ -1,15 +1,26 @@
 // Shared modelling kit for landmark builders (js/course/lm/*.js).
 //
 // Builder contract: `export default function build()` returns
-//   { group, glow: Material[], update?(t, dt, day) }
+//   { group, glow: Material[], update?(t, dt, day), trees?: tree()[] }
 // The group sits on y = 0 at its base. Local axes: -Z points the direction of
 // play at the green (away from the tee), +X is the golfer's right, +Z back
 // toward the tee. Units are metres. `glow` materials get their emissive
 // uplighting faded in at night (userData.night = strength). `update` runs
 // every frame for ambient motion (t seconds, day 0 = night .. 1 = day).
+// `trees` are planted by the course with its real tree models (impostors at
+// range, collision where in play) rather than modelled into the group.
 import * as THREE from 'three';
 
 export const FT = 0.3048;
+
+/** Course species slots (js/scene/trees.js VARIANTS) a landmark can ask for. */
+export const SLOT = { oak: 0, youngOak: 1, maple: 2, sycamore: 3, cedar: 4, spruce: 5, cottonwood: 6 };
+/**
+ * A tree for the course to plant: base (x, y, z) in the builder's space,
+ * height h and crown radius in metres; `slot` picks the species (SLOT),
+ * else the course's own broadleaf, or a conifer with `conifer`.
+ */
+export const tree = (x, y, z, h, crown, { slot = null, conifer = false } = {}) => ({ x, y, z, h, crown, slot, conifer });
 
 export function mat(color, opts = {}) {
   return new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0, ...opts });

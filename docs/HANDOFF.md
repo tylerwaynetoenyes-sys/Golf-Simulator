@@ -205,14 +205,31 @@ add `&manual` to drive frames with `window.__advance(seconds)`.
   course holds 60 fps on the M1 with 120–280 draw calls and 0.6–1.4M
   triangles (shadow pass included).
 
+## Realistic world, finished (October 15, late)
+
+- **Landmark trees**: builders return `trees` (`tree()` and `SLOT` in
+  `js/course/lm/kit.js`) instead of modelling round crowns; `CourseWorld`
+  plants them with the hole's own forest (real models, impostors,
+  collision), far landmarks included. Riverfront, Arch grounds (London plane
+  allées), Basilica, Delmar, Zoo, City Museum, Chain of Rocks (cottonwoods,
+  sycamores) and the Piasa bluff (oak-hickory, red cedar on the ledges).
+- **Links fescue** on the harbor theme (Liberty): `_buildFescue` plants
+  knee-high straw tufts (`tuftGeometry` with `root`, `dry`, `segs` options)
+  in drifts beyond the first cut, chunked to 220 m; the ground under the
+  drifts goes to straw (`fescue` in the palette).
+- **Shipping containers** (East St. Louis): corrugated steel from Poly
+  Haven's `container_side` (normal map plus luminance and a rust mask,
+  `tools/blender/container.py`), UVs in metres, rust heavier at the bottom
+  rail.
+
 ## Next steps
 
 - Long and middle irons land 2–4° flatter than Trackman; closing that needs
   a Reynolds-dependent drag curve (see `docs/physics.md`).
 - More tree species: add a model to `SPECIES` in `js/scene/treeModels.js`
   and point a slot at it in `SLOT_MODEL` (`js/scene/trees.js`).
-- Some landmark builders still plant round procedural trees (the riverfront
-  on the Confluence); they could use `treeModels.buildForest`.
+- The Zoo's savanna acacias are still modelled umbrellas: the acacia model
+  only loads for courses whose tree set uses it.
 - Import more real courses with `tools/import-course.mjs` (US courses via
   OpenGolfAPI; anywhere OSM has `golf=hole` ways via `--lat/--lon`).
 - Back nines for the real-terrain courses.

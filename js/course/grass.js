@@ -10,23 +10,28 @@ export const GRASS = {
   uBall: { value: new THREE.Vector3(0, -999, 0) },
 };
 
-/** One clump: `blades` blades, each a 3-segment strip curving outward. Unit height. */
-export function tuftGeometry(blades = 14, seed = 7) {
+/**
+ * One clump: `blades` blades, each a 3-segment strip curving outward. Unit
+ * height. `width` scales the blades, `lean` their arc and `dry` is the share
+ * of straw-coloured ones (links fescue: fine, upright and mostly dry);
+ * `segs` the segments per blade and `root` the radius the roots spread over
+ * (a wide root makes a patch of sward rather than a clump).
+ */
+export function tuftGeometry(blades = 14, seed = 7, { width = 1, lean: leanK = 1, dry = 0.18, segs = 3, root = 0.05 } = {}) {
   let r = seed;
   const rnd = () => ((r = (r * 16807) % 2147483647) / 2147483647);
   const pos = [], col = [], idx = [];
   for (let i = 0; i < blades; i++) {
     const a = rnd() * Math.PI * 2;
     const ca = Math.cos(a), sa = Math.sin(a);
-    const base = rnd() * 0.05; // root spread
+    const base = rnd() * root; // root spread
     const bx = ca * base, bz = sa * base;
-    const lean = 0.18 + rnd() * 0.4; // how far it arcs out by the tip
+    const lean = (0.18 + rnd() * 0.4) * leanK; // how far it arcs out by the tip
     const hgt = 0.65 + rnd() * 0.35;
-    const w = 0.009 + rnd() * 0.006;
+    const w = (0.009 + rnd() * 0.006) * width;
     const tone = 0.85 + rnd() * 0.3;
-    const yellow = rnd() < 0.18 ? 1 : 0; // a few dry blades
+    const yellow = rnd() < dry ? 1 : 0; // a few dry blades
     const start = pos.length / 3;
-    const segs = 3;
     for (let k = 0; k <= segs; k++) {
       const u = k / segs;
       const out = lean * u * u; // curve: steeper near the root

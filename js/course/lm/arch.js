@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { archGeometry, archMaterial } from '../../scene/skyline.js';
-import { mat, lit, seeded, canvasTex, facadeMaterial } from './kit.js';
+import { mat, lit, seeded, canvasTex, facadeMaterial, tree, SLOT } from './kit.js';
 
 const GY = 5; // height of the Arch grounds above the levee
 
@@ -244,7 +244,7 @@ export default function build() {
     return Math.abs(r - 222) < 18 && an > 0.44 && an < 1.19;
   };
   const onTerrace = (x, z) => Math.abs(x) < 290 && z > -126 && z < 60;
-  const tryTree = (x, z, r) => { if (!nearArch(x, z) && !inPond(x, z) && onTerrace(x, z) && !(Math.abs(x) < 40 && z > 40)) trees.push([x, z, r]); };
+  const tryTree = (x, z, r, allee = false) => { if (!nearArch(x, z) && !inPond(x, z) && onTerrace(x, z) && !(Math.abs(x) < 40 && z > 40)) trees.push([x, z, r, allee]); };
   for (const w of walks) {
     let acc = 0;
     for (let i = 1; i < w.length; i++) {
@@ -254,7 +254,7 @@ export default function build() {
       if (acc < 9) continue;
       acc = 0;
       const nx = -(z1 - z0) / L, nz = (x1 - x0) / L;
-      for (const sd of [-1, 1]) tryTree(x1 + nx * 5.5 * sd, z1 + nz * 5.5 * sd, 3.2 + rnd() * 0.8);
+      for (const sd of [-1, 1]) tryTree(x1 + nx * 5.5 * sd, z1 + nz * 5.5 * sd, 3.2 + rnd() * 0.8, true);
     }
   }
   // groves filling the grounds away from the walks
@@ -265,27 +265,8 @@ export default function build() {
     if (ok) for (const t of trees) if (Math.hypot(t[0] - x, t[1] - z) < 7) { ok = false; break; }
     if (ok && z < 30) tryTree(x, z, 3.4 + rnd() * 1.4);
   }
-  {
-    const n = trees.length;
-    const trunkM = mat(0x4e4034, { roughness: 0.9 });
-    const leafM = mat(0xffffff, { roughness: 0.85 });
-    const trunk = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.16, 0.26, 1, 5).translate(0, 0.5, 0), trunkM, n);
-    const crown = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 9, 6), leafM, n);
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color();
-    trees.forEach(([x, z, r], i) => {
-      const th = r * 1.1;
-      m4.compose(new THREE.Vector3(x, GY, z), q, new THREE.Vector3(1, th, 1));
-      trunk.setMatrixAt(i, m4);
-      m4.compose(new THREE.Vector3(x, GY + th + r * 0.85, z), q.setFromEuler(new THREE.Euler(0, rnd() * 6, 0)), new THREE.Vector3(r, r * 1.15, r * (0.9 + rnd() * 0.2)));
-      crown.setMatrixAt(i, m4);
-      c.setHSL(0.24 + rnd() * 0.05, 0.38 + rnd() * 0.15, 0.24 + rnd() * 0.07);
-      crown.setColorAt(i, c);
-      q.identity();
-    });
-    trunk.castShadow = crown.castShadow = true;
-    crown.receiveShadow = true;
-    group.add(trunk, crown);
-  }
+  // the allées are London planes (they replaced Kiley's rose ash in 2017); oaks and maples in the groves
+  const treeList = trees.map(([x, z, r, allee]) => tree(x, GY, z, r * 3.1, r, { slot: allee ? SLOT.sycamore : rnd() < 0.5 ? SLOT.oak : SLOT.maple }));
 
   // lamp standards along the front and back arcs and the levee
   const lamps = [];
@@ -477,5 +458,5 @@ export default function build() {
     haloM.opacity = 0.9 * n;
     halos.visible = n > 0.02;
   };
-  return { group, glow, arch: archMat, update };
+  return { group, glow, arch: archMat, update, trees: treeList };
 }

@@ -6,8 +6,8 @@
 // right of the fairway, so its -X side (Flight Cage broadside, west promenade)
 // and its +Z side (Bird House, flamingos, station) are the show faces.
 import * as THREE from 'three';
-import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, seeded, canvasTex } from './kit.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mat, lit, seeded, canvasTex, tree, SLOT } from './kit.js';
 
 // ---------------------------------------------------------------- helpers
 const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
@@ -713,9 +713,10 @@ export default function build() {
     M.add(new THREE.BoxGeometry(5, 2.9, 2.2), 0xe2d6bd, xf(sx + 4, 0.6, sz - 1.4));
   }
 
+  const treeList = [];
   // ---------- shade trees (instanced), avoiding exhibits, paths and track
   {
-    const trunks = [], crowns = [], crowns2 = [];
+    const trunks = [];
     const inZone = (x, z) => zones.some((q) => ((x - q.x) / q.rx) ** 2 + ((z - q.z) / q.rz) ** 2 < 1);
     let tries = 0;
     while (trunks.length < 62 && tries++ < 4000) {
@@ -723,15 +724,10 @@ export default function build() {
       if (inZone(x, z) || (z > 72 && rnd() < 0.6) || nearPath(x, z, 4.2) || nearRail(x, z, 3.2)) continue;
       if (trunks.some((t) => (t.x - x) ** 2 + (t.z - z) ** 2 < 36)) continue;
       const h = (z > 55 ? 5.5 : 7) + rnd() * (z > 55 ? 3 : 6), s = h / 10;
-      const hue = [0x3f6a2c, 0x4a7532, 0x37602a, 0x56803a, 0x426b34][Math.floor(rnd() * 5)];
-      trunks.push({ x, z, ry: rnd() * 6, s, sx: s, sy: s, sz: s });
-      crowns.push({ x, y: h * 0.72, z, ry: rnd() * 6, sx: s * (3.2 + rnd()), sy: s * (2.6 + rnd() * 0.6), sz: s * (3.0 + rnd()), color: hue });
-      crowns2.push({ x: x + (rnd() - 0.5) * 2.4 * s, y: h * 0.86, z: z + (rnd() - 0.5) * 2.4 * s, ry: rnd() * 6, sx: s * 2.2, sy: s * 1.8, sz: s * 2.2, color: hue });
+      trunks.push({ x, z, s, h });
     }
-    group.add(inst(new THREE.CylinderGeometry(0.16, 0.28, 7, 6).translate(0, 3.5, 0), mat(0x5a4636, { roughness: 0.95 }), trunks));
-    const cg = mergeVertices(rockGeo(9, 0.22).deleteAttribute('normal').deleteAttribute('uv')); cg.computeVertexNormals();
-    const cm = mat(0xffffff, { roughness: 0.9 });
-    group.add(inst(cg, cm, crowns), inst(cg, cm, crowns2));
+    // Forest Park shade: oaks, maples and sycamores
+    for (const t of trunks) treeList.push(tree(t.x, 0, t.z, t.h, t.s * 3.4, { slot: [SLOT.oak, SLOT.maple, SLOT.sycamore, SLOT.youngOak][Math.floor(rnd() * 4)] }));
   }
 
   // ---------- animals
@@ -914,5 +910,5 @@ export default function build() {
     flyIM.instanceMatrix.needsUpdate = true;
   }
   update(0);
-  return { group, glow, update };
+  return { group, glow, update, trees: treeList };
 }

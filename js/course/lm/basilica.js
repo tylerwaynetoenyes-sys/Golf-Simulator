@@ -6,7 +6,7 @@
 // Front faces +Z (toward the golfer). Footprint x∈[-55,55], z∈[-75,45], ~70 m to the cross.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, box, cyl, seeded, canvasTex } from './kit.js';
+import { mat, lit, box, cyl, seeded, canvasTex, tree, SLOT } from './kit.js';
 
 // ---------- batching: merge everything that shares a material ----------
 function batcher() {
@@ -415,23 +415,8 @@ export default function build() {
     for (let i = 0; i < 6; i++) trees.push([sx * (44 + tr2() * 8), 40 - i * 17 + tr2() * 5, 1.25]);
     for (let i = 0; i < 4; i++) trees.push([sx * (36 + tr2() * 6), -48 - i * 7, 1.0]);
   }
-  const trunkG = new THREE.CylinderGeometry(0.16, 0.24, 1, 6).translate(0, 0.5, 0);
-  const crownG = new THREE.IcosahedronGeometry(1, 1);
-  const trunks = new THREE.InstancedMesh(trunkG, mat(0x4a3a2c), trees.length);
-  const crowns = new THREE.InstancedMesh(crownG, mat(0xffffff, { roughness: 0.95, flatShading: true }), trees.length * 3);
-  const M = new THREE.Matrix4(), q = new THREE.Quaternion(), sv = new THREE.Vector3(), pv = new THREE.Vector3(), col = new THREE.Color();
-  trees.forEach(([x, z, s], i) => {
-    const h = (3.2 + tr2() * 1.2) * s;
-    M.compose(pv.set(x, 0, z), q.identity(), sv.set(s, h, s)); trunks.setMatrixAt(i, M);
-    for (let k = 0; k < 3; k++) {
-      const r = (2.1 + tr2() * 0.7) * s;
-      const ox = (tr2() - 0.5) * 1.6 * s, oz = (tr2() - 0.5) * 1.6 * s;
-      M.compose(pv.set(x + ox, h + r * 0.55 + k * 0.5 * s, z + oz), q.setFromEuler(new THREE.Euler(tr2(), tr2() * 3, 0)), sv.set(r, r * 0.85, r));
-      crowns.setMatrixAt(i * 3 + k, M);
-      crowns.setColorAt(i * 3 + k, col.setHSL(0.25 + tr2() * 0.05, 0.5, 0.15 + tr2() * 0.07));
-    }
-  });
-  group.add(trunks, crowns);
+  // the Lindell lawn and Newstead side: pin oaks and maples
+  const treeList = trees.map(([x, z, s]) => tree(x, 0, z, (7 + tr2() * 1.6) * s, 2.9 * s, { slot: tr2() < 0.6 ? SLOT.oak : SLOT.maple }));
 
   // a few visitors on the plaza
   const peopleG = [], pr = seeded(8);
@@ -446,9 +431,9 @@ export default function build() {
     pb.add(sphere12(0.115, skinM, 0, 1.62, 0), null, P);
   }
   pb.build(group);
-  group.traverse((o) => { if (o.isMesh && o !== trunks && o !== crowns) o.receiveShadow = true; });
+  group.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
 
-  return { group, glow };
+  return { group, glow, trees: treeList };
 
   // ---------- helpers (closures over B and materials) ----------
   function addWin(x, y, z, w, h, ry, surround = true, gm = glass) {

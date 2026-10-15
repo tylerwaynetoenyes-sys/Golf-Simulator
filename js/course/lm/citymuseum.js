@@ -8,7 +8,7 @@
 // Front faces +Z. Footprint x∈[-55,55], z∈[-45,55], ~59 m to the top of the wheel.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, box, cyl, seeded, canvasTex } from './kit.js';
+import { mat, lit, box, cyl, seeded, canvasTex, tree, SLOT } from './kit.js';
 
 function batcher() {
   const lists = new Map();
@@ -378,18 +378,14 @@ export default function build() {
   bulbMesh.castShadow = false;
   group.add(bulbMesh);
   // trees along the street edge
-  const trunks = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.15, 0.22, 1, 6).translate(0, 0.5, 0), mat(0x4a3a2c), 10);
-  const crowns = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(1, 1), mat(0xffffff, { roughness: 0.95, flatShading: true }), 10);
+  const treeList = [];
   for (let i = 0; i < 10; i++) {
     const x = -50 + (i % 2) * 100 + (rnd() - 0.5) * 3, z = -6 + Math.floor(i / 2) * 12;
-    M.compose(mid.set(x, 0, z), q.identity(), sc.set(1, 3.5, 1)); trunks.setMatrixAt(i, M);
-    M.compose(mid.set(x, 5.2, z), q.identity(), sc.set(2.4, 2.2, 2.4)); crowns.setMatrixAt(i, M);
-    crowns.setColorAt(i, col.setHSL(0.26, 0.5, 0.17 + rnd() * 0.06));
+    treeList.push(tree(x, 0, z, 7.5 + rnd() * 1.5, 2.6, { slot: SLOT.maple }));
   }
-  group.add(trunks, crowns);
 
   return {
-    group, glow,
+    group, glow, trees: treeList,
     update(t) {
       const r = t * 0.12;
       wheel.rotation.z = r;

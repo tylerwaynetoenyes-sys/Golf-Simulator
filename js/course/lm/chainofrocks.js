@@ -6,7 +6,7 @@
 // +X/-Z. Footprint x -120..520, z -300..60.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, seeded, canvasTex } from './kit.js';
+import { mat, lit, seeded, canvasTex, tree as mkTree, SLOT } from './kit.js';
 
 const DEG = Math.PI / 180;
 const XMIN = -120, XMAX = 520, ZMIN = -300, ZMAX = 60;
@@ -459,26 +459,12 @@ export default function build() {
     g.add(tm, new THREE.Mesh(mergeGeometries(sl), slate), new THREE.Mesh(mergeGeometries(dk), dark), new THREE.Mesh(mergeGeometries(wl), winLit));
   }
 
+  const treeList = [];
   // ---- riparian woods on the far bank and along the near shore ----------------------
   {
-    const leaf = [], wood = [];
     const r = seeded(2025);
-    const greens = [0x4b6331, 0x5a7038, 0x3f5a2c, 0x667a3d, 0x52683a];
-    const tree = (x, z, s) => {
-      const h = (5 + r() * 4) * s;
-      wood.push(new THREE.CylinderGeometry(0.25 * s, 0.4 * s, h, 5).translate(x, h / 2, z).toNonIndexed());
-      const base = new THREE.Color(greens[Math.floor(r() * greens.length)]);
-      for (let k = 0; k < 4; k++) {
-        const rr = (2.6 + r() * 2.2) * s, a = r() * 6.28, d = k ? (1.5 + r() * 2.5) * s : 0;
-        const sg = new THREE.SphereGeometry(rr, 7, 5).scale(1, 0.85, 1).translate(x + Math.cos(a) * d, h + (r() - 0.2) * 2.5 * s + 1.2 * s, z + Math.sin(a) * d).toNonIndexed();
-        const c = base.clone().offsetHSL(0, 0, (r() - 0.5) * 0.08);
-        const n = sg.attributes.position.count, col = new Float32Array(n * 3);
-        sg.computeBoundingBox();
-        for (let i = 0; i < n; i++) { const kk = 0.7 + 0.3 * (sg.attributes.position.getY(i) - sg.boundingBox.min.y) / (2 * rr); col[i * 3] = c.r * kk; col[i * 3 + 1] = c.g * kk; col[i * 3 + 2] = c.b * kk; }
-        sg.setAttribute('color', new THREE.BufferAttribute(col, 3));
-        leaf.push(sg);
-      }
-    };
+    // cottonwoods and sycamores, the bottomland trees of the Mississippi
+    const tree = (x, z, s) => treeList.push(mkTree(x, 0, z, (9 + r() * 5) * s, 4.2 * s, { slot: r() < 0.6 ? SLOT.cottonwood : SLOT.sycamore }));
     // far bank (where the bridge lands)
     for (let n = 0; n < 70; n++) {
       const q = -60 + r() * 280;
@@ -508,11 +494,9 @@ export default function build() {
       if (x > XMAX - 2 || z < ZMIN + 2 || z > ZMAX) continue;
       bankGeo.push(new THREE.CylinderGeometry(10, 13, 1.6, 7).translate(x, 0.2, z).toNonIndexed());
     }
-    const wm = new THREE.Mesh(mergeGeometries(wood), mat(0x4a3e30));
-    const lm = new THREE.Mesh(mergeGeometries(leaf), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 }));
     const bm = new THREE.Mesh(mergeGeometries(bankGeo), mat(0x5f7a3c, { roughness: 1 }));
     bm.receiveShadow = true;
-    g.add(wm, lm, bm);
+    g.add(bm);
   }
 
   // ---- gulls over the rapids ----------------------------------------------------
@@ -542,6 +526,7 @@ export default function build() {
   return {
     group: g,
     glow,
+    trees: treeList,
     update(t, dt, day) {
       ripple.offset.set(t * 0.004, t * 0.006);
       foamMats[0].map.offset.set(t * 0.002, -t * 0.09);

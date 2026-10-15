@@ -4,7 +4,7 @@
 // changing how they play:
 //   chain-link fencing with razor wire along the out-of-bounds lines, gaps
 //   and sagging panels; leaning creosote utility poles with sagging wires;
-//   rusted shipping containers; derelict brick warehouses with broken and
+//   rusted, corrugated shipping containers; derelict brick warehouses with broken and
 //   boarded windows and graffiti; cracked asphalt pads (Poly Haven's
 //   "Road Damaged" scan) with heaps of broken concrete (a scanned model);
 //   tall weeds pushing through (the course's own grass tufts, gone to seed).
@@ -60,12 +60,6 @@ function materials() {
       c.stroke();
     }
   }, [1, 1]);
-  const rust = canvasTex(128, 128, (c, w, h) => {
-    const r = seeded(23);
-    c.fillStyle = '#7a3f22'; c.fillRect(0, 0, w, h);
-    for (let x = 0; x < w; x += 8) { c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(x, 0, 2, h); }
-    for (let i = 0; i < 90; i++) { c.fillStyle = `rgba(${150 + r() * 60},${70 + r() * 40},${30 + r() * 20},${0.2 + r() * 0.4})`; c.fillRect(r() * w, r() * h, 2 + r() * 10, 2 + r() * 16); }
-  }, [1, 1]);
   // a 2.2 m scan of broken, patched asphalt (CC0) as luminance, the grey
   // coming from the material; one repeat per 4.4 m
   const asphalt = typeof document !== 'undefined'
@@ -74,6 +68,20 @@ function materials() {
   asphalt.colorSpace = THREE.SRGBColorSpace;
   asphalt.anisotropy = 4;
   asphalt.wrapS = asphalt.wrapT = THREE.RepeatWrapping;
+  // Poly Haven's container_side scan (CC0, 1.94 m square; tools/blender/container.py):
+  // corrugation in the normal map, paint grime in R, a rust mask in G
+  const tex = (f, srgb) => {
+    const t = typeof document !== 'undefined'
+      ? new THREE.TextureLoader().load(new URL(`../../assets/textures/${f}`, import.meta.url).href)
+      : new THREE.Texture();
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = 4;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.repeat.set(1 / 1.94, 1 / 1.94); // container UVs are in metres
+    t.updateMatrix();
+    return t;
+  };
+  const wall = tex('container_side.jpg', false), wallN = tex('container_side_nor.jpg', false);
   shared = {
     chain: new THREE.MeshStandardMaterial({ color: 0xb8bcbf, alphaMap: chain, alphaTest: 0.35, side: THREE.DoubleSide, metalness: 0.6, roughness: 0.5 }),
     steel: new THREE.MeshStandardMaterial({ color: 0x8f9396, metalness: 0.6, roughness: 0.55 }),
@@ -82,14 +90,63 @@ function materials() {
     brick: new THREE.MeshStandardMaterial({ map: brick, roughness: 0.95 }),
     facade: new THREE.MeshStandardMaterial({ map: facade, roughness: 0.9 }),
     roof: new THREE.MeshStandardMaterial({ color: 0x2b2a28, roughness: 1 }),
-    rust: new THREE.MeshStandardMaterial({ map: rust, roughness: 0.85, metalness: 0.3 }),
-    containerCols: [0x2f4f6f, 0x6f2a24, 0x3e5a3a, 0x8a6a2a, 0x555555].map((c) => new THREE.MeshStandardMaterial({ color: c, map: rust, roughness: 0.8, metalness: 0.35 })),
+    // faded line colours: Maersk blue, oxblood, Evergreen green, ochre, grey
+    containerCols: [0x4d7aa0, 0x8e3a2e, 0x4f7d58, 0xb48a42, 0x84888a].map((c) => containerMaterial(c, wall, wallN)),
     asphalt: new THREE.MeshStandardMaterial({ map: asphalt, color: new THREE.Color(2.3, 2.25, 2.15), roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2 }),
     rubble: new THREE.MeshStandardMaterial({ color: 0x7a706a, roughness: 1, flatShading: true }),
     weedGeo: Object.assign(tuftGeometry(9, 31), { userData: { shared: true } }),
     weed: grassMaterial(0x9c9a55), // dry, gone to seed
   };
   return shared;
+}
+
+/**
+ * Corrugated container steel in one paint colour: the scan's grime over the
+ * paint, rust where the mask says (heavier toward the bottom rail, where
+ * water sits), and the ribs from the normal map.
+ */
+function containerMaterial(color, wall, wallN) {
+  const m = new THREE.MeshStandardMaterial({ color, roughness: 0.68, metalness: 0.12, normalMap: wallN, normalScale: new THREE.Vector2(1.5, 1.5) });
+  m.userData.wall = wall;
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uWall = { value: wall };
+    sh.uniforms.uWallM = { value: wall.matrix };
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform mat3 uWallM;\nvarying vec2 vWallUv;')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\nvWallUv = (uWallM * vec3(uv, 1.0)).xy;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uWall;\nvarying vec2 vWallUv;')
+      .replace('#include <map_fragment>', `
+        vec3 wl = texture2D(uWall, vWallUv).rgb;
+        // vWallUv.y is height in tiles (1.94 m): rust gathers along the bottom
+        // rail where water sits, and runs down from the top rail
+        float low = 1.0 - smoothstep(0.0, 0.5, vWallUv.y);
+        float rust = smoothstep(0.18, 0.8, wl.g * (0.75 + 1.3 * low));
+        vec3 rc = mix(vec3(0.16, 0.07, 0.03), vec3(0.33, 0.15, 0.06), wl.r * wl.g + 0.3);
+        vec3 paint = diffuseColor.rgb * wl.r * (0.9 - 0.25 * low);
+        diffuseColor.rgb = mix(paint, rc, rust * 0.85);`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.95, rust);')
+      .replace('#include <metalnessmap_fragment>', '#include <metalnessmap_fragment>\nmetalnessFactor = mix(metalnessFactor, 0.05, rust);');
+  };
+  m.customProgramCacheKey = () => 'containerSteel';
+  return m;
+}
+
+/**
+ * A 2.44 m wide, 2.59 m high (8 ft 6 in) container of length `len`, base at
+ * y = 0, its UVs in metres (u across each face, v up it) offset by `shift`
+ * so no two show the same rust.
+ */
+function containerGeometry(len, shift) {
+  const geo = new THREE.BoxGeometry(2.44, 2.59, len).translate(0, 1.295, 0);
+  // BoxGeometry faces in order +x, -x, +y, -y, +z, -z: their size in metres
+  const faces = [[len, 2.59], [len, 2.59], [2.44, len], [2.44, len], [2.44, 2.59], [2.44, 2.59]];
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    const [w, h] = faces[Math.floor(i / 4)];
+    uv.setXY(i, uv.getX(i) * w + shift, uv.getY(i) * h);
+  }
+  return geo;
 }
 
 /**
@@ -208,8 +265,9 @@ export function buildDecay(T, rand, ground, clear) {
     if (!at) continue;
     const n = 1 + Math.floor(rand() * 3);
     for (let k = 0; k < n; k++) {
-      const c = new THREE.Mesh(new THREE.BoxGeometry(2.44, 2.59, rand() < 0.5 ? 6.06 : 12.19), M.containerCols[Math.floor(rand() * M.containerCols.length)]);
-      c.position.set(at.x + (k === 1 ? 2.6 : 0), at.y + 1.3 + (k === 2 ? 2.59 : 0), at.z);
+      // 20 ft and 40 ft boxes
+      const c = new THREE.Mesh(containerGeometry(rand() < 0.5 ? 6.06 : 12.19, Math.abs(at.x * 0.37 + at.z * 0.21 + k * 7.3) % 20), M.containerCols[Math.floor(rand() * M.containerCols.length)]);
+      c.position.set(at.x + (k === 1 ? 2.6 : 0), at.y + (k === 2 ? 2.59 : 0), at.z);
       c.rotation.y = at.rot + (rand() - 0.5) * 0.15;
       c.castShadow = c.receiveShadow = true;
       g.add(c);

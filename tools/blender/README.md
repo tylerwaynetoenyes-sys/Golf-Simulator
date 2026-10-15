@@ -8,10 +8,12 @@ Blender (4.3, run headless) before they ship in `assets/`.
 | Old olive (scanned tree) | `island_tree_02` (glTF 1k + leaf alpha) | `tree.py` | `assets/models/island_tree_02.glb` |
 | Turf and ground detail | `aerial_grass_rock` (diffuse 1k) | `detail.py` | `assets/textures/ground_detail.jpg` |
 | Bunker sand detail | `dense_sand` (diffuse 1k) | `detail.py` | `assets/textures/sand_detail.jpg` |
+| Shipping container steel | `container_side` (diffuse + normal GL 1k) | `container.py` | `assets/textures/container_side.jpg`, `container_side_nor.jpg` |
 
 ```
 blender -b --factory-startup --python tools/blender/tree.py -- island_tree_02_1k.gltf island_tree_02_leaves_alpha_1k.jpg assets/models/island_tree_02.glb
 blender -b --factory-startup --python tools/blender/detail.py -- aerial_grass_rock_diff_1k.jpg assets/textures/ground_detail.jpg 512 1.0
+blender -b --factory-startup --python tools/blender/container.py -- container_side_diff_1k.jpg container_side_nor_gl_1k.jpg assets/textures 512
 blender -b --factory-startup --python tools/blender/render.py -- assets/models/island_tree_02.glb preview.png
 ```
 
@@ -21,6 +23,11 @@ branches, puts the leaf alpha into the base colour so the leaves clip
 cleanly, downsizes textures to 512 px and exports a GLB: 1.07 M faces to
 about 35 k, 2.3 MB. In game it is instanced (at most 30 per hole) as the
 olive on the Cassis course.
+
+`container.py` keeps the container scan's paint luminance (the material
+supplies each box's colour) in red and writes a tileable rust mask (blotches,
+streaks running down the ribs) into green; the corrugation comes from the
+normal map.
 
 `detail.py` turns a colour scan into a tileable luminance map (mean 0.85,
 limited contrast) that multiplies over each course's own ground colours, so
