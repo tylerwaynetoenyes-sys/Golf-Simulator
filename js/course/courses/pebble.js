@@ -14,7 +14,7 @@ export default {
   // Carmel Bay
   waterLevel: 1.6, // the elevation tiles read the open bay at ~1.2 m
   waterTint: 0x1d4652,
-  credit: 'Holes © OpenStreetMap contributors (ODbL); scorecard via OpenGolfAPI (ODbL); elevation: AWS Terrain Tiles; ground colour: contains modified Copernicus Sentinel data 2024 (via AWS Open Data)',
+  credit: 'Holes © OpenStreetMap contributors (ODbL); scorecard via OpenGolfAPI (ODbL); elevation: AWS Terrain Tiles; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',
   holes: [
     {
       n: 1, name: "Hole 1", par: 4,

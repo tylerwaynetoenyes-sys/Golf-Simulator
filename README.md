@@ -25,25 +25,31 @@ cinematic camera and the full set of numbers.
 
 ## Quick start
 
-**Open the game (with or without an R10):**
+**On a Mac: double-click Fairway on the Desktop.** It finds Python, sets up the
+bridge, starts it and opens the game. First time, build the Desktop icon with
+`launcher/install-mac.sh`. Updates, Wi-Fi play with friends and troubleshooting
+are in **[PLAY.md](PLAY.md)**.
+
+**Anywhere else (Python 3.10+; on a Mac, `launcher/fairway.sh` takes the same
+`--lan` and `--mock` flags):**
 
 ```bash
 cd bridge
-pip install -r requirements.txt     # first time only (Python 3.10+)
-python -m r10bridge --open          # serves the game at http://localhost:8765
+python3 -m pip install -r requirements.txt   # first time only
+python3 -m r10bridge --open                  # serves the game at http://localhost:8765
 ```
 
-Open **<http://localhost:8765>**, then press **Pair Garmin R10**, or **Play in
-Demo Mode**. No R10 handy? `python -m r10bridge --mock --open` runs a simulated
-R10 through the full Bluetooth protocol stack.
+Then press **Pair Garmin R10**, or **Play in Demo Mode**. No R10 handy?
+`python3 -m r10bridge --mock --open` runs a simulated R10 through the full
+Bluetooth protocol stack.
 
 | You want | Run on the computer | Open |
 |---|---|---|
-| Play on this computer | `python -m r10bridge` | `http://localhost:8765` |
-| Play on a TV or projector from the computer | `python -m r10bridge` | `http://localhost:8765/?tv` |
-| Use an iPad as the screen | `python -m r10bridge --lan` | `http://<computer-name>.local:8765/?tv` on the iPad (the bridge prints the exact address) |
-| Check the Bluetooth setup step by step | `python -m r10bridge --diagnose` | — |
-| Rehearse without hardware | `python -m r10bridge --mock` | `http://localhost:8765` |
+| Play on this computer | `python3 -m r10bridge` | `http://localhost:8765` |
+| Play on a TV or projector from the computer | `python3 -m r10bridge` | `http://localhost:8765/?tv` |
+| Use an iPad as the screen | `python3 -m r10bridge --lan` | `http://<computer-name>.local:8765/?tv` on the iPad (the bridge prints the exact address) |
+| Check the Bluetooth setup step by step | `python3 -m r10bridge --diagnose` | — |
+| Rehearse without hardware | `python3 -m r10bridge --mock` | `http://localhost:8765` |
 
 **Demo mode only (no Python needed):** serve the folder with any static server.
 ES modules don't load from `file://`.
@@ -68,7 +74,7 @@ Browsers can't talk to the R10 directly, so a small Python bridge does it:
 ```
 
 1. **Install once:** `cd bridge && pip install -r requirements.txt` (Python 3.10+).
-2. **Start it:** `python -m r10bridge`. Leave the terminal open while you play.
+2. **Start it:** `python3 -m r10bridge`. Leave the terminal open while you play.
 3. **Pairing mode:** turn the R10 on and hold its button until the LED is
    **solid blue**. Close the Garmin Golf app; the R10 talks to one device at a time.
 4. **Open the game** at <http://localhost:8765> and press **Pair Garmin R10**.
@@ -111,10 +117,10 @@ the tracer and ball. Turn it on with `?tv` in the address or *Settings → Scree
 
 - **MacBook → TV (recommended).** Connect HDMI / USB-C, or AirPlay
   (*Control Center → Screen Mirroring*). Use the TV as a separate display so
-  the terminal stays on the laptop. Run `python -m r10bridge`, open
+  the terminal stays on the laptop. Run `python3 -m r10bridge`, open
   `http://localhost:8765/?tv` on the TV display, and go full screen (⌃⌘F).
 - **iPad → TV.** iPadOS can't run the bridge, so run it on a Mac or PC with
-  `python -m r10bridge --lan`. It prints the address to open on the iPad, e.g.
+  `python3 -m r10bridge --lan`. It prints the address to open on the iPad, e.g.
   `http://your-mac.local:8765/?tv`. In Safari use *Share → Add to Home Screen*
   for a full-screen app, then mirror the iPad to an Apple TV or through a
   USB-C / Lightning HDMI adapter. The game keeps the screen awake while you play.

@@ -182,7 +182,7 @@ export function openSettings(game) {
     <div class="setting"><label>Night ambience</label><input type="range" min="0" max="1" step="0.05" value="${s.ambience}" data-range="ambience" /></div>
     <h3>R10 bridge</h3>
     <div class="setting"><div><label>R10 to ball</label><div class="hint">How far behind the ball the R10 sits (Garmin: 6–8 ft). Sent to the R10 on connect.</div></div><input type="range" min="6" max="8" step="0.5" value="${s.r10Distance}" data-range="r10Distance" /><span class="hint" id="r10DistVal">${s.r10Distance} ft</span></div>
-    <div class="setting"><div><label>Bridge address</label><div class="hint">Where <code>python -m r10bridge</code> is listening.</div></div><input type="text" value="${esc(s.bridgeUrl)}" data-text="bridgeUrl" spellcheck="false" /></div>
+    <div class="setting"><div><label>Bridge address</label><div class="hint">Where the R10 bridge is listening.</div></div><input type="text" value="${esc(s.bridgeUrl)}" data-text="bridgeUrl" spellcheck="false" /></div>
     <div class="panel-actions"><button class="btn btn-primary" data-close>Done</button></div>`);
   el.querySelectorAll('.seg[data-key]').forEach((g) => g.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
     g.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
@@ -259,17 +259,16 @@ function helpPairing() {
   return `
     <p>Browsers can't talk Bluetooth to the R10 directly, so a small <b>bridge</b> runs on a Mac or PC near the hitting area. It connects to the R10 and passes every shot to the game. An iPad can be the screen, but the bridge has to run on a computer.</p>
     <ol class="help-steps">
-      <li><b>Start the bridge</b> on the computer (first time only: install).
+      <li><b>Start the bridge.</b> On a Mac, double-click <b>Fairway</b> on the Desktop (or <code>Fairway.command</code> in the Golf-Simulator folder). It sets itself up, starts the bridge and opens the game. Leave its window open. Elsewhere, with Python 3.10 or newer:
         ${cmd('cd bridge && pip install -r requirements.txt')}
-        ${cmd('python -m r10bridge')}
-        It also serves the game: open <code>http://localhost:8765</code>. Leave the terminal open.</li>
+        ${cmd('python3 -m r10bridge --open')}</li>
       <li><b>Bluetooth on.</b> On a Mac: Control Center → Bluetooth. The first run asks to let Terminal use Bluetooth: click <b>Allow</b>. If you said no, turn it on in System Settings → Privacy &amp; Security → Bluetooth, then quit and reopen Terminal.</li>
       <li><b>Free the R10 from your phone.</b> Close the Garmin Golf app, or switch the phone's Bluetooth off. The R10 talks to one device at a time. A <b>flashing blue</b> light means it's trying to reach your phone.</li>
       <li><b>Pairing mode.</b> Hold the R10's button until the status light is <b>solid blue</b>. If that doesn't work from off, turn it on first, then hold the button again.</li>
       <li><b>Press “Pair Garmin R10”</b> in the game. When it says <b>R10 Connected</b>, the R10's light <b>flashes green</b>, meaning it's ready for a shot. Solid red means it's busy reading a shot.</li>
       <li><b>Place it.</b> On the ground <b>6–8 ft (1.8–2.4 m) behind the ball</b>, level, pointed down your target line through the ball. Indoors, leave <b>at least 8 ft (2.4 m)</b> from the ball to the net or screen. 10 ft or more reads better. Set the exact distance in Settings → R10 to ball.</li>
     </ol>
-    <div class="callout">No R10 handy? <code>python -m r10bridge --mock</code> runs a pretend R10 through the full protocol, and demo mode needs no bridge at all.</div>`;
+    <div class="callout">No R10 handy? <code>launcher/fairway.sh --mock</code> runs a pretend R10 through the full protocol, and demo mode needs no bridge at all.</div>`;
 }
 
 function helpFix() {

@@ -1,12 +1,7 @@
 {
  "size": 16000,
  "px": 1536,
- "scenes": [
-  [
-   "S2B_15SYC_20240909_0_L2A",
-   "2024-09-09",
-   0.0
-  ]
- ],
- "credit": "Contains modified Copernicus Sentinel data 2024"
+ "source": "EOxCloudless 2024 (s2cloudless-2024_3857, zoom 14)",
+ "licence": "CC BY-NC-SA 4.0",
+ "credit": "EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0"
 }

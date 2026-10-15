@@ -9,7 +9,7 @@ export default {
   theme: 'western',
   dem: true,
   blurb: 'Nine holes on the real ground below Scotts Bluff, where wagon trains crossed Mitchell Pass.',
-  credit: 'Elevation: USGS 3DEP via AWS Terrain Tiles; ground colour: contains modified Copernicus Sentinel data 2024 (via AWS Open Data)',
+  credit: 'Elevation: USGS 3DEP via AWS Terrain Tiles; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',
   holes: [
     {
       n: 1, name: 'Jumping-Off', par: 4,

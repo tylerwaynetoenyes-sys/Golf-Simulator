@@ -10,7 +10,7 @@ export default {
   theme: 'coastal',
   dem: true,
   blurb: 'Nine holes across the vineyard plateau and down to the old town, with Cap Canaille, the Calanques and the Mediterranean below.',
-  credit: 'Elevation: Mapzen terrain tiles (EU-DEM, produced using Copernicus data; SRTM, USGS); landmark positions © OpenStreetMap contributors; ground colour: contains modified Copernicus Sentinel data 2024 (via AWS Open Data)',
+  credit: 'Elevation: Mapzen terrain tiles (EU-DEM, produced using Copernicus data; SRTM, USGS); landmark positions © OpenStreetMap contributors; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',
   waterLevel: 0.3,
   waterTint: 0x1d5b6e,
   // the cliffs of Cap Canaille are a red-ochre conglomerate and sandstone;

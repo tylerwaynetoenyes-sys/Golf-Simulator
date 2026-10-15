@@ -1,7 +1,19 @@
 """Satellite ground colour for the DEM courses.
 
-For each course, mosaic cloud-free Copernicus Sentinel-2 L2A true-colour
-scenes (the 10 m "visual" product, served as Cloud-Optimised GeoTIFFs from the
+Two sources:
+
+  eox (default)  EOxCloudless 2024: EOX's seamless, colour-balanced, cloud-free
+                 Sentinel-2 mosaic, read from its public WMTS tiles. Licence
+                 CC BY-NC-SA 4.0: fine for Fairway as a private, non-commercial
+                 game; commercial use would need EOX's paid licence. Credit:
+                 "EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH
+                 (Contains modified Copernicus Sentinel data 2024)".
+  sentinel       Mosaic cloud-free Copernicus Sentinel-2 L2A true-colour
+                 scenes yourself (fully open data, any use; can show seams
+                 between scenes).
+
+For each course with the sentinel source, mosaic cloud-free Copernicus
+Sentinel-2 L2A true-colour scenes (the 10 m "visual" product, served as Cloud-Optimised GeoTIFFs from the
 AWS Open Data registry via the Earth Search STAC API) into the course's DEM
 frame: a square centred on the course's lat/lon, x east and z south, the same
 extent as assets/courses/<id>/far.json. Writes assets/courses/<id>/sat.jpg.
@@ -10,7 +22,7 @@ Copernicus Sentinel data is free and open (Copernicus data policy); credit:
 "Contains modified Copernicus Sentinel data <year>".
 
 Needs Python with rasterio, numpy and Pillow:
-    python tools/fetch-sat.py [course ...]
+    python tools/fetch-sat.py [--source eox|sentinel] [course ...]
 """
 import json
 import os
@@ -40,6 +52,55 @@ def search(bbox, season):
     req = urllib.request.Request(STAC, body, {'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=60) as r:
         return json.load(r)['features']
+
+
+EOX = 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg'
+EOX_CREDIT = 'EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0'
+UA = {'User-Agent': 'Fairway-golf/1.0 (private, non-commercial; github.com/tylerwaynetoenyes-sys/Golf-Simulator)'}
+
+
+def build_eox(cid, z=14):
+    """Stitch EOxCloudless web-mercator tiles over the course, then warp them
+    into the DEM frame."""
+    import io
+    import math
+    import time
+    meta = json.load(open(os.path.join(ROOT, 'assets/courses', cid, 'far.json')))
+    lat, lon, size = meta['lat'], meta['lon'], meta['size']
+    dst_crs = CRS.from_proj4(f'+proj=eqc +lat_ts={lat} +lat_0={lat} +lon_0={lon} +R=6378137 +units=m +no_defs')
+    half = size / 2
+    w, s_, e, n = transform_bounds(dst_crs, 'EPSG:4326', -half, -half, half, half)
+    nt = 2 ** z
+    tx = lambda lo: (lo + 180) / 360 * nt
+    ty = lambda la: (1 - math.log(math.tan(math.radians(la)) + 1 / math.cos(math.radians(la))) / math.pi) / 2 * nt
+    x0, x1 = int(tx(w)), int(tx(e))
+    y0, y1 = int(ty(n)), int(ty(s_))
+    mosaic = np.zeros((3, (y1 - y0 + 1) * 256, (x1 - x0 + 1) * 256), np.uint8)
+    for y in range(y0, y1 + 1):
+        for x in range(x0, x1 + 1):
+            for attempt in range(4):
+                try:
+                    req = urllib.request.Request(EOX.format(z=z, x=x, y=y), headers=UA)
+                    with urllib.request.urlopen(req, timeout=30) as r:
+                        tile = np.asarray(Image.open(io.BytesIO(r.read())).convert('RGB'))
+                    break
+                except Exception:
+                    if attempt == 3:
+                        raise
+                    time.sleep(1.5 * 2 ** attempt)
+            mosaic[:, (y - y0) * 256:(y - y0 + 1) * 256, (x - x0) * 256:(x - x0 + 1) * 256] = np.transpose(tile, (2, 0, 1))
+            time.sleep(0.05)
+    world = 2 * math.pi * 6378137
+    res_m = world / nt / 256
+    src_tf = from_origin(-world / 2 + x0 * 256 * res_m, world / 2 - y0 * 256 * res_m, res_m, res_m)
+    out = np.zeros((3, PX, PX), np.uint8)
+    reproject(mosaic, out, src_transform=src_tf, src_crs='EPSG:3857',
+              dst_transform=from_origin(-half, half, size / PX, size / PX), dst_crs=dst_crs, resampling=Resampling.average)
+    Image.fromarray(np.transpose(out, (1, 2, 0))).save(os.path.join(ROOT, 'assets/courses', cid, 'sat.jpg'), quality=82, optimize=True)
+    json.dump({'size': size, 'px': PX, 'source': 'EOxCloudless 2024 (s2cloudless-2024_3857, zoom %d)' % z, 'licence': 'CC BY-NC-SA 4.0',
+               'credit': EOX_CREDIT}, open(os.path.join(ROOT, 'assets/courses', cid, 'sat.json'), 'w'), indent=1)
+    print(f'  {cid}: {(x1 - x0 + 1) * (y1 - y0 + 1)} EOX tiles', flush=True)
+    return 1.0
 
 
 def build(cid):
@@ -85,6 +146,13 @@ def build(cid):
 
 
 if __name__ == '__main__':
-    ids = sys.argv[1:] or ['oregon', 'eaststl', 'paris', 'cassis', 'liberty']
+    argv = sys.argv[1:]
+    source = 'eox'
+    if '--source' in argv:
+        i = argv.index('--source')
+        source = argv[i + 1]
+        del argv[i:i + 2]
+    ids = argv or ['oregon', 'eaststl', 'paris', 'cassis', 'liberty', 'pebble', 'sawgrass']
     for cid in ids:
-        print(cid, f'{build(cid) * 100:.1f}% covered')
+        cov = build_eox(cid) if source == 'eox' else build(cid)
+        print(cid, f'{cov * 100:.1f}% covered')

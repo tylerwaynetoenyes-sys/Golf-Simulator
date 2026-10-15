@@ -11,8 +11,7 @@ step), vanilla ES modules. A Python Garmin R10 bridge (`bridge/`, a port of
 for iPad play.
 
 ```
-cd bridge
-python -m r10bridge --open      # then open http://localhost:8765 and hard refresh
+launcher/fairway.sh             # or double-click Fairway on the Desktop (see PLAY.md)
 ```
 
 **Must keep working:** the R10 bridge, multiplayer (1–6 players, teams), the
@@ -52,7 +51,7 @@ the water decision, day/night and weather, TV mode.
   `tools/landmark-preview.html?type=<lm>&night=1`, `tools/fetch-dem.mjs`.
 - **Tests**: `cd bridge && python -m pytest -q` (30 pass); Playwright smoke
   runs used headless Chromium against `?manual` (window.__advance,
-  window.__game) with `python -m r10bridge --mock --port 8765`.
+  window.__game) with `launcher/fairway.sh --mock`.
 
 ## Done in the local session (October 14, 2026)
 
@@ -110,9 +109,20 @@ add `&manual` to drive frames with `window.__advance(seconds)`.
 - **Light and weather**: Poly Haven HDRIs for image-based light (the sun
   aligned to the scene's), overcast and night variants; **Rain** weather
   (`js/scene/rain.js`, audio hiss, wet turf in `simulateShot` via `wet`).
-- **Ground colour** from Copernicus Sentinel-2 (`tools/fetch-sat.py`, runs
-  with rasterio + Pillow) on every real-ground backdrop; steep faces keep
-  their rock colour. EOX Cloudless was rejected on licence (CC BY-NC-SA).
+- **Ground colour** on every real-ground backdrop (`tools/fetch-sat.py`, runs
+  with rasterio + Pillow); steep faces keep their rock colour. Now from
+  EOxCloudless 2024 (CC BY-NC-SA: fine because Fairway is private and
+  non-commercial); `--source sentinel` rebuilds from open Copernicus scenes.
+
+## Launch and sharing (October 14, evening)
+
+- The old start command failed: this Mac has no `python`, and Apple's
+  `python3` is 3.9. `launcher/fairway.sh` finds Homebrew's 3.12, builds or
+  repairs `bridge/venv` itself, and starts the bridge. It's wrapped by
+  `Fairway.command`, `Fairway on Wi-Fi.command`, `Update Fairway.command`, and
+  the Desktop `Fairway.app` (`launcher/install-mac.sh`). See `PLAY.md`.
+- `docs/alton-courses.md`: 1 m USGS LiDAR covers Alton; which local courses
+  OSM and OpenGolfAPI cover; the engine work for LiDAR-accurate courses.
 - **Pebble Beach** front nine and the **TPC Sawgrass** Stadium back nine
   (island green at 17); `--course` keeps OSM holes inside one course and
   imports keep real hole numbers.

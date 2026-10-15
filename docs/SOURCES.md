@@ -119,7 +119,12 @@ Not redistributed; listed so figures can be checked.
 | Asset | Source | Licence |
 |---|---|---|
 | HDRIs `assets/hdri/` (Kloofendal 48d Partly Cloudy Pure Sky, Kloofendal Overcast Pure Sky, Moonless Golf) | Poly Haven, by Greg Zaal (sky edits Jarod Guest) | CC0 |
-| `assets/courses/<id>/sat.jpg`: summer true colour, ~10 m/pixel over each 16 km backdrop | Copernicus Sentinel-2 L2A "visual" COGs, AWS Open Data via the Earth Search STAC API; mosaicked into each DEM frame by `tools/fetch-sat.py` (scene ids in `sat.json`) | Copernicus open data policy: "Contains modified Copernicus Sentinel data 2024" |
+| `assets/courses/<id>/sat.jpg`: true colour at ~10 m/pixel over each 16 km backdrop | **EOxCloudless 2024** (`s2cloudless-2024_3857` WMTS), warped into each DEM frame by `tools/fetch-sat.py` | **CC BY-NC-SA 4.0**. Credit: "EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024)". Shown in each course's credits. |
 
-EOX's Sentinel-2 Cloudless mosaic was considered and rejected: its current
-terms are CC BY-NC-SA, with a paid licence for commercial use.
+The EOX imagery is licensed for non-commercial use only. That fits Fairway
+as a private game for friends; the derived `sat.jpg` files carry the same
+CC BY-NC-SA 4.0 licence. If Fairway ever became commercial, either buy EOX's
+commercial licence or rebuild with `python tools/fetch-sat.py --source
+sentinel`, which mosaics open Copernicus Sentinel-2 L2A scenes from AWS Open
+Data (any use; credit "Contains modified Copernicus Sentinel data").
+

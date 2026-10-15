@@ -11,7 +11,7 @@ export default {
   dem: true,
   origin: [30.20222, -81.39585],
   blurb: "The back nine of Pete Dye's Stadium Course, home of THE PLAYERS Championship, as mapped on OpenStreetMap: water on 11 of 18 holes and the island green at the 17th.",
-  credit: 'Holes © OpenStreetMap contributors (ODbL); scorecard via OpenGolfAPI (ODbL); elevation: AWS Terrain Tiles; ground colour: contains modified Copernicus Sentinel data 2024 (via AWS Open Data)',
+  credit: 'Holes © OpenStreetMap contributors (ODbL); scorecard via OpenGolfAPI (ODbL); elevation: AWS Terrain Tiles; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',
   holes: [
     {
       n: 10, name: "Hole 10", par: 4,

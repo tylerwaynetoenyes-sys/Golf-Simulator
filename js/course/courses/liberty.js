@@ -19,7 +19,7 @@ export default {
     { type: 'ellisisland', ll: [40.6995, -74.0396], maxD: Infinity },
     { type: 'manhattan', ll: [40.71274, -74.01338], maxD: Infinity },
   ],
-  credit: 'Holes © OpenStreetMap contributors (ODbL); scorecard via OpenGolfAPI (ODbL); elevation: AWS Terrain Tiles; ground colour: contains modified Copernicus Sentinel data 2024 (via AWS Open Data)',
+  credit: 'Holes © OpenStreetMap contributors (ODbL); scorecard via OpenGolfAPI (ODbL); elevation: AWS Terrain Tiles; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',
   holes: [
     {
       n: 1, name: "Opening Drive", par: 4,
