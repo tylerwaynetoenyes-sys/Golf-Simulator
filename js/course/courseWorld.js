@@ -1007,14 +1007,16 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
    */
   _buildSlopeGrid(T, g) {
     const pts = [], dirs = [], mags = [], phases = [], fades = [];
-    const Rmax = 4.6; // ~15 ft
-    const sp = 0.58;
+    // the whole green and its fringe: the read matters from anywhere on it
+    const Rmax = Math.max(6, (T.greenR || 14) + 6);
+    const sp = 0.72;
     for (let x = -Rmax; x <= Rmax; x += sp) {
       for (let z = -Rmax; z <= Rmax; z += sp) {
         const r = Math.hypot(x, z);
         if (r > Rmax || r < 0.22) continue;
         const wx = T.pin.x + x, wz = T.pin.z + z;
-        if (T.terrain(wx, wz).surface !== 'green') continue;
+        const sf = T.terrain(wx, wz).surface;
+        if (sf !== 'green' && sf !== 'fringe') continue;
         const e = 0.2;
         const gx = (T.meshHeight(wx + e, wz) - T.meshHeight(wx - e, wz)) / (2 * e);
         const gz = (T.meshHeight(wx, wz + e) - T.meshHeight(wx, wz - e)) / (2 * e);
@@ -1024,8 +1026,8 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
         mags.push(m);
         // stagger along the fall line so the chevrons read as a flow
         phases.push(((x * (m > 1e-5 ? -gx / m : 0) + z * (m > 1e-5 ? -gz / m : 0)) / 0.9) % 1);
-        const f = 1 - Math.min(1, Math.max(0, (r - 2.6) / (Rmax - 2.6)));
-        fades.push(f * f * (3 - 2 * f));
+        // full strength on the green, eased off over the fringe
+        fades.push(sf === 'green' ? 1 : 0.55);
       }
     }
     // a flat chevron lying on the green, pointing downhill (local x = downhill)

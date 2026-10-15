@@ -215,7 +215,7 @@ export class Game {
   }
 
   restartMode() {
-    const opts = this.mode.course ? { length: this.mode.length, rings: this.mode.rings, mulligans: this.mode.mulligans, startHole: this.mode.holes[0].n } : {};
+    const opts = this.mode.course ? { length: this.mode.length, rings: this.mode.rings, gimme: this.mode.gimme, mulligans: this.mode.mulligans, startHole: this.mode.holes[0].n } : {};
     this.setMode(this.mode.id, opts);
   }
 
@@ -243,7 +243,12 @@ export class Game {
     this.aimLine.position.set(s.origin.x, w.ball.mesh.position.y - 0.02, s.origin.z);
     this.aimLine.visible = !s.putting;
     this._addressClub();
-    if (m.course) { w.course.setPutting(false); w.course.setRings(true, m.ringRadii); }
+    if (m.course) {
+      // putting it out: the slope read and the gimme circle on the green; otherwise the scoring rings
+      w.course.setPutting(!!s.putting);
+      if (m.puttOut) w.course.setRings(!!s.putting && m.ringRadii.one > 0, m.ringRadii);
+      else w.course.setRings(true, m.ringRadii);
+    }
     this._buildPuttLine();
     w.markers.set(m.markers());
     const sug = m.suggestedClub?.();
@@ -467,7 +472,9 @@ export class Game {
       const ft = (m) => m / 0.3048;
       const playsTxt = Math.abs(ft(plays) - ft(read.distance)) >= 1.5 ? ` · plays <b>${U.proximity(plays)}</b>` : '';
       const slope = Math.abs(read.uphill) < 0.03 ? '' : read.uphill > 0 ? ' uphill' : ' downhill';
-      this.hud.setPrompt(`<b>${U.proximity(read.distance)}</b>${slope} · ${brk}${playsTxt} · ${key('Enter')} auto putt · hold ${key('Space')} to putt · ${key('← →')} aim`, this.r10);
+      const cost = this.mode.skipCost?.(this.player);
+      this.hud.setSkipCost(cost);
+      this.hud.setPrompt(`<b>${U.proximity(read.distance)}</b>${slope} · ${brk}${playsTxt} · ${key('Enter')} auto putt · hold ${key('Space')} to putt · ${key('K')} skip (+${cost}) · ${key('← →')} aim · ${key('G')} slopes`, this.r10);
       this.hud.setPuttMode(true);
       return;
     }
@@ -593,8 +600,11 @@ export class Game {
     if (this.state === 'intro') this._endIntro();
     const s = this.setup;
     // a putting stroke picked up by the radar (or a tap of the demo meter)
-    if (s.putting && this.mode.course && launch.ballSpeed < 9) {
-      const res = this.mode.manualPutt(this.player, Math.min(1.1, launch.ballSpeed / 4), this.aimDeg + (launch.launchDirection - this.aimDeg));
+    if (s.putting && this.mode.course) {
+      // a stroke on the green is a putt: the radar's ball speed and start line, rolled for real
+      const res = source === 'demo' || !this.mode.radarPutt
+        ? this.mode.manualPutt(this.player, Math.min(1.1, launch.ballSpeed / 4), this.aimDeg + (launch.launchDirection || 0))
+        : this.mode.radarPutt(this.player, launch.ballSpeed, this.aimDeg + (launch.launchDirection || 0));
       this._play(res, { ...launch, putt: true }, source);
       return;
     }
@@ -613,6 +623,18 @@ export class Game {
     } else {
       this._play(result, lie, source);
     }
+  }
+
+  /**
+   * Skip putting (putting it out is optional): the ball is holed with strokes
+   * added by how far it sits from the hole (courseMode skipPutts).
+   */
+  skipPutt() {
+    if (this.state !== 'ready' || !this.setup.putting || !this.mode.course) return;
+    audio.init();
+    const b = this.setup.origin;
+    const res = simulatePutt({ x: b.x, y: b.y, z: b.z }, 0, 0, this.mode.T.terrain, null);
+    this._play(res, { putt: true, skip: true, ballSpeed: 0, launchAngle: 0, launchDirection: 0, totalSpin: 0, spinAxis: 0 }, 'skip');
   }
 
   /** Auto or manual putt for the current player (course only). */
@@ -726,7 +748,7 @@ export class Game {
     const o = s.outcome;
     s.restTimer = r.holed && (!s.tapping || s.ring) ? 3.0 : o.summary ? 2.6 : o.holeComplete ? 2.2 : r.putt ? 1.5 : 3.2 + (this.hud.commentEl.classList.contains('show') ? 0.8 : 0);
     // finished inside a putting ring: roll it in
-    if (o.finish && !s.tapped) s.tapDelay = 0.9;
+    if (o.finish && !o.finish.holedPutt && !o.finish.skipped && !s.tapped) s.tapDelay = 0.9;
     // in the water: the player chooses drop, re-hit or mulligan
     if (o.waterChoice && !s.tapping) { s.awaitDecision = true; s.decisionDelay = 1.1; }
     this._syncMulligan();
@@ -913,7 +935,7 @@ export class Game {
     const lm = lmg ? lmg.getWorldPosition(new THREE.Vector3()) : null;
     const path = holeIntroPath(T, (x, z) => this.world.groundFn(x, z), rig, rig.addressPose(), lm);
     const rr = m.ringRadii;
-    this.hud.showHoleCard({ n: h.n, name: h.name, par: h.par, yards: Math.round(T.length / YD), note: h.note, idx: m.holeIdx + 1, of: m.holes.length, rings: `Gold ring ${Math.round(rr.one / 0.3048)} ft = 1-putt · white ${Math.round(rr.two / 0.3048)} ft = 2-putt`, rules: `${MULLIGANS[m.mulligans]?.short || ''} · water: drop or re-hit, +1 stroke`, party: store.settings.partyMode ? partyRule(h) : null });
+    this.hud.showHoleCard({ n: h.n, name: h.name, par: h.par, yards: Math.round(T.length / YD), note: h.note, idx: m.holeIdx + 1, of: m.holes.length, rings: m.puttOut ? `Putt it out${rr.one > 0 ? ` · gimme inside ${Math.round(rr.one / 0.3048)} ft` : ''} · skip putts: strokes by distance` : `Gold ring ${Math.round(rr.one / 0.3048)} ft = 1-putt · white ${Math.round(rr.two / 0.3048)} ft = 2-putt`, rules: `${MULLIGANS[m.mulligans]?.short || ''} · water: drop or re-hit, +1 stroke`, party: store.settings.partyMode ? partyRule(h) : null });
     const orbit = () => {
       this.hud.hideHoleCard();
       this._orbiting = true;
@@ -1279,6 +1301,7 @@ export class Game {
         case 'h': case 'H': case '?': openHelp(this, 'pairing'); break;
         case 'r': case 'R': if (this.state === 'ready') this.setAim(0); break;
         case 'u': case 'U': this.mulligan(); break;
+        case 'k': case 'K': if (this.state === 'ready' && this.setup.putting) this.skipPutt(); break;
         case 'g': case 'G':
           if (this.mode.course) {
             const c = this.world.course;
@@ -1302,6 +1325,7 @@ export class Game {
     on('skipButton', () => this.skip());
     on('mulliganButton', () => this.mulligan());
     on('autoPuttButton', () => this.putt('auto'));
+    on('skipPuttButton', () => this.skipPutt());
     on('manualButton', () => { audio.click(); openManual(this); });
     on('modeButton', () => { audio.click(); openModePicker(this); });
     on('sessionButton', () => { audio.click(); if (this.mode.course) openScorecard(this); else openSession(this); });

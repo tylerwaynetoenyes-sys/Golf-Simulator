@@ -5,10 +5,12 @@
 // the previous hole first), then the player farthest from the hole plays.
 // Rules handled: lies (rough/sand slow the ball), water (one-stroke penalty,
 // drop where it crossed in), out of bounds (stroke and distance), a pick-up
-// at par + 4 to keep the round moving, and the green finish: there is no
-// putting mode. Two rings around every hole score the putts: finish inside
-// the inner ring and it's a 1-putt, inside the outer ring a 2-putt, anywhere
-// else on the green a 3-putt. A ball that rolls into the cup is simply holed.
+// at par + 4 to keep the round moving, and the green finish, one of two ways:
+// putt it out (aim, read the slopes, stroke or putt with the radar; a gimme
+// is picked up for one, and a player may skip putting for strokes added by
+// distance), or rings: finish inside the inner ring and it's a 1-putt, inside
+// the outer ring a 2-putt, anywhere else on the green a 3-putt. A ball that
+// rolls into the cup is simply holed.
 import { simulatePutt, puttSpeedFor, YD } from '../core/physics.js';
 import { coursePar } from '../course/holes.js';
 import { loadedCourse } from '../course/courses.js';
@@ -43,10 +45,28 @@ const SAVE_KEY = 'alton-range.round.v1';
 
 /** Putting rings (feet): inner = 1-putt, outer = 2-putt. */
 export const PUTT_RINGS = {
+  // putt it out on the green (aim, read, stroke or radar putt); skipping a putt
+  // adds strokes by distance (skipPutts), and the gimme is picked up for one
+  putt: { label: 'Putt it out', one: 0, two: 0, putt: true },
   tight: { label: 'Tight', one: 6, two: 20 },
   standard: { label: 'Standard', one: 10, two: 30 },
   generous: { label: 'Generous', one: 15, two: 45 },
 };
+
+/** Gimme distance (feet) when putting it out: inside it the ball is picked up for one stroke. */
+export const GIMMES = { off: { label: 'Off', ft: 0 }, two: { label: '2 ft', ft: 2 }, three: { label: '3 ft', ft: 3 }, five: { label: '5 ft', ft: 5 } };
+
+/**
+ * Strokes charged for skipping the putting from `feet` away: a little worse
+ * than a Tour player's average (who two-putts from 30 ft), so a skip never
+ * beats putting well.
+ */
+export function skipPutts(feet) {
+  if (feet <= 3) return 1;
+  if (feet <= 20) return 2;
+  if (feet <= 60) return 3;
+  return 4;
+}
 
 /** Mulligan rules: how many replays each player gets. */
 export const MULLIGANS = {
@@ -76,6 +96,7 @@ export class CourseMode {
     this.roundOver = false;
     this.length = 9;
     this.rings = 'standard';
+    this.gimme = 'two';
     this.mulligans = 'nine';
   }
 
@@ -87,6 +108,7 @@ export class CourseMode {
   start(opts = {}) {
     if (opts.length) this.length = opts.length;
     if (opts.rings && PUTT_RINGS[opts.rings]) this.rings = opts.rings;
+    if (opts.gimme && GIMMES[opts.gimme]) this.gimme = opts.gimme;
     if (opts.mulligans && MULLIGANS[opts.mulligans]) this.mulligans = opts.mulligans;
     this.mullUsed = new Map();
     this._undo = null;
@@ -114,11 +136,14 @@ export class CourseMode {
 
   get hole() { return this.holes[this.holeIdx]; }
 
-  /** Ring radii in metres. */
+  /** Ring radii in metres (putting it out: the gimme circle alone). */
   get ringRadii() {
+    if (this.puttOut) { const g = (GIMMES[this.gimme]?.ft || 0) * FT; return { one: g, two: g }; }
     const r = PUTT_RINGS[this.rings] || PUTT_RINGS.standard;
     return { one: r.one * FT, two: r.two * FT };
   }
+  /** Putting it out (rather than the rings settling the green). */
+  get puttOut() { return !!PUTT_RINGS[this.rings]?.putt; }
   get T() { return this.game.world.course.T; }
 
   _startHole() {
@@ -159,7 +184,8 @@ export class CourseMode {
       origin: { x: b.x, y: b.teed ? b.y + 0.04 : T.groundHeight(b.x, b.z) + 0.021, z: b.z },
       heading,
       teed: b.teed,
-      putting: false, // the rings settle the green; every shot is a full swing or chip
+      // putting it out: on the green (or the fringe close in) the putter comes out
+      putting: this.puttOut && !b.teed && (b.surface === 'green' || (b.surface === 'fringe' && toPin < 9)),
       lie: b.teed ? 'tee' : b.surface,
       lieDetail: this._lieDetail(b, toPin),
       toPin,
@@ -273,7 +299,8 @@ export class CourseMode {
     const par = this.hole.par;
     const before = { x: b.x, y: b.y, z: b.z, surface: b.surface, teed: b.teed };
     this._undo = { pid: player.id, holeIdx: this.holeIdx, snap: { ...b } };
-    b.strokes += 1;
+    const skip = !!launch?.skip;
+    if (!skip) b.strokes += 1;
     let penalty = null;
     let holed = !!result.holed;
 
@@ -303,7 +330,21 @@ export class CourseMode {
     // the green finish: rings around the hole score the putts
     let finish = null;
     const toPin = T.toPin(b.x, b.z);
-    if (!b.holed && !penalty) {
+    if (launch?.putt) b.putts = (b.putts || 0) + 1;
+    if (skip) {
+      const added = skipPutts(toPin / FT);
+      finish = { putts: (b.putts || 0) + added, from: toPin, skipped: true, added };
+      b.strokes += added;
+      b.holed = true;
+    } else if (!b.holed && !penalty && this.puttOut) {
+      // the gimme: picked up for one more
+      const g = (GIMMES[this.gimme]?.ft || 0) * FT;
+      if (g > 0 && toPin <= g && (b.surface === 'green' || b.surface === 'fringe')) {
+        finish = { putts: (b.putts || 0) + 1, from: toPin, gimme: true };
+        b.strokes += 1;
+        b.holed = true;
+      }
+    } else if (!b.holed && !penalty) {
       const R = this.ringRadii;
       const putts = toPin <= R.one ? 1 : toPin <= R.two ? 2 : b.surface === 'green' ? 3 : 0;
       if (putts) {
@@ -312,6 +353,8 @@ export class CourseMode {
         b.holed = true;
       }
     }
+    // a holed putt: how many it took on the green
+    if (holed && launch?.putt) finish = { putts: b.putts, from: 0, holedPutt: true };
     // pick up to keep things moving
     let pickedUp = false;
     if (!b.holed && b.strokes >= par + MAX_OVER) {
@@ -324,7 +367,13 @@ export class CourseMode {
     if (b.holed) {
       const name = scoreName(b.strokes, par);
       headline = name;
-      sub = finish
+      sub = finish?.skipped
+        ? `Putts skipped from ${proximity(finish.from)}: +${finish.added} · ${b.strokes} strokes`
+        : finish?.gimme
+        ? `Gimme from ${proximity(finish.from)} · ${b.strokes} strokes`
+        : finish?.holedPutt
+        ? `${finish.putts}-putt · ${b.strokes} stroke${b.strokes === 1 ? '' : 's'}`
+        : finish
         ? `${finish.putts}-putt from ${proximity(finish.from)} · ${b.strokes} strokes`
         : `Holed out · ${b.strokes} stroke${b.strokes === 1 ? '' : 's'}`;
       const d = b.strokes - par;
@@ -351,7 +400,8 @@ export class CourseMode {
     const out = { headline, sub, category, bests: [], holed: b.holed, penalty, ace: b.holed && b.strokes === 1, finish, lie: !b.holed && !penalty ? b.surface : null };
     if (penalty && category === 'water' && !pickedUp) out.waterChoice = true;
     // the shot card shouldn't give away the drop: it shows the ring first
-    if (finish) out.preview = { headline: `${proximity(finish.from)} · ${finish.putts}-putt`, sub: finish.putts === 3 ? 'On the green · three to get down' : `Inside the ${finish.putts === 1 ? 'inner' : 'outer'} ring` };
+    if (finish?.gimme) out.preview = { headline: `${proximity(finish.from)} · gimme`, sub: 'Inside the gimme: picked up for one' };
+    else if (finish && !finish.holedPutt && !finish.skipped) out.preview = { headline: `${proximity(finish.from)} · ${finish.putts}-putt`, sub: finish.putts === 3 ? 'On the green · three to get down' : `Inside the ${finish.putts === 1 ? 'inner' : 'outer'} ring` };
     if (b.holed && b.strokes === 1) out.bests.push({ label: 'Hole in one', value: this.hole.name });
 
     // a finished hole can't be replayed
@@ -455,6 +505,20 @@ export class CourseMode {
       if (along(mid) < want) lo = mid; else hi = mid;
     }
     return (lo + hi) / 2;
+  }
+
+  /** A putt read by the radar: its real ball speed (mph) and start line (degrees off the aim). */
+  radarPutt(player, ballMph, aimDeg) {
+    const T = this.T;
+    const b = this.ball.get(player.id);
+    const base = (Math.atan2(T.pin.x - b.x, -(T.pin.z - b.z)) * 180) / Math.PI;
+    return simulatePutt({ x: b.x, y: b.y, z: b.z }, base + aimDeg, Math.min(9, ballMph * 0.44704), T.terrain, T.pin);
+  }
+
+  /** The strokes a skip would cost from where the ball lies now. */
+  skipCost(player) {
+    const b = this.ball.get(player.id);
+    return skipPutts(this.T.toPin(b.x, b.z) / FT);
   }
 
   /** Manual putt from the swing meter: 80% power = hole pace on a flat green. */
@@ -592,7 +656,7 @@ export class CourseMode {
   _save() {
     try {
       localStorage.setItem(SAVE_KEY, JSON.stringify({
-        at: Date.now(), course: this.def.id, length: this.length, first: this.holes[0].n, holeIdx: this.holeIdx, rings: this.rings, mulligans: this.mulligans,
+        at: Date.now(), course: this.def.id, length: this.length, first: this.holes[0].n, holeIdx: this.holeIdx, rings: this.rings, gimme: this.gimme, mulligans: this.mulligans,
         names: this.players.map((p) => p.name),
         cards: this.players.map((p) => this.cards.get(p.id)),
         honor: this.honor.map((id) => this.players.findIndex((p) => p.id === id)),

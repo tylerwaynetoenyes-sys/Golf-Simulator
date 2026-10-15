@@ -337,6 +337,9 @@ export class HUD {
     if (on && h) wipeIn(el);
   }
 
+  /** The skip button's cost, e.g. "Skip putts · +2". */
+  setSkipCost(n) { const sk = $('#skipPuttButton'); if (sk) sk.textContent = n ? `Skip putts · +${n}` : 'Skip putts'; }
+
   /** Putting UI: hide clubs, offer auto putt, relabel the swing button. */
   setPuttMode(on) {
     if (this._putt === on) return;
@@ -344,6 +347,8 @@ export class HUD {
     document.body.classList.toggle('putting', on);
     const ap = $('#autoPuttButton');
     if (ap) ap.hidden = !on;
+    const sk = $('#skipPuttButton');
+    if (sk) sk.hidden = !on;
     $('#swingButton').textContent = on ? 'Hold to putt' : 'Hold to swing';
     const lbl = $('#swingMeter .meter-labels');
     if (lbl) lbl.innerHTML = on ? '<span>Short</span><span>Hole pace</span><span>Firm</span>' : '<span>Soft</span><span>Full</span><span>Over</span>';

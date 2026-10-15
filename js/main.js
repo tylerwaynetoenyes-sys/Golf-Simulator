@@ -111,7 +111,7 @@ async function boot() {
     pairing.enterGame('demo');
     if (PARAMS.has('day')) world.env.setTime('day', true);
     const h = Math.max(1, Math.min(c.holes.length, Number(PARAMS.get('hole')) || 1));
-    game.setMode('course', { course: c, length: PARAMS.has('hole') ? 1 : Math.min(9, c.holes.length), startHole: h, rings: 'standard', mulligans: 'nine' });
+    game.setMode('course', { course: c, length: PARAMS.has('hole') ? 1 : Math.min(9, c.holes.length), startHole: h, rings: store.settings.rings || 'putt', gimme: store.settings.gimme, mulligans: 'nine' });
   }
 
   // Resume audio after tab switches

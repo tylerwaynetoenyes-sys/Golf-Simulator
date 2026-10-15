@@ -3,7 +3,7 @@
 import { $, esc, copyButtons, toast } from './dom.js';
 import { bus } from '../core/events.js';
 import { COURSES, courseById, loadCourse } from '../course/courses.js';
-import { CourseMode, fmtToPar, PUTT_RINGS, MULLIGANS } from '../game/courseMode.js';
+import { CourseMode, fmtToPar, PUTT_RINGS, MULLIGANS, GIMMES } from '../game/courseMode.js';
 import { PLAYER_COLORS, TEAMS, MAX_PLAYERS } from '../game/roster.js';
 import { store } from '../data/store.js';
 import { CLUBS, clubById } from '../data/clubs.js';
@@ -556,7 +556,8 @@ export function openCourseSetup(game) {
   let course = courseById(s.course || 'confluence');
   let length = s.courseLength || 9;
   let start = s.courseStart || 1;
-  let rings = PUTT_RINGS[s.rings] ? s.rings : 'standard';
+  let rings = PUTT_RINGS[s.rings] ? s.rings : 'putt';
+  let gimme = GIMMES[s.gimme] ? s.gimme : 'two';
   let mull = MULLIGANS[s.mulligans] ? s.mulligans : 'nine';
   const fix = () => {
     if (course.holes.length < 18) { length = 9; start = 1; }
@@ -594,8 +595,10 @@ export function openCourseSetup(game) {
     <div class="seg" id="csLen">${lengthSeg()}</div>
     <div id="csHoles" style="margin-top:12px">${holeList()}</div>
     <h3>On the green</h3>
-    <div class="setting" style="border:0;padding-top:0"><div><div class="hint">No putting: two rings around every hole settle it. Finish inside the gold ring for a 1-putt, inside the white ring for a 2-putt, anywhere else on the green for a 3-putt. Roll it in the cup and it's holed.</div></div>
-      <div class="seg" id="csRings">${Object.entries(PUTT_RINGS).map(([k, r]) => `<button data-v="${k}" aria-pressed="${rings === k}">${r.label} <small style="opacity:.7">${r.one}/${r.two} ft</small></button>`).join('')}</div></div>
+    <div class="setting" style="border:0;padding-top:0"><div><div class="hint" id="csRingHint"></div></div>
+      <div class="seg" id="csRings">${Object.entries(PUTT_RINGS).map(([k, r]) => `<button data-v="${k}" aria-pressed="${rings === k}">${r.label}${r.putt ? '' : ` <small style="opacity:.7">${r.one}/${r.two} ft</small>`}</button>`).join('')}</div></div>
+    <div class="setting" id="csGimmeRow" style="border:0;padding-top:0"><div><label>Gimme</label><div class="hint">Inside this distance the ball is picked up for one stroke.</div></div>
+      <div class="seg" id="csGimme">${Object.entries(GIMMES).map(([k, gm]) => `<button data-v="${k}" aria-pressed="${gimme === k}">${gm.label}</button>`).join('')}</div></div>
     <h3>Mulligans</h3>
     <div class="setting" style="border:0;padding-top:0"><div><div class="hint">A mulligan replays your last shot from the same spot with no penalty. After a ball in the water you can also choose a drop or a re-hit, each with a one-stroke penalty.</div></div>
       <div class="seg" id="csMull">${Object.entries(MULLIGANS).map(([k, r]) => `<button data-v="${k}" aria-pressed="${mull === k}">${r.label}</button>`).join('')}</div></div>
@@ -623,9 +626,22 @@ export function openCourseSetup(game) {
     el.querySelector('#csHoles').innerHTML = holeList();
     audio.tick();
   }));
+  const ringHint = () => {
+    el.querySelector('#csRingHint').textContent = PUTT_RINGS[rings]?.putt
+      ? 'Putt it out: read the slopes, aim and stroke it (or putt with the R10). Putting is optional: skip it and strokes are added by how far you are from the hole (+1 inside 3 ft, +2 inside 20 ft, +3 inside 60 ft, +4 beyond).'
+      : 'No putting: two rings around every hole settle it. Finish inside the gold ring for a 1-putt, inside the white ring for a 2-putt, anywhere else on the green for a 3-putt. Roll it in the cup and it\'s holed.';
+    el.querySelector('#csGimmeRow').style.display = PUTT_RINGS[rings]?.putt ? '' : 'none';
+  };
+  ringHint();
   el.querySelectorAll('#csRings button').forEach((b) => b.addEventListener('click', () => {
     el.querySelectorAll('#csRings button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     rings = b.dataset.v;
+    ringHint();
+    audio.tick();
+  }));
+  el.querySelectorAll('#csGimme button').forEach((b) => b.addEventListener('click', () => {
+    el.querySelectorAll('#csGimme button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    gimme = b.dataset.v;
     audio.tick();
   }));
   el.querySelectorAll('#csMull button').forEach((b) => b.addEventListener('click', () => {
@@ -655,12 +671,13 @@ export function openCourseSetup(game) {
     store.setSetting('courseLength', length);
     store.setSetting('courseStart', start);
     store.setSetting('rings', rings);
+    store.setSetting('gimme', gimme);
     store.setSetting('mulligans', mull);
     audio.click();
-    go(e.currentTarget, course.id, { length, rings, mulligans: mull, startHole: start });
+    go(e.currentTarget, course.id, { length, rings, gimme, mulligans: mull, startHole: start });
   });
   el.querySelector('#csResume')?.addEventListener('click', (e) => {
-    go(e.currentTarget, savedCourse.id, { length: saved.length, rings: saved.rings, mulligans: saved.mulligans, startHole: saved.first, resume: saved });
+    go(e.currentTarget, savedCourse.id, { length: saved.length, rings: saved.rings, gimme: saved.gimme, mulligans: saved.mulligans, startHole: saved.first, resume: saved });
   });
 }
 

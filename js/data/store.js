@@ -30,7 +30,8 @@ const DEFAULT_SETTINGS = {
   display: 'standard', // standard | tv
   timeOfDay: 'night', // night | day
   weather: 'clear', // clear | cloudy | breezy | windy | rain
-  rings: 'standard', // putting rings: tight | standard | generous
+  rings: 'putt', // on the green: putt (putt it out, optional) | tight | standard | generous (rings settle it)
+  gimme: 'two', // putting it out: picked up inside off | two | three | five feet
   mulligans: 'nine', // off | nine | hole | free
   courseLength: 9,
   courseStart: 1,
