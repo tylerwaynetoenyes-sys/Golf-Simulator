@@ -31,7 +31,7 @@ const FILES = {
 };
 /** Which models each course uses. */
 export const COURSE_MODELS = {
-  paris: ['eiffel'],
+  paris: ['eiffel', 'peopleLo', 'statue'],
   liberty: ['statue'],
   centralpark: ['peopleLo'],
   eaststl: ['lowrider', 'wreck', 'people', 'peopleLo', 'rubble'],

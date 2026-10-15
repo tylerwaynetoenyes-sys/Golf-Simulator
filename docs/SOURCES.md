@@ -255,6 +255,16 @@ water, by a search over that map. The landmarks (Bethesda Terrace and the
 Angel of the Waters, Bow Bridge, Belvedere Castle, Cleopatra's Needle) are
 modelled in `js/course/lm/centralpark.js` from published descriptions.
 
+## The Seine (Paris)
+
+`assets/landmarks/paris/seine.json`: the Seine's outline, the bridges' OSM
+`man_made=bridge` footprints (reduced to oriented boxes) and the Île aux
+Cygnes, from OpenStreetMap (ODbL) via Overpass, in the Paris course's DEM
+frame. The course carves the river's bed to that outline (`riverbed`). The
+quays, bridges, boats and the Liberty replica are modelled in
+`js/course/lm/seine.js`; the replica is cut from the Statue of Liberty model
+credited above.
+
 ## Built surfaces
 
 `assets/textures/pbr/` (Poly Haven, CC0; colour, roughness and normal,

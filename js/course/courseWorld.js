@@ -943,7 +943,8 @@ diffuseColor.rgb *= stripes * turf;`)
     const n2 = 0.5 + 0.5 * Math.sin(x * 0.071 + z * 0.053) * Math.sin(z * 0.067 - x * 0.031);
     c.copy(P.grass).lerp(P.scrub, THREE.MathUtils.smoothstep(n1 * 0.7 + n2 * 0.3, 0.35, 0.75));
     // a strip of shore (sand, shingle or mud) just above the water line
-    if (T.seaLevel != null && y < T.seaLevel + 2.5) c.lerp(P.shore || COL.sand, THREE.MathUtils.smoothstep(T.seaLevel + 2.5 - y, 0, 2) * 0.85);
+    // (a walled river, e.g. the Seine between its quays, has none)
+    if (T.seaLevel != null && !T.hole.quays && y < T.seaLevel + 2.5) c.lerp(P.shore || COL.sand, THREE.MathUtils.smoothstep(T.seaLevel + 2.5 - y, 0, 2) * 0.85);
     let rock = P.rock;
     const zones = T.hole.rockZones;
     if (zones?.length) {

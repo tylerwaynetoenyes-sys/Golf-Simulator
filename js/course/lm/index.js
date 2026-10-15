@@ -23,6 +23,7 @@ import cahokiasite from './cahokiasite.js';
 import zoogrounds from './zoogrounds.js';
 import backnine from './backnine.js';
 import centralpark from './centralpark.js';
+import seine from './seine.js';
 
-const all = { zoo, delmar, arch, riverfront, riverboat, piasa, chainofrocks, cahokia, basilica, citymuseum, altonlegends, forestpark, confluencepoint, gatewayarch, cahokiasite, zoogrounds, centralpark, ...western, ...harbor, ...paris, ...eaststl, ...cassis, ...backnine };
+const all = { zoo, delmar, arch, riverfront, riverboat, piasa, chainofrocks, cahokia, basilica, citymuseum, altonlegends, forestpark, confluencepoint, gatewayarch, cahokiasite, zoogrounds, centralpark, ...western, ...harbor, ...paris, ...eaststl, ...cassis, ...backnine, ...seine };
 export const EXTRA = Object.fromEntries(Object.entries(all).filter(([, b]) => typeof b === 'function'));
