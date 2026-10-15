@@ -95,6 +95,7 @@ export class World {
       this.visualGround = rangeGround;
       this.rig.setGround(rangeGround);
       this.rig.obstacle = null;
+      this.rig.canopy = null;
       this.rig.nearPole = null;
       this.rig.setAddress(new THREE.Vector3(0, 0.1, 0), 0);
       this.markers.set([]);
@@ -127,6 +128,7 @@ export class World {
     this.visualGround = this.course.visualHeight;
     this.rig.setGround(T.groundHeight);
     this.rig.obstacle = this.course.cameraClear;
+    this.rig.canopy = this.course.treeHit;
     this.rig.nearPole = this.course.nearPole;
     const mid = T.pointAt(T.length * 0.5);
     this.ambient.setCenter(mid.x, mid.z);

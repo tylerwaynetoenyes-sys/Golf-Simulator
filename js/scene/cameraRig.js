@@ -31,6 +31,7 @@ export class CameraRig {
     this.fovScale = 1;
     this.t = 0;
     this._v = new THREE.Vector3();
+    this._v2 = new THREE.Vector3();
     this._dir = new THREE.Vector3();
     camera.position.copy(this.pos);
     camera.lookAt(this.look);
@@ -124,6 +125,9 @@ export class CameraRig {
     const o = result.origin || { x: 0, z: 0 };
     if (result.putt) return;
     const lp = result.landing || result.carryPoint || result.rest;
+    this.treeCam = null;
+    const tree = result.events?.find((e) => e.type === 'tree');
+    if (tree && tree.t > 0.5 && this.style !== 'tee') { this._planTreeCam(result, tree); return; }
     const wet = result.lost && result.events.some((e) => e.surface === 'water');
     if (wet && this.style !== 'tee') {
       const sp = result.events.find((e) => e.type === 'splash') || lp;
@@ -149,6 +153,48 @@ export class CameraRig {
     } else if (lp && result.flightTime > 2.2 && this.style === 'cinematic') {
       this._planLandingCam(result, lp);
     }
+  }
+
+  /**
+   * Into the trees: cut to a camera off to the side of the strike, at canopy
+   * height and clear of other trees, a beat before contact, so the hit reads;
+   * then follow the ball down out of the branches.
+   */
+  _planTreeCam(result, e) {
+    const g = this.ground;
+    const o = result.origin || { x: 0, z: 0 };
+    let fx = e.x - o.x, fz = e.z - o.z;
+    const len = Math.hypot(fx, fz) || 1;
+    fx /= len; fz /= len;
+    const rx = -fz, rz = fx;
+    let best = null;
+    for (const side of [-1, 1]) for (const d of [16, 22, 12]) {
+      const back = d * 0.45;
+      const cam = new THREE.Vector3(e.x - fx * back + rx * d * side, 0, e.z - fz * back + rz * d * side);
+      cam.y = Math.max(g(cam.x, cam.z) + 1.8, e.y - 1.5);
+      let lift = 0;
+      while (lift < 14 && this._blocked(cam, e.x, e.y, e.z, 2.5)) { cam.y += 2; lift += 2; }
+      const cost = lift + (this._blocked(cam, e.x, e.y, e.z, 2.5) ? 100 : 0) + (d !== 16 ? 1 : 0);
+      if (!best || cost < best.cost) best = { cam, cost };
+    }
+    this.treeCam = { pos: best.cam, point: new THREE.Vector3(e.x, e.y, e.z), at: Math.max(0.35, e.t - 0.9), t: e.t, cut: false };
+  }
+
+  /** Does a tree canopy (or the ground) sit between `from` and the point? Ignores the last `skip` metres. */
+  _blocked(from, tx, ty, tz, skip = 1.5) {
+    const g = this.ground;
+    const dx = tx - from.x, dy = ty - from.y, dz = tz - from.z;
+    const L = Math.hypot(dx, dy, dz);
+    if (L < skip + 1) return false;
+    const n = Math.min(24, Math.ceil(L / 2.5));
+    for (let i = 1; i < n; i++) {
+      const u = i / n;
+      if (L * (1 - u) < skip) break;
+      const x = from.x + dx * u, y = from.y + dy * u, z = from.z + dz * u;
+      if (y < g(x, z) + 0.2) return true;
+      if (this.canopy && this.canopy(x, y, z)) return true;
+    }
+    return false;
   }
 
   /**
@@ -319,6 +365,23 @@ export class CameraRig {
         this.baseFov = THREE.MathUtils.clamp(42 - d * 0.35, 26, 42);
         this.rate = 1.5;
         this.lookRate = 7;
+      } else if (this.treeCam && playT >= this.treeCam.at) {
+        const tc = this.treeCam;
+        if (!tc.cut) {
+          tc.cut = true;
+          this.pos.copy(tc.pos);
+          this.look.copy(tc.point);
+          this.fov = this.baseFov = 36;
+          this.shake = 0;
+        }
+        // hold on the strike, then follow the ball out of the branches
+        const after = playT - tc.t;
+        this.desiredPos.copy(tc.pos);
+        if (after < 0) this.desiredLook.lerpVectors(tc.point, b, 0.35);
+        else this.desiredLook.copy(b);
+        this.baseFov = after < 0 ? 36 : THREE.MathUtils.clamp(36 + after * 4, 36, 46);
+        this.rate = 2;
+        this.lookRate = after < 0 ? 5 : 8;
       } else if (this.landCam && playT >= this.cutAt) {
         // Landing camera: frame the drop zone while the ball is high, follow
         // it down, then lead toward where it will stop.
@@ -405,6 +468,20 @@ export class CameraRig {
         this.desiredPos.set(x, Math.max(g(x, z), p.y - 2, -50) + 3.5, z);
       }
       this.desiredLook.copy(p);
+    }
+
+    // keep the ball in sight: if a canopy or a ridge sits between the camera
+    // and the ball, rise (and if that's not enough, close in) until it's clear
+    const cupClose = this.mode === 'shot' && this.cupShot && playT >= this.cupShot.at - this.cupShot.lead;
+    if (b && (this.mode === 'shot' || this.mode === 'rest') && !cupClose && !(this.result?.putt) && !this.result?.holed) {
+      const target = this.mode === 'rest' ? this.restPos : b;
+      let tries = 0;
+      while (target && tries < 10 && this._blocked(this.desiredPos, target.x, target.y + 0.15, target.z)) {
+        this.desiredPos.y += 2;
+        if (tries >= 5) this.desiredPos.lerp(this._v2.set(target.x, this.desiredPos.y, target.z), 0.15);
+        tries++;
+      }
+      if (tries) this.rate = Math.max(this.rate, 3);
     }
 
     if (this.mode !== 'flyover') {

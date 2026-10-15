@@ -544,7 +544,8 @@ export class Game {
       });
     }
 
-    this.shot = { launch, result, outcome, source, club, player, t: 0, ev: 0, landed: false, holed: false, revealed: false };
+    const treeEv = result.events?.find((e) => e.type === 'tree');
+    this.shot = { launch, result, outcome, source, club, player, t: 0, ev: 0, landed: false, holed: false, revealed: false, treeAt: treeEv && treeEv.t > 0.5 ? treeEv.t : null };
     this.state = 'flight';
     this.aimLine.visible = false;
     if (this.puttLine) this.puttLine.visible = false;
@@ -852,6 +853,11 @@ export class Game {
         const rel = s.t - r.holedAt.t;
         if (rel > -0.42 && rel < 0.45) scale = 0.34;
         else if (rel > -0.8 && rel <= -0.42) scale = 1 - 0.66 * ((rel + 0.8) / 0.38);
+      } else if (s.treeAt != null) {
+        // into the trees: slow through the strike so it reads
+        const rel = s.t - s.treeAt;
+        if (rel > -0.22 && rel < 0.55) scale = 0.35;
+        else if (rel > -0.6 && rel <= -0.22) scale = 1 - 0.65 * ((rel + 0.6) / 0.38);
       }
       s.t += dt * scale;
       this.timeScale = scale;
