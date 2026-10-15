@@ -3,13 +3,23 @@
 // Every model is optional: the procedural stand-ins draw when one is missing.
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+
+// full-detail meshes ship Draco-compressed; the decoder is vendored
+let draco = null;
+function gltfLoader() {
+  const l = new GLTFLoader();
+  draco ||= new DRACOLoader().setDecoderPath(new URL('../../vendor/three/addons/libs/draco/gltf/', import.meta.url).href);
+  l.setDRACOLoader(draco);
+  return l;
+}
 
 const FILES = {
   eiffel: 'eiffel_tower.glb',
   statue: 'statue_of_liberty.glb',
   lowrider: 'lowrider_impala.glb',
   wreck: 'abandoned_sedan.glb',
-  people: 'people_male.glb',
+  people: 'people_real.glb', // Renderpeople and deep3dstudio scans
 };
 /** Which models each course uses. */
 export const COURSE_MODELS = {
@@ -26,7 +36,7 @@ function load(name) {
   if (cache.has(name)) return Promise.resolve(cache.get(name));
   if (pending.has(name)) return pending.get(name);
   const url = new URL(`../../assets/models/${FILES[name]}`, import.meta.url).href;
-  const p = new GLTFLoader().loadAsync(url).then((g) => {
+  const p = gltfLoader().loadAsync(url).then((g) => {
     g.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     cache.set(name, g.scene);
     return g.scene;

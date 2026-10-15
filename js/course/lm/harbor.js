@@ -113,31 +113,27 @@ function statueofliberty() {
   tab.rotation.z = 0.2;
   tab.rotation.x = -0.12;
   st.add(tab);
-  // the detailed statue (Dystopia, Sketchfab, CC BY) replaces the sculpted
-  // stand-in when it's loaded: 46 m from her heel to the torch
-  const M = model('statue');
-  if (M) {
-    st.clear();
-    const bb = new THREE.Box3().setFromObject(M);
-    const h = bb.max.y - bb.min.y;
-    M.scale.setScalar(46 / h);
-    const c = bb.getCenter(new THREE.Vector3()).multiplyScalar(46 / h);
-    M.position.set(-c.x, -bb.min.y * (46 / h), -c.z);
-    M.traverse((o) => {
-      if (!o.isMesh) return;
-      o.castShadow = true;
-      o.material = o.material.clone();
-      o.material.emissive = new THREE.Color(0x9fe8cf);
-      o.material.emissiveIntensity = 0;
-      o.material.userData.night = 0.35;
-      cu.userData.statueMats = (cu.userData.statueMats || []).concat(o.material);
-    });
-    st.add(M);
-  }
   st.rotation.y = -0.65; // she faces south-east, to the Narrows
   g.add(st);
-  const sm = cu.userData.statueMats || [];
-  return { group: g, glow: [granite, concrete, cu, ...sm], haze: [granite, concrete, cu, lawn, ...sm] };
+  // the photogrammetry scan (CMBC, Sketchfab, CC BY): statue, pedestal, Fort
+  // Wood and Liberty Island at real scale (93 m to the torch), centred on her.
+  // It replaces everything above when it's loaded.
+  const M = model('statue');
+  if (M) {
+    g.clear();
+    const sm = [];
+    M.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = o.receiveShadow = true;
+      o.material.emissive = new THREE.Color(0x9fe8cf);
+      o.material.emissiveIntensity = 0;
+      o.material.userData.night = 0.25; // the floodlit statue at night
+      sm.push(o.material);
+    });
+    g.add(M);
+    return { group: g, glow: [...new Set(sm)], haze: [...new Set(sm)] };
+  }
+  return { group: g, glow: [granite, concrete, cu], haze: [granite, concrete, cu, lawn] };
 }
 
 function ellisisland() {

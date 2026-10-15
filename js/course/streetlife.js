@@ -222,46 +222,23 @@ function importedCar(kind, rand) {
   return g;
 }
 
-/** A shirt / trousers / skin / shoes material for the imported figures, split by height. */
-function outfit(rand) {
-  const pick = (a) => new THREE.Color(a[Math.floor(rand() * a.length)]);
-  const uni = {
-    uShirt: { value: pick([0xf2f2ee, 0x1c1c1e, 0x9a1b1f, 0x1f3b78, 0x2d6a3e, 0xd4a017, 0x6a6a6a]) },
-    uPants: { value: pick([0x22324a, 0x1d1d1f, 0x5b5146, 0x3c4e63, 0x2b2b2b]) },
-    uSkin: { value: pick([0x5c3a21, 0x6b4226, 0x8d5524, 0xc68642, 0xe0ac69]) },
-    uShoe: { value: pick([0xf4f4f0, 0x111111, 0xb22222]) },
-  };
-  const mt = new THREE.MeshStandardMaterial({ roughness: 0.8 });
-  mt.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, uni);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying float vH;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvH = position.y;');
-    sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nvarying float vH; uniform vec3 uShirt; uniform vec3 uPants; uniform vec3 uSkin; uniform vec3 uShoe;')
-      .replace('#include <color_fragment>', `#include <color_fragment>
-        vec3 cc = vH < 0.09 ? uShoe : vH < 0.88 ? uPants : vH < 1.47 ? uShirt : uSkin;
-        diffuseColor.rgb = cc;`);
-  };
-  mt.customProgramCacheKey = () => 'fwOutfit';
-  return mt;
-}
-
 /** A person (~1.75 m) in streetwear; `chain` adds a gold chain. Faces +X. */
 export function person(rand, { chain = false } = {}) {
   const P = model('people');
   if (P && P.children.length) {
+    // real scanned people (textured), standing on the origin, facing +Z: turn to +X
     const fig = P.children[Math.floor(rand() * P.children.length)];
     const g = new THREE.Group();
-    const mt = outfit(rand);
-    fig.traverse((o) => { if (o.isMesh) { o.material = mt; o.castShadow = true; } });
     fig.position.set(0, 0, 0);
-    fig.rotation.set(0, Math.PI / 2, 0); // the scans face +Z: turn them to +X
+    fig.rotation.set(0, Math.PI / 2, 0);
+    fig.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
     g.add(fig);
     if (chain) {
       const m = mats();
-      const c = new THREE.Mesh(new THREE.TorusGeometry(0.12, 0.012, 6, 24), m.gold);
+      const c = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.011, 6, 24), m.gold);
       c.rotation.x = Math.PI / 2 - 0.55;
       c.rotation.z = Math.PI / 2;
-      c.position.set(0.07, 1.4, 0);
+      c.position.set(0.08, 1.42, 0);
       g.add(c);
     }
     return g;
