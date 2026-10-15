@@ -15,6 +15,7 @@ import { lit, box, seeded, canvasTex, facadeMaterial, FT, landmarkWater } from '
 import { pbr } from '../../scene/pbr.js';
 import { place, bx, cy, rod, span, Batch, tow } from './riverfront.js';
 import { courthouse } from './gatewayarch.js';
+import { crowdAt } from '../../scene/crowd.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const built = (B) => { const g = new THREE.Group(); B.build(g); return g; };
@@ -189,11 +190,30 @@ function railyard() {
       }
     }
   }
+  // a seventh track where a switcher shunts a cut of cars back and forth (slowly: yard speed)
+  const xs = 6 * 5.5;
+  T.add(m.ballast, place(new THREE.CylinderGeometry(2.4, 3, 0.4, 4, 1).rotateY(Math.PI / 4).scale(1, 1, 240 / 3.8).translate(0, 0.2, 0), xs, 0, 0));
+  for (let z = -119; z < 120; z += 0.9) T.add(m.tie, bx(2.6, 0.16, 0.24, xs, 0.36, z));
+  for (const s2 of [-0.72, 0.72]) T.add(m.rail, bx(0.07, 0.16, 240, xs + s2, 0.52, 0), bx(0.16, 0.04, 240, xs + s2, 0.52, 0));
+  const S = new Batch();
+  // the locomotive: a road-switcher in Terminal Railroad blue, long hood, cab, short hood
+  const loco = pbr('painted_steel', { scale: 1.5, tint: 0x2f4f8f, metal: 0.4 }), stripe = pbr('painted_steel', { scale: 1.5, tint: 0xe6c84a, metal: 0.3 });
+  S.add(m.dark, bx(3, 0.6, 17, 0, 0.9, 0));
+  for (const tz of [-5.5, 5.5]) { S.add(m.dark, bx(2.6, 0.6, 3.2, 0, 0.45, tz)); for (const w of [-0.9, 0.9]) S.add(m.wheel, place(new THREE.CylinderGeometry(0.5, 0.5, 1.7, 8).rotateZ(Math.PI / 2), 0, 0.6, tz + w)); }
+  S.add(loco, bx(2.2, 2.6, 9, 0, 1.5, 2.6), bx(3, 3.4, 2.8, 0, 1.5, -3.4), bx(2.2, 1.8, 2.6, 0, 1.5, -6.5));
+  S.add(stripe, bx(3.05, 0.25, 17, 0, 1.55, 0));
+  S.add(lit(0x30383f, 0xffe7b8, { night: 0.8, roughness: 0.2 }), bx(3.05, 1, 2.4, 0, 3.4, -3.4));
+  let at = 9.5;
+  const prnd = seeded(91);
+  for (let c = 0; c < 5; c++) { const L = railcar(S, m, c % 2 ? 'hopper' : 'box', paint[Math.floor(prnd() * 3)], 0, at + 8); at += L + 0.8; }
+  const cut = built(S);
+  const shunt = new THREE.Group(); shunt.add(cut); shunt.position.x = xs;
   const g = new THREE.Group();
   B.build(g);
+  g.add(shunt);
   // the track lies flat: no shadow pass for it
   for (const mesh of T.build(g, false)) mesh.userData.noShadow = true;
-  return { group: g, glow: [] };
+  return { group: g, glow: [], update(t) { shunt.position.z = -45 + 55 * (0.5 - 0.5 * Math.cos(t * 0.035)); } };
 }
 
 /** Eads Bridge: three steel arches on granite piers, the road deck above and the rail deck below. */
@@ -240,7 +260,31 @@ function eads() {
   B.add(deckM, bx(total + 20, 0.5, 12, 0, deckY - 6.5, 0));
   const g = built(B);
   g.rotation.y = 0.05;
-  return { group: g, glow: [stone, steel], haze: [stone, steel, deckM] };
+  // a MetroLink Red Line train crossing on the lower deck: two cars, white with the red band
+  const train = new THREE.Group();
+  const body = new THREE.MeshStandardMaterial({ color: 0xeeeeea, roughness: 0.45, metalness: 0.2 }), red = new THREE.MeshStandardMaterial({ color: 0xb8202a, roughness: 0.5 });
+  const win = lit(0x2a3036, 0xffe9c0, { night: 1, roughness: 0.15 });
+  for (let k = 0; k < 2; k++) {
+    const car = new THREE.Group();
+    car.add(new THREE.Mesh(new THREE.BoxGeometry(27, 3.3, 2.7).translate(0, 1.65, 0), body));
+    car.add(new THREE.Mesh(new THREE.BoxGeometry(27.05, 0.4, 2.75).translate(0, 0.7, 0), red));
+    car.add(new THREE.Mesh(new THREE.BoxGeometry(24, 1.1, 2.76).translate(0, 2.1, 0), win));
+    car.position.x = k * 27.6;
+    train.add(car);
+  }
+  train.position.set(0, deckY - 6.25, 2.5);
+  g.add(train);
+  const half = total / 2 + 60;
+  return {
+    group: g, glow: [stone, steel, win], haze: [stone, steel, deckM],
+    update(t) {
+      // across and back, a train every few minutes each way, out of sight beyond the ends
+      const cyc = (t * 14) % (half * 4 + 600);
+      const x = cyc < half * 2 ? -half + cyc : cyc < half * 2 + 300 ? 1e5 : cyc < half * 4 + 300 ? half - (cyc - half * 2 - 300) : 1e5;
+      train.visible = Math.abs(x) < total / 2 + 12;
+      train.position.x = x - 27;
+    },
+  };
 }
 
 /** Downtown St. Louis across the river, west of the Arch. */
@@ -284,4 +328,133 @@ function barges() {
   return { group: g, glow, update(time) { t.position.z = -((time * 2.2) % 1600) + 800; } };
 }
 
-export default { geyser, elevators, railyard, eads, stlouis, barges };
+
+// ── life on the Illinois side: fishermen on the bank, people in the parks, a heritage
+// plaque on every tee, and the jazz mural on the Miles hole ──
+function plaqueTexture(title, line) {
+  return canvasTex(512, 320, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, w, h);
+    g.addColorStop(0, '#6b4a26'); g.addColorStop(0.5, '#8a6434'); g.addColorStop(1, '#5a3d1e');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.strokeStyle = '#c8a060'; c.lineWidth = 10; c.strokeRect(12, 12, w - 24, h - 24);
+    c.fillStyle = '#f0d9a8'; c.textAlign = 'center';
+    c.font = '600 22px Georgia, serif'; c.fillText('EAST ST. LOUIS HERITAGE TRAIL', w / 2, 58);
+    c.font = '700 44px Georgia, serif'; c.fillText(title.toUpperCase(), w / 2, 118);
+    c.font = '20px Georgia, serif';
+    const words = line.split(' '); let row = '', y = 166;
+    for (const wd of words) { if (c.measureText(row + wd).width > w - 70) { c.fillText(row, w / 2, y); row = ''; y += 28; if (y > h - 30) break; } row += wd + ' '; }
+    if (y <= h - 30) c.fillText(row, w / 2, y);
+  });
+}
+function muralTexture() {
+  return canvasTex(1024, 320, (c, w, h) => {
+    const g = c.createLinearGradient(0, 0, w, 0);
+    g.addColorStop(0, '#1d1840'); g.addColorStop(0.5, '#3b1f5c'); g.addColorStop(1, '#0f2a4a');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    // the music: a stave curling across the wall, notes riding it
+    c.strokeStyle = 'rgba(255,214,120,0.75)'; c.lineWidth = 3;
+    for (let k = 0; k < 5; k++) { c.beginPath(); for (let x = 0; x <= w; x += 8) { const y = 150 + k * 12 + Math.sin(x * 0.012) * 50; x ? c.lineTo(x, y) : c.moveTo(x, y); } c.stroke(); }
+    c.fillStyle = '#ffd678';
+    for (let i = 0; i < 16; i++) { const x = 380 + i * 40, y = 150 + Math.sin(x * 0.012) * 50 + ((i * 37) % 48); c.beginPath(); c.ellipse(x, y, 9, 7, -0.4, 0, 6.29); c.fill(); c.fillRect(x + 7, y - 40, 3, 40); }
+    // a trumpeter in silhouette, horn raised, at the left
+    c.fillStyle = '#0a0a14';
+    c.beginPath(); c.arc(150, 92, 30, 0, 6.29); c.fill();
+    c.beginPath(); c.moveTo(118, 120); c.quadraticCurveTo(90, 220, 110, 320); c.lineTo(210, 320); c.quadraticCurveTo(220, 200, 180, 120); c.closePath(); c.fill();
+    c.save(); c.translate(178, 98); c.rotate(-0.35);
+    c.fillRect(0, -5, 130, 10);
+    c.beginPath(); c.moveTo(130, -6); c.lineTo(175, -30); c.lineTo(175, 30); c.lineTo(130, 6); c.closePath(); c.fill();
+    c.restore();
+    c.fillStyle = '#ffd678'; c.font = '700 56px Georgia, serif'; c.textAlign = 'right';
+    c.fillText('EAST ST. LOUIS', w - 40, 80);
+    c.font = 'italic 30px Georgia, serif'; c.fillText('where the trumpet learned to sing', w - 40, 290);
+  });
+}
+
+function eslife() {
+  const group = new THREE.Group();
+  const res = {
+    group, glow: [], trees: [],
+    fit(holder, T, opts = {}) {
+      if (!opts.course) return;
+      holder.updateMatrix();
+      const L = holder.matrix.clone(), Li = L.clone().invert(), w = new THREE.Vector3();
+      const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
+      const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
+      const atHole = (sv, d) => { const p = T.pointAt(sv); w.set(p.x + p.rx * d, 0, p.z + p.rz * d).applyMatrix4(Li); return [w.x, w.z]; };
+      const onField = (x, z, pad = 0) => { toW(x, z); const pr = T.project(w.x, w.z); return Math.abs(pr.d) < Math.max(T.fwHalf || 0, 14) + 10 + pad && pr.s > -20 && pr.s < T.length + 30; };
+      const wl = T.seaLevel != null ? (T.seaLevel - holder.position.y) / holder.scale.y : -1e9;
+      const rnd = seeded(1861 + (T.hole?.n || 0));
+      const spots = [];
+      const bronze = new THREE.MeshStandardMaterial({ color: 0x6b4a26, metalness: 0.7, roughness: 0.45 });
+      const stone = pbr('granite_wall', { scale: 1.2, tint: 0xb8b0a4 });
+
+      // the heritage plaque beside the tee
+      {
+        const [tx, tz] = atHole(-4, -7), [ax, az] = atHole(6, 0);
+        const ry = Math.atan2(ax - tx, az - tz) + Math.PI * 0.5;
+        const pg = new THREE.Group();
+        pg.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.0, 0.4).translate(0, 0.5, 0), stone));
+        const note = (T.hole?.note || '').split('. ')[0].replace(/\.$/, '') + '.';
+        const face = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 0.7), new THREE.MeshStandardMaterial({ map: plaqueTexture(T.hole?.name || '', note), metalness: 0.55, roughness: 0.4 }));
+        face.position.set(0, 1.25, 0.06); face.rotation.x = -0.35;
+        const back = new THREE.Mesh(new THREE.BoxGeometry(1.16, 0.76, 0.05), bronze); back.position.set(0, 1.25, 0.02); back.rotation.x = -0.35;
+        pg.add(back, face);
+        pg.position.set(tx, gy(tx, tz), tz); pg.rotation.y = ry;
+        group.add(pg);
+      }
+      // on the Miles hole, the mural on a brick wall beside the tee
+      if (/Miles/.test(T.hole?.name || '')) {
+        const [mx, mz] = atHole(30, 34), [fx, fz] = atHole(30, 0);
+        const wall = new THREE.Group();
+        wall.add(new THREE.Mesh(new THREE.BoxGeometry(17, 5.6, 0.5).translate(0, 2.8, 0), pbr('red_brick', { scale: 1.6, tint: 0xc0a090 })));
+        const art = new THREE.Mesh(new THREE.PlaneGeometry(16, 5), new THREE.MeshStandardMaterial({ map: muralTexture(), roughness: 0.85 }));
+        art.position.set(0, 2.8, 0.26);
+        wall.add(art);
+        wall.position.set(mx, gy(mx, mz) - 0.2, mz);
+        wall.rotation.y = Math.atan2(fx - mx, fz - mz);
+        group.add(wall);
+        for (let i = 0; i < 6; i++) { const x = mx + (fx - mx) * 0.25 + (rnd() - 0.5) * 12, z = mz + (fz - mz) * 0.25 + (rnd() - 0.5) * 6; spots.push([x, gy(x, z), z, Math.atan2(mx - x, mz - z)]); }
+      }
+      // fishermen along the riverbank, rods out over the water
+      if (wl > -1e8) {
+        const rodM = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.5 }), line = new THREE.LineBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.5 });
+        const bucket = new THREE.MeshStandardMaterial({ color: 0xd8d0b0, roughness: 0.6 });
+        let n = 0;
+        for (let k = 0; k < 400 && n < 12; k++) {
+          const [x, z] = atHole(rnd() * T.length, (rnd() - 0.5) * 900);
+          const y = gy(x, z);
+          if (y < wl + 0.5 || y > wl + 3 || onField(x, z, 10)) continue;
+          // which way is the water?
+          let best = null;
+          for (let a = 0; a < 6.28; a += 0.5) { const qx = x + Math.cos(a) * 9, qz = z + Math.sin(a) * 9; if (gy(qx, qz) < wl - 0.3) { best = a; break; } }
+          if (best == null) continue;
+          const ry = Math.atan2(Math.cos(best), Math.sin(best));
+          spots.push([x, y, z, ry]);
+          const fg = new THREE.Group();
+          const r = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.02, 3.6, 5).translate(0, 1.8, 0), rodM);
+          r.rotation.x = 1.0; r.position.set(0.25, 1.0, 0.2); fg.add(r);
+          const tipZ = 0.2 + Math.sin(1.0) * 3.6, tipY = 1.0 + Math.cos(1.0) * 3.6;
+          fg.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0.25, tipY, tipZ), new THREE.Vector3(0.25, wl - y, tipZ + 1.5)]), line));
+          const b = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.36, 10).translate(0, 0.18, 0), bucket); b.position.set(-0.5, 0, -0.3); fg.add(b);
+          fg.position.set(x, y, z); fg.rotation.y = ry;
+          group.add(fg);
+          n++;
+        }
+      }
+      // people in the park beside the hole: walkers, a family, someone watching the river
+      const edge = Math.max(T.fwHalf || 0, 14);
+      for (let i = 0; i < 50; i++) {
+        const sv = T.length * rnd(), d = (rnd() < 0.5 ? -1 : 1) * (edge + 16 + rnd() * 35);
+        const [x, z] = atHole(sv, d), [tx, tz] = atHole(sv, 0);
+        const y = gy(x, z);
+        if (y < wl + 0.5) continue;
+        spots.push([x, y, z, Math.atan2(tx - x, tz - z) + (rnd() - 0.5) * 2]);
+      }
+      const crowd = crowdAt(spots, rnd);
+      if (crowd) group.add(crowd);
+    },
+  };
+  return res;
+}
+
+export default { geyser, elevators, railyard, eads, stlouis, barges, eslife };

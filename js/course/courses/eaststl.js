@@ -15,9 +15,13 @@ export default {
   // the Mississippi at St. Louis, near normal pool
   waterLevel: 119.6,
   waterTint: 0x4a4a36,
+  // the real town and the St. Louis skyline (OpenStreetMap footprints and heights): brick and limestone
+  buildings: 'nyc',
   far: [
     // the Arch grounds model includes the Old Courthouse and downtown behind it
-    { type: 'arch', ll: [38.62461, -90.18497], maxD: Infinity, rot: Math.PI / 2 },
+    { type: 'archonly', ll: [38.62461, -90.18497], maxD: Infinity, rot: Math.PI / 2 },
+    // the city round it: East St. Louis's blocks, and downtown St. Louis across the river
+    { type: 'eslife', ll: [38.628, -90.168], maxD: Infinity },
     { type: 'eads', ll: [38.62891, -90.17893], maxD: Infinity },
     { type: 'geyser', ll: [38.62290, -90.17290], maxD: Infinity },
     { type: 'elevators', ll: [38.62380, -90.17420], maxD: Infinity, rot: 0.2 },
@@ -27,8 +31,8 @@ export default {
   holes: [
     {
       n: 1, name: 'The Geyser', par: 4,
-      note: 'The Gateway Geyser (1995) was designed to throw water 630 feet, the height of the Arch it faces across the river. It has been shut off since 2023; here it fires for a hole-out.',
-      pts: [[-380, 420], [-370, 120], [-320, 60]], fw: 34, fwStart: 110,
+      note: 'Play south through Malcolm W. Martin Memorial Park toward the Gateway Geyser (1995), built to throw water 630 feet, the height of the Arch it faces across the river. It has been shut off since 2023; here it fires for a hole-out.',
+      pts: [[-320, 60], [-370, 120], [-380, 420]], fw: 34, fwStart: 110,
       green: { r: 15, slope: [0.008, -0.01] }, pin: [3, -3],
       bunkers: [{ t: 0.56, off: 22, rx: 11, rz: 7 }, { t: 1.04, off: -15, rx: 8, rz: 6 }],
       water: [], trees: [{ t: 0.4, off: -40, r: 14, n: 7 }],

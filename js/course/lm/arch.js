@@ -132,7 +132,7 @@ function tiling(m) {
   return m;
 }
 
-export default function build() {
+export default function build(opts = {}) {
   const group = new THREE.Group();
   const glow = [];
   const rnd = seeded(1965);
@@ -320,8 +320,8 @@ export default function build() {
     group.add(cg);
   }
 
-  // ── downtown St. Louis behind the Arch ──
-  {
+  // ── downtown St. Louis behind the Arch (a course with the real city round it leaves it out) ──
+  if (opts.downtown !== false) {
     const fTan = tiling(facadeMaterial('#cbbfa8', { cols: 6, rows: 6, win: '#3a4048', seed: 3 }));
     const fGlass = tiling(facadeMaterial('#7d8d9a', { cols: 8, rows: 8, win: '#2c3a46', frame: '#a9b6c0', seed: 7 }));
     const fRed = tiling(facadeMaterial('#8c5a48', { cols: 6, rows: 6, win: '#30343a', seed: 11 }));
