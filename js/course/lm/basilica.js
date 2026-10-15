@@ -6,7 +6,9 @@
 // Front faces +Z (toward the golfer). Footprint x∈[-55,55], z∈[-75,45], ~70 m to the cross.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, box, cyl, seeded, canvasTex, tree, SLOT } from './kit.js';
+import { lit, box, cyl, seeded, tree, SLOT } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
+import { crowdAt } from '../../scene/crowd.js';
 
 // ---------- batching: merge everything that shares a material ----------
 function batcher() {
@@ -26,11 +28,13 @@ function batcher() {
       return o;
     },
     build(group) {
+      const out = [];
       for (const [m, geos] of lists) {
         const mesh = new THREE.Mesh(mergeGeometries(geos), m);
         mesh.castShadow = true; mesh.receiveShadow = true;
-        group.add(mesh);
+        group.add(mesh); out.push(mesh);
       }
+      return out;
     },
   };
 }
@@ -68,90 +72,29 @@ function prismX(pts, x0, x1) {
   return new THREE.ExtrudeGeometry(s, { depth: x1 - x0, bevelEnabled: false }).translate(0, 0, -x1).rotateY(-Math.PI / 2);
 }
 
-// ---------- textures ----------
-function graniteTex() {
-  const rnd = seeded(91);
-  return canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#a7a8a3'; g.fillRect(0, 0, w, h);
-    const rows = 7, rh = h / rows;
-    for (let r = 0; r < rows; r++) {
-      const off = (r % 2) * 0.5;
-      for (let c = -1; c < 4; c++) {
-        const x = (c + off) * (w / 3.3);
-        const t = 150 + rnd() * 26 | 0;
-        g.fillStyle = `rgb(${t},${t + 1},${t - 3})`;
-        g.fillRect(x + 1, r * rh + 1, w / 3.3 - 2, rh - 2);
-      }
-    }
-    for (let i = 0; i < 5000; i++) {
-      const v = rnd() < 0.5 ? 90 + rnd() * 40 : 190 + rnd() * 50;
-      g.fillStyle = `rgba(${v},${v},${v - 4},0.35)`;
-      g.fillRect(rnd() * w, rnd() * h, 1.2, 1.2);
-    }
-    g.strokeStyle = 'rgba(70,70,68,0.55)'; g.lineWidth = 1.2;
-    for (let r = 0; r <= rows; r++) { g.beginPath(); g.moveTo(0, r * rh); g.lineTo(w, r * rh); g.stroke(); }
-    for (let r = 0; r < rows; r++) {
-      const off = (r % 2) * 0.5;
-      for (let c = 0; c < 4; c++) { const x = (c + off) * (w / 3.3); g.beginPath(); g.moveTo(x, r * rh); g.lineTo(x, (r + 1) * rh); g.stroke(); }
-    }
-  }, [1, 1]);
-}
-function tileTex(base = '#3f7a5e') {
-  const rnd = seeded(17);
-  return canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = base; g.fillRect(0, 0, w, h);
-    const rows = 16, cols = 16, rh = h / rows, cw = w / cols;
-    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
-      const x = (c + (r % 2) * 0.5) * cw, y = r * rh;
-      const l = 40 + rnd() * 22;
-      g.fillStyle = `hsl(${150 + rnd() * 14},${30 + rnd() * 12}%,${l * 0.62}%)`;
-      g.beginPath(); g.moveTo(x, y); g.lineTo(x + cw, y); g.lineTo(x + cw, y + rh * 0.6);
-      g.quadraticCurveTo(x + cw / 2, y + rh * 1.15, x, y + rh * 0.6); g.closePath(); g.fill();
-      g.strokeStyle = 'rgba(15,35,25,0.55)'; g.lineWidth = 1; g.stroke();
-    }
-  }, [1, 1]);
-}
-function paverTex() {
-  const rnd = seeded(5);
-  return canvasTex(256, 256, (g, w, h) => {
-    g.fillStyle = '#b8b3a8'; g.fillRect(0, 0, w, h);
-    const n = 8, s = w / n;
-    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) {
-      const t = 168 + rnd() * 30 | 0;
-      g.fillStyle = `rgb(${t},${t - 3},${t - 10})`; g.fillRect(c * s + 1, r * s + 1, s - 2, s - 2);
-    }
-  }, [1, 1]);
-}
-function grassTex() {
-  const rnd = seeded(3);
-  return canvasTex(128, 128, (g, w, h) => {
-    g.fillStyle = '#5f8a3e'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 2500; i++) { g.fillStyle = `hsl(${88 + rnd() * 18},${40 + rnd() * 15}%,${28 + rnd() * 14}%)`; g.fillRect(rnd() * w, rnd() * h, 1, 2); }
-    g.fillStyle = 'rgba(255,255,255,0.05)'; for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 16, h);
-  }, [1, 1]);
-}
-
 export default function build() {
   const group = new THREE.Group();
   const B = batcher();
   const rnd = seeded(1914);
 
-  const gTex = graniteTex();
-  const stone = lit(0xffffff, 0xffc890, { map: gTex, emissiveMap: gTex, roughness: 0.86, night: 0.13 });
-  const stoneFront = lit(0xf4f4f0, 0xffc890, { map: gTex, emissiveMap: gTex, roughness: 0.86, night: 0.3 });
-  const trim = lit(0xd9d9d3, 0xffc890, { map: gTex, emissiveMap: gTex, roughness: 0.8, night: 0.22 });
-  const polished = mat(0x6d6460, { roughness: 0.28, metalness: 0.05 });
-  const tiles = mat(0xffffff, { map: tileTex(), roughness: 0.55, metalness: 0.1 });
-  const dTex = tileTex('#3c7a60'); dTex.repeat.set(10, 4);
-  const tilesDome = lit(0xffffff, 0x9fe0c0, { map: dTex, emissiveMap: dTex, roughness: 0.45, metalness: 0.12, night: 0.35 });
-  const ribM = mat(0x5f8f78, { roughness: 0.5, metalness: 0.2 });
+  // photographed surfaces (pbr.js): the grey granite (its photo is warm, so a
+  // cool tint), green glazed tile, painted iron, gilt, oak doors, pavers, lawn
+  const granite = (tint, bright, night) => pbr('granite_wall', { scale: 1.6, tint, bright, glow: 0xffc890, night });
+  const stone = granite(0xb4c4e8, 1.35, 0.13);
+  const stoneFront = granite(0xb8c8ec, 1.4, 0.3);
+  const trim = pbr('granite_wall', { scale: 1.1, tint: 0xc0d0f0, bright: 1.5, glow: 0xffc890, night: 0.22 });
+  const polished = pbr('granite_wall', { scale: 0.8, tint: 0x9a8a88, rough: 0.35 });
+  const tiles = pbr('roof_slates_02', { scale: 1.2, tint: 0x6cb89a, bright: 1.2 });
+  const tilesDome = pbr('roof_slates_02', { scale: 1, tint: 0x70c4a4, bright: 1.25, glow: 0x9fe0c0, night: 0.35 });
+  const ribM = pbr('painted_steel', { scale: 1, tint: 0x5f8f78, metal: 0.3 });
   const glass = lit(0x1e252c, 0xffb560, { roughness: 0.25, metalness: 0.3, night: 1.0 });
-  const louver = mat(0x2a2b2a, { roughness: 0.9 });
-  const doorM = lit(0x3b2a1e, 0xffa850, { roughness: 0.5, metalness: 0.4, night: 0.5 });
-  const gold = mat(0xd8b25a, { roughness: 0.3, metalness: 0.9 });
-  const pavers = mat(0xffffff, { map: paverTex(), roughness: 0.9 });
-  const grass = mat(0xffffff, { map: grassTex(), roughness: 1 });
-  const ironM = mat(0x1f2324, { roughness: 0.5, metalness: 0.6 });
+  const louver = pbr('wood_planks_grey', { scale: 0.8, tint: 0x5a5a58 });
+  const doorM = pbr('brown_planks_08', { scale: 1.2, tint: 0x8a6a50, glow: 0xffa850, night: 0.5 });
+  const gold = pbr('painted_steel', { scale: 0.6, tint: 0xf0c060, metal: 0.95, rough: 0.35, bright: 1.6 });
+  const pavers = pbr('brushed_concrete', { scale: 2.5, tint: 0xe8e2d8, bright: 1.2 });
+  const grass = pbr('grass_ground', { scale: 5, tint: 0x80b060 });
+  const ironM = pbr('painted_steel', { scale: 0.8, tint: 0x2a2e30, metal: 0.6 });
+  const benchM = pbr('brown_planks_08', { scale: 1, tint: 0x9a7a5a });
   const lampM = lit(0xfff2d6, 0xffd08a, { night: 1.8, roughness: 0.3 });
   const glow = [stone, stoneFront, trim, glass, doorM, lampM, tilesDome];
 
@@ -404,8 +347,13 @@ export default function build() {
     B.add(cyl(0.22, 0.12, 0.3, ironM, x, 4.5, z, 6));
     B.add(mesh(new THREE.SphereGeometry(0.36, 10, 6), lampM, x, 4.95, z));
   }
-  for (const sx of [-1, 1]) for (const z of [31.5, 38.5]) B.add(box(0.6, 0.45, 2.4, mat(0x4a3628), sx * 19, 0, z));
-  B.build(group);
+  for (const sx of [-1, 1]) for (const z of [31.5, 38.5]) {
+    // park benches: slatted seat and back on cast-iron ends
+    for (const k of [0, 1, 2]) B.add(box(0.12, 0.04, 2.4, benchM, sx * (19 + (k - 1) * 0.15), 0.44, z));
+    for (const k of [0, 1]) B.add(box(0.04, 0.12, 2.4, benchM, sx * (19 + 0.3), 0.62 + k * 0.18, z));
+    for (const dz of [-1.05, 1.05]) B.add(box(0.5, 0.44, 0.06, ironM, sx * 19, 0, z + dz), box(0.06, 0.9, 0.06, ironM, sx * 19.3, 0, z + dz));
+  }
+  for (const m of B.build(group)) if (m.material === grass || m.material === pavers) { m.castShadow = false; m.userData.noShadow = true; }
 
   // trees (instanced)
   const trees = [];
@@ -418,19 +366,11 @@ export default function build() {
   // the Lindell lawn and Newstead side: pin oaks and maples
   const treeList = trees.map(([x, z, s]) => tree(x, 0, z, (7 + tr2() * 1.6) * s, 2.9 * s, { slot: tr2() < 0.6 ? SLOT.oak : SLOT.maple }));
 
-  // a few visitors on the plaza
-  const peopleG = [], pr = seeded(8);
-  const shirts = [0x2f4f7f, 0x8a3a3a, 0xd8d0c0, 0x3d5c3a, 0x6b5b8a, 0x222222];
-  const pb = batcher();
-  const pmats = shirts.map((c) => mat(c)), legM = mat(0x2c3442), skinM = mat(0xc89070, { roughness: 0.6 });
-  for (let i = 0; i < 9; i++) {
-    const x = (pr() - 0.5) * 30, z = 26 + pr() * 17, ry = pr() * 6;
-    const P = new THREE.Matrix4().compose(new THREE.Vector3(x, 0, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, ry, 0)), new THREE.Vector3(1, 1, 1));
-    pb.add(box(0.34, 0.86, 0.22, legM), null, P);
-    pb.add(box(0.44, 0.62, 0.26, pmats[i % pmats.length], 0, 0.86, 0), null, P);
-    pb.add(sphere12(0.115, skinM, 0, 1.62, 0), null, P);
-  }
-  pb.build(group);
+  // a few visitors on the plaza: scanned people
+  const pr = seeded(8), spots = [];
+  for (let i = 0; i < 12; i++) spots.push([(pr() - 0.5) * 30, 0.1, 26 + pr() * 17, pr() * 6]);
+  const people = crowdAt(spots, pr);
+  if (people) group.add(people);
   group.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
 
   return { group, glow, trees: treeList };
@@ -468,7 +408,6 @@ export default function build() {
   }
 }
 
-function sphere12(r, m, x, y, z) { const o = new THREE.Mesh(new THREE.SphereGeometry(r, 10, 6), m); o.position.set(x, y, z); return o; }
 function archRing(w, h, t) {
   const s = archPath(new THREE.Shape(), w + 2 * t, h + t, -0.3);
   s.holes.push(archPath(new THREE.Path(), w, h, 0));
