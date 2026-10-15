@@ -154,6 +154,21 @@ export class HoleTerrain {
       const c = this.greenPoly.settle(this.green.x, this.green.z, Math.min(3, this.greenPoly.R * 0.4));
       this.green = { x: c.x, z: c.z };
     }
+    // a drawn green gets an organic outline (gently lobed, a touch longer along
+    // the line of play), not a circle: real greens are shaped, never compass-drawn
+    if (!this.greenPoly && !hole.roundGreen) {
+      const n = hole.n || 1, R = this.greenR, fd = this.finalDir, fr = this.finalRight;
+      const ph1 = n * 1.31, ph2 = n * 2.17, ph3 = n * 0.73;
+      const pts = [];
+      for (let i = 0; i < 72; i++) {
+        const th = (i / 72) * Math.PI * 2;
+        const k = 1 + 0.11 * Math.sin(2 * th + ph1) + 0.07 * Math.sin(3 * th + ph2) + 0.04 * Math.sin(5 * th + ph3);
+        const along = Math.cos(th) * R * k * 1.12, across = Math.sin(th) * R * k * 0.93;
+        pts.push([this.green.x + fd.x * along + fr.x * across, this.green.z + fd.z * along + fr.z * across]);
+      }
+      this.greenPoly = new Outline(pts);
+      this.greenR = this.greenPoly.R;
+    }
     // Green contours: two soft swells/swales per green (deterministic per hole)
     // on top of the overall tilt, flattened around the pin like a real hole
     // location. Peak slopes stay around 2–3%.
@@ -183,7 +198,19 @@ export class HoleTerrain {
       const poly = new Outline(o.poly);
       return { x: poly.x, z: poly.z, dirx: this.finalDir.x, dirz: this.finalDir.z, rx: poly.R, rz: poly.R, poly };
     };
-    this.bunkers = (hole.bunkers || []).map((b) => (b.poly ? outline(b) : { ...place(b.t, b.off), rx: b.rx, rz: b.rz }));
+    // a drawn bunker is shaped too: kidney and lobed outlines round its ellipse
+    const shaped = (b, i) => {
+      const c = place(b.t, b.off), pts = [];
+      const ph = (hole.n || 1) * 3.1 + i * 1.7;
+      for (let k = 0; k < 48; k++) {
+        const th = (k / 48) * Math.PI * 2;
+        const f = 1 + 0.16 * Math.sin(2 * th + ph) + 0.09 * Math.sin(3 * th + ph * 1.3) - 0.12 * Math.max(0, Math.cos(th - ph)) ** 6;
+        const across = Math.cos(th) * b.rx * f, along = Math.sin(th) * b.rz * f;
+        pts.push([c.x + -c.dirz * across + c.dirx * along, c.z + c.dirx * across + c.dirz * along]);
+      }
+      return { ...outline({ poly: pts }), dirx: c.dirx, dirz: c.dirz };
+    };
+    this.bunkers = (hole.bunkers || []).map((b, i) => (b.poly ? outline(b) : shaped(b, i)));
     // shaping: mounds (+) and hollows (−) as soft Gaussian landforms
     this.mounds = (hole.mounds || []).map((m) => ({ ...place(m.t, m.off), r: m.r, h: m.h }));
     this.ponds = [];
@@ -434,7 +461,15 @@ export class HoleTerrain {
     // (LiDAR already holds the real bunker floors and faces)
     if (!this.lidar) for (const b of this.bunkers) {
       const q = this._ellipse(b, x, z);
-      if (q < 1.6) h += (-0.75 * smooth(1.15, 0, q) + 0.25 * smooth(1.6, 1.05, q) * smooth(0.9, 1.05, q)) * keepGreen;
+      if (q >= 1.7) continue;
+      // the face toward the green stands up: a molded lip of turf, the floor
+      // dished smoothly under it; the far side runs out low and flat
+      const gx = this.green.x - b.x, gz = this.green.z - b.z, gl = Math.hypot(gx, gz) || 1;
+      const ox = x - b.x, oz = z - b.z, ol = Math.hypot(ox, oz) || 1;
+      const face = Math.max(0, (ox * gx + oz * gz) / (ol * gl));
+      const lip = (0.18 + 0.42 * face) * smooth(1.7, 1.08, q) * smooth(0.86, 1.08, q);
+      const bowl = -(0.55 + 0.3 * face) * smooth(1.08, 0.1, q) ** 0.8;
+      h += (bowl + lip) * keepGreen;
     }
     return h;
   }

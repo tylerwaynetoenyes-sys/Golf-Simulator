@@ -188,7 +188,9 @@ def terrarium_fill(dst, size, step):
         if k not in _tcache:
             png = get(f'https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{zoom}/{tx}/{ty}.png')
             a = np.asarray(Image.open(io.BytesIO(png)).convert('RGB'), dtype=np.float64)
-            _tcache[k] = a[..., 0] * 256 + a[..., 1] + a[..., 2] / 256 - 32768
+            h = a[..., 0] * 256 + a[..., 1] + a[..., 2] / 256 - 32768
+            h[h < -500] = 0.0  # no-data pixels (black) over open water: sea level
+            _tcache[k] = h
         return _tcache[k]
 
     def px(X, Y):
@@ -218,6 +220,8 @@ def bake(name, size, step):
     filled = int(miss.sum())
     if filled:
         print(f'  {filled} samples ({100 * filled / h.size:.1f}%) outside the LiDAR: Terrarium tiles')
+    # deep pits are no-data that slipped through (over open water): sea level
+    h[h < -3] = 0.0
     lo, hi = float(np.nanmin(h)), float(np.nanmax(h))
     if hi - lo > 655:
         sys.exit(f'{name}: relief {hi - lo:.0f} m does not fit Uint16 centimetres')
