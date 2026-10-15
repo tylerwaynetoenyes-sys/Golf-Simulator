@@ -12,13 +12,25 @@ import * as THREE from 'three';
 
 // Club length (in), lie (°) and loft (°): typical modern specs
 const SPEC = {
+  DR9: { len: 45.5, lie: 58, loft: 9, kind: 'driver' },
   DR: { len: 45.5, lie: 58, loft: 10.5, kind: 'driver' },
+  DR12: { len: 45.5, lie: 58.5, loft: 12, kind: 'driver' },
   '3W': { len: 43, lie: 58.5, loft: 15, kind: 'wood' },
+  '5W': { len: 42.5, lie: 59, loft: 18, kind: 'wood' },
+  '7W': { len: 42, lie: 59.5, loft: 21, kind: 'wood' },
+  '3H': { len: 40.5, lie: 59.5, loft: 19, kind: 'wood' }, // hybrids: a smaller wood-style head
+  '4H': { len: 40, lie: 60, loft: 22, kind: 'wood' },
+  '3I': { len: 39, lie: 60.5, loft: 20, kind: 'iron' },
+  '4I': { len: 38.5, lie: 61, loft: 22, kind: 'iron' },
   '5I': { len: 38, lie: 61.5, loft: 24, kind: 'iron' },
+  '6I': { len: 37.5, lie: 62, loft: 27, kind: 'iron' },
   '7I': { len: 37, lie: 62.5, loft: 31, kind: 'iron' },
+  '8I': { len: 36.5, lie: 63, loft: 35, kind: 'iron' },
   '9I': { len: 36, lie: 63.5, loft: 39, kind: 'iron' },
   PW: { len: 35.75, lie: 64, loft: 45, kind: 'wedge' },
+  GW: { len: 35.5, lie: 64, loft: 50, kind: 'wedge' },
   SW: { len: 35.25, lie: 64, loft: 56, kind: 'wedge' },
+  LW: { len: 35, lie: 64, loft: 60, kind: 'wedge' },
 };
 const IN = 0.0254;
 const DOWNSWING = 0.26; // s from the top to impact (tour tempo is ~3:1, ~0.25 s down)
