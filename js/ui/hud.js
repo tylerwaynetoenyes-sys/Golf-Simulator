@@ -24,6 +24,8 @@ export class HUD {
     this.card = $('#shotCard');
     this.commentEl = $('#commentary');
     this.map = $('#minimap');
+    // tap the map to enlarge it (and again to shrink it)
+    $('#minimapWrap')?.addEventListener('click', () => $('#minimapWrap').classList.toggle('big'));
     this.mapCtx = this.map.getContext('2d');
     // the course map draws in CSS pixels on a 2× canvas
     this.mapDpr = 2;
@@ -186,6 +188,23 @@ export class HUD {
     el.dataset.lie = lie.kind;
     el.innerHTML = `<b>${escape(lie.label)}</b>${lie.note ? `<span>${escape(lie.note)}</span>` : ''}`;
   }
+
+  /** The lie panel: magnifier image, lie name, distance and rise/fall to the pin. Null hides it. */
+  showLiePanel(info) {
+    const el = $('#liePanel');
+    if (!el) return;
+    if (!info) { el.hidden = true; return; }
+    el.hidden = false;
+    if (info.image) $('#lieCanvas').getContext('2d').putImageData(info.image, 0, 0);
+    $('#lieName').textContent = info.name;
+    $('#lieDist').textContent = info.dist;
+    $('#lieUnit').textContent = info.unit;
+    const e = $('#lieElev');
+    e.textContent = info.elev || '';
+    e.className = `li-elev ${info.up ? 'up' : 'down'}`;
+  }
+
+  setLieClub(short) { const c = $('#lieClub'); if (c) c.textContent = short; }
 
   /** Mulligan button: null hides it, otherwise {left} (Infinity = unlimited). */
   setMulligan(state) {
@@ -481,7 +500,7 @@ export class HUD {
       minR = Math.min(minR, r - hw); maxR = Math.max(maxR, r + hw);
     }
     maxF += T.greenR + 16; minF -= 10;
-    const top = 26, bottom = 10;
+    const top = 50, bottom = 24;
     const scale = Math.min((H - top - bottom) / (maxF - minF), (W - 14) / (maxR - minR));
     const cR = (minR + maxR) / 2;
     const toMap = (x, z) => {
@@ -503,13 +522,42 @@ export class HUD {
     const c = cv.getContext('2d');
     c.setTransform(k, 0, 0, k, 0, 0);
     const { toMap, fromMap, scale } = frame;
+    // real-ground courses: the aerial photo under the hole, as on Trackman and
+    // GSPro (EOxCloudless, warped from the DEM frame with one affine transform)
+    const sat = T.F?.d?.sat;
+    this._mapPhoto = false;
+    if (sat?.image) {
+      const im = sat.image, size = sat.meta.size;
+      const toImg = (mx, my) => {
+        const [lx, lz] = fromMap(mx, my);
+        const [X, Z] = T.F.toDem(lx, lz);
+        return [(X / size + 0.5) * im.width, (Z / size + 0.5) * im.height];
+      };
+      const p0 = toImg(0, 0), p1 = toImg(W, 0), p2 = toImg(0, H);
+      const ax = (p1[0] - p0[0]) / W, ay = (p1[1] - p0[1]) / W, bx = (p2[0] - p0[0]) / H, by = (p2[1] - p0[1]) / H;
+      const det = ax * by - bx * ay;
+      if (Math.abs(det) > 1e-9) {
+        // inverse: image pixels → map pixels
+        const i11 = by / det, i12 = -bx / det, i21 = -ay / det, i22 = ax / det;
+        const e1 = -(i11 * p0[0] + i12 * p0[1]), e2 = -(i21 * p0[0] + i22 * p0[1]);
+        c.save();
+        c.setTransform(k * i11, k * i21, k * i12, k * i22, k * e1, k * e2);
+        c.imageSmoothingQuality = 'high';
+        c.drawImage(im, 0, 0);
+        c.restore();
+        c.fillStyle = 'rgba(8,12,10,0.18)'; // a touch darker so the overlays read
+        c.fillRect(0, 0, W, H);
+        this._mapPhoto = true;
+      }
+    }
     // the land, and the sea or lake beyond it, from the terrain itself
     const cell = 3;
     for (let y = 0; y < H; y += cell) {
       for (let x = 0; x < W; x += cell) {
         const [wx, wz] = fromMap(x + cell / 2, y + cell / 2);
         const sea = T.seaLevel != null && T.meshHeight(wx, wz) < T.seaLevel;
-        c.fillStyle = sea ? 'rgba(38,92,150,0.9)' : 'rgba(34,52,32,0.55)';
+        if (this._mapPhoto && !sea) continue; // the photo shows the land
+        c.fillStyle = sea ? (this._mapPhoto ? 'rgba(38,92,150,0.45)' : 'rgba(38,92,150,0.9)') : 'rgba(34,52,32,0.55)';
         c.fillRect(x, y, cell, cell);
       }
     }
@@ -528,8 +576,8 @@ export class HUD {
       c.closePath(); c.fill();
     };
     // rough corridor, then the fairway: mown stripes like the course
-    ribbon((s) => T.fairwayHalf(s) + 30, 'rgba(62,92,46,0.42)', -10);
-    ribbon((s) => T.fairwayHalf(s), 'rgba(118,176,86,0.62)');
+    ribbon((s) => T.fairwayHalf(s) + 30, this._mapPhoto ? 'rgba(62,92,46,0.22)' : 'rgba(62,92,46,0.42)', -10);
+    ribbon((s) => T.fairwayHalf(s), this._mapPhoto ? 'rgba(126,186,92,0.5)' : 'rgba(118,176,86,0.62)');
     // out of bounds: white dashes where the stakes are
     c.strokeStyle = 'rgba(255,255,255,0.32)'; c.setLineDash([2, 3]); c.lineWidth = 1;
     for (const side of [-1, 1]) {
@@ -620,22 +668,45 @@ export class HUD {
       // ball to pin
       c.strokeStyle = 'rgba(255,213,74,0.35)'; c.setLineDash([1, 3]);
       c.beginPath(); c.moveTo(bx, by); c.lineTo(px, py); c.stroke(); c.setLineDash([]);
-      // the club's carry on the aim line, with its landing area
+      // the club's carry on the aim line: a white dispersion fan from the ball
+      // (±4.5°), the club tag and carry at the landing spot, the rise or fall
+      // there, and what's left from there to the pin
       const id = course.game.club?.id;
       const carry = (STOCK_CARRY[id] || 0) * YD;
       if (carry) {
         const a = ((setup.heading + aimDeg) * Math.PI) / 180;
         const lx = o.x + Math.sin(a) * carry, lz = o.z - Math.cos(a) * carry;
         const [ax, ay] = toMap(lx, lz);
-        c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 1.2;
+        const spread = 0.078;
+        const L1 = carry * 1.06;
+        const fan = [[a - spread, L1], [a + spread, L1]].map(([q, d]) => toMap(o.x + Math.sin(q) * d, o.z - Math.cos(q) * d));
+        const g2 = c.createLinearGradient(bx, by, ax, ay);
+        g2.addColorStop(0, 'rgba(255,255,255,0.02)'); g2.addColorStop(1, 'rgba(255,255,255,0.28)');
+        c.fillStyle = g2;
+        c.beginPath(); c.moveTo(bx, by); c.lineTo(fan[0][0], fan[0][1]); c.lineTo(fan[1][0], fan[1][1]); c.closePath(); c.fill();
+        c.strokeStyle = 'rgba(255,255,255,0.9)'; c.lineWidth = 1.2; c.setLineDash([3, 3]);
         c.beginPath(); c.moveTo(bx, by); c.lineTo(ax, ay); c.stroke();
-        // dispersion: about ±6% of carry long and short, ±4.5° wide
-        const ang = Math.atan2(ax - bx, -(ay - by));
-        c.save(); c.translate(ax, ay); c.rotate(ang);
-        c.fillStyle = 'rgba(236,208,143,0.22)'; c.strokeStyle = 'rgba(236,208,143,0.9)'; c.lineWidth = 1;
-        c.beginPath(); c.ellipse(0, 0, Math.max(3, carry * Math.tan(0.078) * scale), Math.max(4, carry * 0.06 * scale), 0, 0, Math.PI * 2); c.fill(); c.stroke();
-        c.restore();
-        label(`${yd(carry)}`, ax + 9, ay, { size: 10, color: '#ecd08f', weight: 600 });
+        // landing to pin
+        c.strokeStyle = 'rgba(255,255,255,0.55)';
+        c.beginPath(); c.moveTo(ax, ay); c.lineTo(px, py); c.stroke(); c.setLineDash([]);
+        c.fillStyle = '#fff'; c.beginPath(); c.arc(ax, ay, 2.6, 0, Math.PI * 2); c.fill();
+        // club tag + carry, and the elevation change at the landing spot
+        const rise = (T.meshHeight(lx, lz) - (o.y - 0.04)) * (U.isMetric() ? 1 : 3.2808);
+        const left = Math.hypot(T.pin.x - lx, T.pin.z - lz);
+        const right = ax < W - 64;
+        const tx = right ? ax + 8 : ax - 8;
+        const tag = course.game.club?.short || id;
+        c.font = font(700, 9.5);
+        const w1 = c.measureText(tag).width + 8;
+        const cy = ay - 6;
+        const bxs = right ? tx : tx - w1 - 46;
+        c.fillStyle = 'rgba(8,10,12,0.82)'; c.fillRect(bxs, cy - 7, w1 + 46, 14);
+        c.fillStyle = '#fff'; c.fillRect(bxs, cy - 7, w1, 14);
+        c.fillStyle = '#0b0d0f'; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(tag, bxs + 4, cy + 0.5);
+        c.fillStyle = '#fff'; c.font = font(600, 9.5); c.fillText(`${yd(carry)} ${unit}`, bxs + w1 + 4, cy + 0.5);
+        label(`${rise >= 0 ? '▲' : '▼'}${Math.abs(rise).toFixed(1)} ${U.isMetric() ? 'm' : 'ft'}`, right ? bxs + 2 : bxs + w1 + 44, cy + 13, { size: 8.5, align: right ? 'left' : 'right', color: 'rgba(255,255,255,0.85)' });
+        const mx = (ax + px) / 2, my = (ay + py) / 2;
+        label(`${yd(left)} ${unit}`, mx + 6, my, { size: 9, color: '#fff', weight: 600 });
       }
     }
     // flag + distance to the pin
@@ -673,24 +744,35 @@ export class HUD {
       c.fillStyle = '#fff'; c.shadowColor = '#ecd08f'; c.shadowBlur = 8;
       c.beginPath(); c.arc(x, y, 3.4, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
     }
-    // header: hole, par, length
-    c.fillStyle = 'rgba(11,13,15,0.55)';
-    c.fillRect(0, 0, W, 20);
-    label(`HOLE ${course.hole.n}`, 7, 10.5, { size: 9.5, weight: 600, color: '#ecd08f' });
-    label(`PAR ${course.hole.par} · ${yd(T.length)} ${unit.toUpperCase()}`, 52, 10.5, { size: 9.5, weight: 500, color: 'rgba(255,255,255,0.8)' });
+    // header: course, then hole · length · par · stroke index (as on Trackman)
+    c.fillStyle = 'rgba(11,13,15,0.72)';
+    c.fillRect(0, 0, W, 30);
+    label(course.name || '', W / 2, 8.5, { size: 8, weight: 500, align: 'center', color: 'rgba(255,255,255,0.7)' });
+    const si = /Stroke index (\d+)/i.exec(course.hole.note || '')?.[1];
+    const parts = [`${course.hole.n}`, `${yd(T.length)} ${unit}`, `Par ${course.hole.par}`, si ? `Index ${si}` : null].filter(Boolean);
+    label(parts.join('   '), W / 2, 21, { size: 10, weight: 650, align: 'center', color: '#fff' });
+    // aim readouts along the bottom: aim angle, and the rise or fall to the pin
+    if (o && setup && !setup.putting) {
+      c.fillStyle = 'rgba(11,13,15,0.72)';
+      c.fillRect(0, H - 18, W, 18);
+      const aim = aimDeg || 0;
+      label(`${Math.abs(aim).toFixed(1)}° ${aim > 0.05 ? 'RIGHT' : aim < -0.05 ? 'LEFT' : 'AIM'}`, 8, H - 9, { size: 9, weight: 600 });
+      const dz = (T.meshHeight(T.pin.x, T.pin.z) - (o.y - 0.04)) * (U.isMetric() ? 1 : 3.2808);
+      label(`${dz >= 0 ? '▲' : '▼'} ${Math.abs(dz).toFixed(1)} ${U.isMetric() ? 'm' : 'ft'} to pin`, W - 8, H - 9, { size: 9, weight: 600, align: 'right' });
+    }
     // wind, turned into the map's frame
     const wv = world.env.wind(0, { gust: false });
     if (wv.mph >= 0.5) {
       const vf = wv.x * fx + wv.z * fz, vr = wv.x * rx + wv.z * rz;
       const ang = Math.atan2(vr, vf);
-      const cx = W - 34, cy = 10.5;
+      const cx = 12, cy = 42;
       c.save(); c.translate(cx, cy); c.rotate(ang);
       c.strokeStyle = '#fff'; c.fillStyle = '#fff'; c.lineWidth = 1.3;
       c.beginPath(); c.moveTo(0, 5); c.lineTo(0, -4); c.stroke();
       c.beginPath(); c.moveTo(0, -6); c.lineTo(-3, -2); c.lineTo(3, -2); c.closePath(); c.fill();
       c.restore();
       const v = U.isMetric() ? `${(wv.mph * MPH).toFixed(0)}` : `${Math.round(wv.mph)}`;
-      label(v, W - 25, 10.5, { size: 9.5, weight: 600 });
+      label(v, 21, 42, { size: 9.5, weight: 600 });
     }
   }
 }

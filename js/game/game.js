@@ -249,11 +249,94 @@ export class Game {
     this.refreshMode();
     this.hud.setTurn(this._turnInfo(), this.roster.multi || m.course);
     this.hud.setLie(m.course ? this._lieChip(s) : null);
+    this._scheduleLieView();
+    this._buildCallouts();
     this._syncMulligan();
     this.hud.hideCard();
     this.hud.setSkip(false);
     if (this.roster.multi && prevPlayer && prevPlayer.id !== this.player.id && !immediate) {
       audio.click();
+    }
+  }
+
+  /**
+   * The lie magnifier: once the ball is set up and the dense rough round it
+   * has grown, render the close-up once and fill the panel.
+   */
+  _scheduleLieView() {
+    clearTimeout(this._lieTimer);
+    const m = this.mode, s = this.setup;
+    if (!m.course || !s || s.putting) { this.hud.showLiePanel(null); return; }
+    this._lieTimer = setTimeout(() => {
+      if (this.setup !== s || this.state !== 'ready') return;
+      const w = this.world, T = m.T;
+      const img = w.renderLieView(s.origin, s.heading + this.aimDeg);
+      const toPin = Math.hypot(T.pin.x - s.origin.x, T.pin.z - s.origin.z);
+      const dz = w.groundFn(T.pin.x, T.pin.z) - (s.origin.y - 0.04);
+      const name = s.teed ? 'Tee' : ({ fairway: 'Fairway', rough: 'Rough', sand: 'Bunker', fringe: 'Fringe', green: 'Green', tee: 'Tee' }[s.lie] || 'Lie');
+      this.hud.showLiePanel({
+        image: img, name, dist: U.dist(toPin), unit: U.distUnit(), up: dz >= 0,
+        elev: `${dz >= 0 ? '▲' : '▼'} ${U.isMetric() ? Math.abs(dz).toFixed(1) + ' m' : (Math.abs(dz) * 3.2808).toFixed(1) + ' ft'}`,
+      });
+      this.hud.setLieClub(this.club?.short || '');
+    }, 1100);
+  }
+
+  /**
+   * Carry callouts in the scene (after Golfzon): the front of the green, any
+   * water to carry, and bunkers near the landing area, each at its spot with
+   * the distance from the ball. Built once per setup; projected each frame.
+   */
+  _buildCallouts() {
+    const host = document.getElementById('callouts');
+    if (!host) return;
+    host.innerHTML = '';
+    this._callouts = [];
+    const m = this.mode, s = this.setup;
+    if (!m.course || !s || s.putting) return;
+    const T = m.T, o = s.origin, w = this.world;
+    const toPin = Math.hypot(T.pin.x - o.x, T.pin.z - o.z);
+    const dx = (T.pin.x - o.x) / toPin, dz = (T.pin.z - o.z) / toPin;
+    const rx = -dz, rz = dx;
+    const list = [];
+    const at = (d, lat = 0) => ({ x: o.x + dx * d + rx * lat, z: o.z + dz * d + rz * lat });
+    const gc = Math.hypot(T.green.x - o.x, T.green.z - o.z);
+    if (gc - T.greenR > 25) list.push({ d: gc - T.greenR, label: 'Green edge', p: at(gc - T.greenR) });
+    for (const p of T.ponds) {
+      if (p.island) continue;
+      const vx = p.x - o.x, vz = p.z - o.z;
+      const along = vx * dx + vz * dz, lat = vx * rx + vz * rz;
+      const r = Math.max(p.rx || 0, p.rz || 0, p.poly ? p.poly.R : 0);
+      if (along - r < 15 || along - r > toPin + 10 || Math.abs(lat) > r + 25) continue;
+      list.push({ d: along + r * 0.8, label: 'Water carry', p: at(along + r * 0.8, lat * 0.5) });
+    }
+    // the sea or a river across the line (Pebble's 8th, the Seine in Paris)
+    if (T.seaLevel != null) {
+      let first = null, last = null;
+      for (let d = 15; d < toPin - 5; d += 4) {
+        const q = at(d);
+        if (T.meshHeight(q.x, q.z) < T.seaLevel) { if (first == null) first = d; last = d; }
+      }
+      if (last != null && last - first > 8) list.push({ d: last + 2, label: 'Water carry', p: at(last + 2) });
+    }
+    if (T.ponds.some((p) => p.island)) list.push({ d: gc - T.greenR, label: 'Island green', p: at(gc - T.greenR) });
+    for (const b of T.bunkers) {
+      const vx = b.x - o.x, vz = b.z - o.z;
+      const along = vx * dx + vz * dz, lat = vx * rx + vz * rz;
+      if (along < 60 || along > toPin - T.greenR - 15 || Math.abs(lat) > 35) continue;
+      const r = Math.max(b.rx || 0, b.rz || 0);
+      list.push({ d: along + r, label: 'Bunker carry', p: at(along + r, lat) });
+    }
+    list.sort((a, b) => a.d - b.d);
+    // keep it readable: the green, and at most two hazards, a fair way apart
+    const keep = [];
+    for (const c of list) if (!keep.some((k) => Math.abs(k.d - c.d) < 18) && (c.label !== 'Bunker carry' || keep.filter((k) => k.label === 'Bunker carry').length < 1)) keep.push(c);
+    for (const c of keep.slice(0, 3)) {
+      const el = document.createElement('div');
+      el.className = 'callout';
+      el.innerHTML = `<span class="co-dot"></span><span class="co-line"></span><span class="co-text">${c.label}<b>${U.dist(c.d)}${U.isMetric() ? ' m' : ''}</b></span>`;
+      host.appendChild(el);
+      this._callouts.push({ el, x: c.p.x, z: c.p.z, y: w.groundFn(c.p.x, c.p.z) + 0.3 });
     }
   }
 
@@ -313,6 +396,7 @@ export class Game {
   selectClub(id, quiet = false) {
     this.club = clubById(id);
     this.hud.setClub(this.club.id);
+    this.hud.setLieClub(this.club.short);
     if (this.state === 'ready') this._addressClub();
     if (!quiet) audio.tick();
     this._updateHelper();
@@ -499,6 +583,8 @@ export class Game {
   }
 
   handleLaunch(launch, source = 'demo') {
+    clearTimeout(this._lieTimer);
+    this.hud.showLiePanel(null);
     if (this.state === 'idle' || this.state === 'swinging') return;
     audio.init();
     this._ensureReady();
@@ -990,6 +1076,40 @@ export class Game {
   }
 
   _updateLabels() {
+    // carry callouts: shown while setting up a shot
+    if (this._callouts?.length) {
+      const on = this.state === 'ready' && !panelOpen();
+      const shown = [];
+      for (const c of this._callouts) {
+        const pt = on ? this._project(c.x, c.y, c.z) : null;
+        if (!pt) { if (c.el.style.display !== 'none') c.el.style.display = 'none'; continue; }
+        c.el.style.display = '';
+        shown.push({ c, x: pt.x - 4.5, y: pt.y });
+      }
+      // nearer callouts sit lower on screen; stack any that would overlap
+      shown.sort((a, b) => b.y - a.y);
+      for (let i = 1; i < shown.length; i++) {
+        const prev = shown[i - 1];
+        if (prev.y - shown[i].y < 24 && Math.abs(prev.x - shown[i].x) < 240) shown[i].y = prev.y - 24;
+      }
+      for (const s2 of shown) s2.c.el.style.transform = `translate(${s2.x.toFixed(1)}px, ${s2.y.toFixed(1)}px) translate(0, -50%)`;
+    }
+    // the wind dial, turned to the view: up is a tailwind
+    {
+      const wv = this.world.env.wind(0, { gust: false });
+      const cam = this.world.camera;
+      const fwd = cam.getWorldDirection(this._fwd || (this._fwd = new THREE.Vector3()));
+      const ang = Math.atan2(wv.x * -fwd.z + wv.z * fwd.x, wv.x * fwd.x + wv.z * fwd.z);
+      const mph = wv.mph;
+      const txt = U.isMetric() ? (mph * 0.44704).toFixed(0) : Math.round(mph).toString();
+      if (this._windTxt !== txt) {
+        this._windTxt = txt;
+        document.getElementById('windMph').textContent = txt;
+        document.getElementById('windUnit').textContent = U.isMetric() ? 'm/s' : 'mph';
+      }
+      const deg = Math.round((ang * 180) / Math.PI); // clockwise from straight ahead
+      if (this._windDeg !== deg) { this._windDeg = deg; document.getElementById('windArrow').style.transform = `rotate(${deg}deg)`; }
+    }
     const el = this._pinEl || (this._pinEl = document.getElementById('pinLabel'));
     const tp = this._targetPoint();
     const show = tp && (this.state === 'ready') && !panelOpen() && !this.setup.putting;
@@ -999,8 +1119,15 @@ export class Game {
       el.hidden = false;
       el.style.transform = `translate(${pt.x.toFixed(1)}px, ${pt.y.toFixed(1)}px) translate(-50%, -100%)`;
       const o = this.setup.origin;
-      const label = `${U.dist(Math.hypot(tp.x - o.x, tp.z - o.z))} ${U.distUnit()}`;
-      if (this._pinText !== label) { this._pinText = label; document.getElementById('pinDist').textContent = label; }
+      // distance, and the rise or fall to it (the callout over the flag)
+      const dz = this.world.groundFn(tp.x, tp.z) - (o.y - 0.04);
+      const elev = U.isMetric() ? `${Math.abs(dz).toFixed(1)} m` : `${Math.round(Math.abs(dz) * 3.2808)} ft`;
+      const label = `${U.dist(Math.hypot(tp.x - o.x, tp.z - o.z))}|${U.distUnit()}|${dz >= 0 ? 'up' : 'down'}|${elev}`;
+      if (this._pinText !== label) {
+        this._pinText = label;
+        const [d, u, dir, e] = label.split('|');
+        document.getElementById('pinDist').innerHTML = `<b>${d}</b><small>${u}</small><i class="${dir}">${dir === 'up' ? '▲' : '▼'} ${e}</i>`;
+      }
     }
     // other players' balls
     const tags = this.world.markers.items.map((m) => ({ ...m, pt: this.state === 'ready' || this.state === 'rest' ? this._project(m.x, m.y + 0.9, m.z) : null }));

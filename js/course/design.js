@@ -55,7 +55,7 @@ export function enrichHole(hole) {
     add(bunkers, { t: +(1 + (gr * 0.5) / L).toFixed(3), off: gr + 4, rx: 6.5, rz: 4.5 }, 3);
   }
   // a pond on some par 3s, short and to the side of the line
-  if (hole.par === 3 && !water.length && hole.n % 3 === 0) {
+  if (hole.par === 3 && !water.length && !hole.carryWater && hole.n % 3 === 0) {
     add(water, { t: 0.62, off: -side * (gr * 0.6 + 6), rx: 13, rz: 18, level: -1 }, 6);
   }
   // shaping: mounds along the rough and a hollow or two short of the green

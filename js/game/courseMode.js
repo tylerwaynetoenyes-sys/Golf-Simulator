@@ -501,7 +501,9 @@ export class CourseMode {
     const rows = this.players.map((p) => {
       const t = this.toPar(p.id);
       const b = this.ball?.get(p.id);
-      const live = b && !b.holed && !b.pickedUp && b.strokes > 0 ? ` · ${b.strokes} on ${this.hole.n}` : '';
+      // on the hole: strokes so far and how far each ball is from the pin (as on Trackman)
+      const away = b && !b.holed && !b.pickedUp && this.T ? ` · ${dist(this.T.toPin(b.x, b.z))} ${distUnit()}` : '';
+      const live = b && !b.holed && !b.pickedUp && b.strokes > 0 ? ` · ${b.strokes} on ${this.hole.n}${away}` : away;
       return { id: p.id, name: p.name, color: p.color, value: t.toPar, display: fmtToPar(t.toPar), sub: `thru ${t.thru}${live}` };
     }).sort((a, b) => a.value - b.value);
     const teams = this.roster.teams().map((t) => {

@@ -147,6 +147,40 @@ export class World {
     this.terrain.setCtpGreen();
   }
 
+  /**
+   * The lie view: a close-up of the ball from just behind it, rendered once
+   * into a small offscreen target and read back (no per-frame cost). Returns
+   * ImageData, or null.
+   */
+  renderLieView(pos, headingDeg, size = 176) {
+    const r = this.r.renderer;
+    if (!this._lieRT) {
+      this._lieRT = new THREE.WebGLRenderTarget(size, size, { samples: 4 });
+      this._lieRT.texture.colorSpace = THREE.SRGBColorSpace;
+      this._lieCam = new THREE.PerspectiveCamera(32, 1, 0.02, 400);
+      this._liePx = new Uint8Array(size * size * 4);
+    }
+    const cam = this._lieCam;
+    const a = (headingDeg * Math.PI) / 180;
+    const fx = Math.sin(a), fz = -Math.cos(a);
+    const by = this.ball.mesh.position.y;
+    cam.position.set(pos.x - fx * 0.42 + fz * 0.12, by + 0.22, pos.z - fz * 0.42 - fx * 0.12);
+    cam.lookAt(pos.x + fx * 0.05, by, pos.z + fz * 0.05);
+    const clubVis = this.club.root.visible;
+    this.club.root.visible = false;
+    const prevTarget = r.getRenderTarget();
+    r.setRenderTarget(this._lieRT);
+    r.clear();
+    r.render(this.scene, cam);
+    r.readRenderTargetPixels(this._lieRT, 0, 0, size, size, this._liePx);
+    r.setRenderTarget(prevTarget);
+    this.club.root.visible = clubVis;
+    // flip rows (GL reads bottom-up)
+    const out = new ImageData(size, size);
+    for (let y = 0; y < size; y++) out.data.set(this._liePx.subarray((size - 1 - y) * size * 4, (size - y) * size * 4), y * size * 4);
+    return out;
+  }
+
   update(dt, ballPos, playT, render = true) {
     this.time += dt;
     const t = this.time;

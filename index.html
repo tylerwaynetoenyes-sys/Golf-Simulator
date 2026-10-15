@@ -212,8 +212,16 @@
     <div class="pin-label" id="pinLabel" hidden><span class="pin-dist" id="pinDist"></span><span class="pin-stem"></span></div>
 
     <!-- mini map -->
+    <div class="callouts" id="callouts" aria-hidden="true"></div>
+    <div class="lie-panel" id="liePanel" hidden>
+      <div class="lie-view"><canvas id="lieCanvas" width="176" height="176"></canvas><span class="lie-name" id="lieName">Tee</span></div>
+      <div class="lie-info"><div class="li-dist"><b id="lieDist">0</b><small id="lieUnit">yd</small></div><div class="li-elev" id="lieElev"></div></div>
+      <div class="li-club" id="lieClub">DR</div>
+    </div>
+    <div class="wind-dial" id="windDial" aria-label="Wind"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="29" fill="rgba(11,13,15,0.78)" stroke="rgba(255,255,255,0.9)" stroke-width="3"/><g id="windArrow"><path d="M32 2 L39 12 L25 12 Z" fill="#fff"/></g></svg><b id="windMph">0</b><small id="windUnit">mph</small></div>
     <div class="minimap glass" id="minimapWrap" aria-hidden="true">
       <canvas id="minimap" width="360" height="520"></canvas>
+      <span class="map-expand" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M9.5 2.5h4v4M13.5 2.5l-5 5M6.5 13.5h-4v-4M2.5 13.5l5-5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
     </div>
   </div>
 
