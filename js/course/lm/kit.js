@@ -10,6 +10,7 @@
 // `trees` are planted by the course with its real tree models (impostors at
 // range, collision where in play) rather than modelled into the group.
 import * as THREE from 'three';
+import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createWaterMaterial } from '../../scene/river.js';
 
 export const FT = 0.3048;
@@ -27,6 +28,29 @@ export const tree = (x, y, z, h, crown, { slot = null, conifer = false } = {}) =
 let _water = null;
 export function landmarkWater() {
   return (_water ||= createWaterMaterial({ y: 0, tint: 0x1f3236, flow: 0.15 }));
+}
+
+/**
+ * A weathered boulder of radius r: an icosphere pushed about by layered
+ * noise, smooth-shaded (lay pbr('rock_face_03') or similar on it). `flat`
+ * squashes it, `detail` is the icosphere's subdivision.
+ */
+export function boulderGeometry(r, rnd = Math.random, { detail = 3, flat = 0.75 } = {}) {
+  const g = new THREE.IcosahedronGeometry(1, detail);
+  const p = g.attributes.position, k = [rnd() * 9, rnd() * 9, rnd() * 9];
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    // broad swells, ridged fractures, then fine pitting
+    const n = Math.sin(x * 2.1 + k[0]) * Math.sin(y * 1.7 + k[1]) * Math.sin(z * 2.3 + k[2]) * 0.18
+      - Math.abs(Math.sin(x * 4.3 + y * 2.9 + k[1]) * Math.sin(z * 4.1 - y * 3.3 + k[2])) * 0.16
+      + Math.sin(x * 11.3 + k[2]) * Math.sin(y * 9.7 + k[0]) * Math.sin(z * 10.9 + k[1]) * 0.035;
+    const s = r * (1 + n);
+    p.setXYZ(i, x * s, y * s * flat, z * s);
+  }
+  g.deleteAttribute('normal'); g.deleteAttribute('uv');
+  const m = mergeVertices(g);
+  m.computeVertexNormals();
+  return m;
 }
 
 export function mat(color, opts = {}) {

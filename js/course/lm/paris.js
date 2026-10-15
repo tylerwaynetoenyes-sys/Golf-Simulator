@@ -11,7 +11,9 @@
 //     ~10 m high with a waterfall into a pool
 // Far landmarks are modelled in map axes (+x east, +z south).
 import * as THREE from 'three';
-import { mat, lit, box, cyl, sphere, seeded, canvasTex, facadeMaterial } from './kit.js';
+import { mat, lit, box, cyl, sphere, seeded, canvasTex, facadeMaterial, boulderGeometry, landmarkWater } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
+import { Batch, bx, place } from './riverfront.js';
 import { model } from '../../scene/models.js';
 
 const BROWN = 0x6e5a42;
@@ -170,26 +172,42 @@ function eiffel() {
 }
 
 function arcdetriomphe() {
+  // cut limestone: 50 m tall, 45 m wide, 22 m deep; the great arch through the
+  // long faces (29.19 × 14.62 m), the smaller arches through the short faces
+  // (18.68 × 8.44 m), the frieze, the cornice and the attic with its shields
+  const stone = pbr('sandstone_blocks_08', { scale: 5, tint: 0xf4ecdc, bright: 1.35, glow: 0xffe0b0, night: 0.7 });
+  const carved = pbr('white_plaster_02', { scale: 1.5, tint: 0xf0e6d4, bright: 1.6 });
+  const B = new Batch();
+  const W = 45, D = 22, H = 50, ga = 7.31, gh = 29.19, sa = 4.22, sh = 18.68, base = H - 9;
+  const archHole = (path, half, h) => { path.moveTo(-half, 0); path.lineTo(-half, h - half); path.absarc(0, h - half, half, Math.PI, 0, true); path.lineTo(half, 0); path.closePath(); return path; };
+  // the two piers, each pierced by the side arch (shape across Z, extruded along X)
+  const pw = W / 2 - ga;
+  for (const s of [-1, 1]) {
+    const sp = new THREE.Shape(); sp.moveTo(-D / 2, 0); sp.lineTo(D / 2, 0); sp.lineTo(D / 2, base); sp.lineTo(-D / 2, base); sp.closePath();
+    sp.holes.push(archHole(new THREE.Path(), sa, sh));
+    B.add(stone, place(new THREE.ExtrudeGeometry(sp, { depth: pw, bevelEnabled: false, curveSegments: 12 }).rotateY(Math.PI / 2), s > 0 ? ga : -W / 2, 0, 0));
+    // the sculpture groups on the pillars' faces (Rude's Marseillaise and the rest), as carved panels
+    for (const z of [D / 2, -D / 2]) B.add(carved, bx(pw * 0.62, 11, 1.2, s * (ga + pw / 2), 4.5, z + Math.sign(z) * 0.6));
+    for (const z of [D / 2, -D / 2]) B.add(carved, bx(pw * 0.7, 5, 0.6, s * (ga + pw / 2), 22, z + Math.sign(z) * 0.3));
+  }
+  // the vault over the great arch (shape across X, extruded along Z)
+  const vs = new THREE.Shape(); vs.moveTo(-ga, 0); vs.lineTo(ga, 0); vs.lineTo(ga, base); vs.lineTo(-ga, base); vs.closePath();
+  vs.holes.push(archHole(new THREE.Path(), ga - 0.001, gh));
+  B.add(stone, new THREE.ExtrudeGeometry(vs, { depth: D, bevelEnabled: false, curveSegments: 16 }).translate(0, 0, -D / 2));
+  // the impost band at the springing of the great arch, the frieze, the cornice, the attic and its shields
+  B.add(carved, bx(W + 0.6, 1.0, D + 0.6, 0, gh - ga - 0.5, 0));
+  B.add(carved, bx(W + 0.8, 3.0, D + 0.8, 0, base - 5, 0));
+  B.add(stone, bx(W + 1.5, 2.2, D + 1.5, 0, base - 2, 0));
+  B.add(stone, bx(W, 9, D, 0, base, 0), bx(W + 1, 1, D + 1, 0, H, 0));
+  for (let i = 0; i < 6; i++) for (const z of [D / 2 + 0.2, -D / 2 - 0.2]) B.add(carved, place(new THREE.CylinderGeometry(1.4, 1.4, 0.4, 16).rotateX(Math.PI / 2), -W / 2 + 3.75 + i * 7.5, base + 4.5, z));
   const g = new THREE.Group();
-  const stone = lit(0xd9cfb9, 0xffe0b0, { night: 0.7 });
-  const W = 45, D = 22, H = 50;
-  // the body with the great arch (29.19 × 14.62) cut through the long faces
-  const s = new THREE.Shape();
-  s.moveTo(-W / 2, 0); s.lineTo(W / 2, 0); s.lineTo(W / 2, H - 9); s.lineTo(-W / 2, H - 9); s.closePath();
-  const hole = new THREE.Path();
-  hole.moveTo(-7.31, 0); hole.lineTo(-7.31, 29.19 - 7.31); hole.absarc(0, 29.19 - 7.31, 7.31, Math.PI, 0, true); hole.lineTo(7.31, 0); hole.closePath();
-  s.holes.push(hole);
-  const body = new THREE.Mesh(new THREE.ExtrudeGeometry(s, { depth: D, bevelEnabled: false }).translate(0, 0, -D / 2), stone);
-  g.add(body);
-  g.add(box(W + 1.5, 2.2, D + 1.5, stone, 0, H - 11, 0)); // the frieze cornice
-  g.add(box(W, 9, D, stone, 0, H - 9, 0)); // the attic
-  g.add(box(W + 1, 1, D + 1, stone, 0, H, 0));
-  return { group: g, glow: [stone], haze: [stone] };
+  B.build(g);
+  return { group: g, glow: [stone], haze: [stone, carved] };
 }
 
 function ladefense() {
   const g = new THREE.Group();
-  const white = lit(0xf0eee8, 0xdfe8ff, { night: 0.5 });
+  const white = pbr('white_stucco', { scale: 4, tint: 0xf4f6f8, bright: 1.8, glow: 0xdfe8ff, night: 0.5 });
   const glass = facadeMaterial('#6b8297', { cols: 10, rows: 30, win: '#24313d', lamp: '#fff0d0', seed: 41 });
   // the Grande Arche: a 110 m hollow cube, turned 6.33° off the historical axis
   const arche = new THREE.Group();
@@ -217,7 +235,7 @@ function haussmann() {
   const g = new THREE.Group();
   const rnd = seeded(1853);
   const stones = ['#e3d6bd', '#d9cbb0', '#e8dcc6', '#d4c6aa'].map((c, i) => facadeMaterial(c, { cols: 9, rows: 6, win: '#3a3a40', lamp: '#ffd9a0', frame: '#bfb196', seed: 60 + i }));
-  const zinc = lit(0x7d8790, 0x223344, { night: 0.1, roughness: 0.5, metalness: 0.4 });
+  const zinc = pbr('metal_plate', { scale: 3, tint: 0x8a96a2, metal: 0.4, glow: 0x223344, night: 0.1 });
   // blocks along a few boulevards, in map axes
   for (let bx = -6; bx <= 6; bx++) {
     for (let bz = -10; bz <= 10; bz++) {
@@ -240,16 +258,15 @@ function haussmann() {
 /** The Grande Cascade: a rock cliff with a waterfall into a pool. */
 function cascade() {
   const g = new THREE.Group();
-  const rock = mat(0x8c8273, { roughness: 1 });
+  // the artificial cliff: rough limestone boulders piled round the fall
+  const rock = pbr('rock_face_03', { scale: 3, tint: 0xb8c4d8, bright: 1.2 });
   const rnd = seeded(1856);
+  const R = new Batch();
   for (let i = 0; i < 26; i++) {
     const r = 2 + rnd() * 3.2;
-    const s = new THREE.Mesh(new THREE.DodecahedronGeometry(r, 0), rock);
-    s.position.set((rnd() - 0.5) * 22, rnd() * 9, -4 - rnd() * 5);
-    s.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
-    s.castShadow = true;
-    g.add(s);
+    R.add(rock, place(boulderGeometry(r, rnd, { flat: 0.8 }), (rnd() - 0.5) * 22, rnd() * 9, -4 - rnd() * 5, rnd() * 6.28));
   }
+  R.build(g);
   const fallTex = canvasTex(64, 256, (c, w, h) => {
     for (let y = 0; y < h; y++) { c.fillStyle = `rgba(235,245,255,${0.35 + 0.4 * Math.random()})`; c.fillRect(Math.random() * w, y, 3 + Math.random() * 10, 1); }
   }, [1, 1]);
@@ -257,7 +274,7 @@ function cascade() {
   const fall = new THREE.Mesh(new THREE.PlaneGeometry(5, 10), new THREE.MeshBasicMaterial({ map: fallTex, transparent: true, opacity: 0.85, depthWrite: false }));
   fall.position.set(0, 5, -1.2);
   g.add(fall);
-  const pool = new THREE.Mesh(new THREE.CircleGeometry(11, 32).rotateX(-Math.PI / 2), mat(0x2d4b55, { roughness: 0.1, metalness: 0.3 }));
+  const pool = new THREE.Mesh(new THREE.CircleGeometry(11, 32).rotateX(-Math.PI / 2), landmarkWater());
   pool.position.set(0, 0.15, 5);
   g.add(pool);
   return { group: g, glow: [], update(t) { fallTex.offset.y = (t * 1.6) % 1; } };
@@ -266,7 +283,7 @@ function cascade() {
 /** A Morris column, a Wallace fountain and a bench: Paris street furniture by the green. */
 function colonne() {
   const g = new THREE.Group();
-  const green = mat(0x24443a, { roughness: 0.6, metalness: 0.3 });
+  const green = pbr('metal_plate', { scale: 0.8, tint: 0x2e5a4a, metal: 0.35 }); // Paris's painted cast iron
   const posters = new THREE.MeshStandardMaterial({
     roughness: 0.8,
     map: canvasTex(256, 128, (c, w, h) => {

@@ -13,14 +13,16 @@
 import * as THREE from 'three';
 import { model } from '../../scene/models.js';
 import { mat, lit, box, cyl, sphere, seeded, facadeMaterial } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
+import { Batch, bx, cy, place } from './riverfront.js';
 
 const COPPER = 0x7fae98; // weathered verdigris
 
 function statueofliberty() {
   const g = new THREE.Group();
   const lawn = mat(0x5f8a46, { roughness: 1 });
-  const granite = lit(0xb8afa2, 0xffe2b8, { night: 0.5 });
-  const concrete = lit(0xcfc8bb, 0xffe2b8, { night: 0.35 });
+  const granite = pbr('granite_wall', { scale: 2, tint: 0xd8c8b8, bright: 1.2, glow: 0xffe2b8, night: 0.5 });
+  const concrete = pbr('concrete_wall_008', { scale: 3, tint: 0xd2dcf2, bright: 1.3, glow: 0xffe2b8, night: 0.35 });
   const cu = lit(COPPER, 0xc8ffe6, { night: 0.45, roughness: 0.7, metalness: 0.15 });
   const gold = new THREE.MeshStandardMaterial({ color: 0xf2c25a, emissive: 0xffc04a, emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.3 });
   // Liberty Island: ~6 ha of lawn and paths, just above the water
@@ -136,28 +138,67 @@ function statueofliberty() {
   return { group: g, glow: [granite, concrete, cu], haze: [granite, concrete, cu, lawn] };
 }
 
+/** Round-headed opening outline (w wide, h to the crown) as a flat pane facing +Z. */
+function archPane(w, h) {
+  const s = new THREE.Shape(), r = w / 2;
+  s.moveTo(-r, 0); s.lineTo(r, 0); s.lineTo(r, h - r); s.absarc(0, h - r, r, 0, Math.PI, false); s.closePath();
+  return new THREE.ShapeGeometry(s, 8);
+}
+
 function ellisisland() {
-  const g = new THREE.Group();
-  const brick = facadeMaterial('#9a4b33', { cols: 14, rows: 4, win: '#2a2d33', lamp: '#ffd9a0', seed: 12 });
-  const stone = lit(0xd9d2c3, 0xffe2b8, { night: 0.4 });
-  const cu = lit(COPPER, 0xc8ffe6, { night: 0.3 });
+  // the Main Building (Boring & Tilton, 1900): red Flemish-bond brick with
+  // limestone quoins and trim, three great arched windows over the entrance
+  // into the Registry Room, four towers with copper cupolas, hipped roofs
+  const brick = pbr('red_bricks_02', { scale: 1.8, tint: 0xf0d8cc, glow: 0xffd9a0, night: 0.25 });
+  const stone = pbr('white_sandstone_bricks', { scale: 1.5, tint: 0xf4ece0, bright: 1.3, glow: 0xffe2b8, night: 0.4 });
+  const roof = pbr('roof_slates_02', { scale: 1.5, tint: 0x9aa0a8 });
+  const cu = pbr('metal_plate', { scale: 1.5, tint: 0xa8e0c8, bright: 1.5, metal: 0.25, glow: 0xc8ffe6, night: 0.3 });
+  const glass = lit(0x232a32, 0xffd9a0, { night: 0.9, roughness: 0.08, metalness: 0.5 });
   const lawn = mat(0x5f8a46, { roughness: 1 });
+  const seawall = pbr('granite_wall', { scale: 2, tint: 0xb8c0cc });
+  const B = new Batch();
   const isl = new THREE.Mesh(new THREE.BoxGeometry(260, 2, 150), lawn);
   isl.position.y = -0.6;
-  g.add(isl);
-  g.add(box(103, 18, 30, brick, 0, 0.4, 0));
-  g.add(box(105, 1.4, 32, stone, 0, 18.4, 0));
-  g.add(box(30, 6, 22, stone, 0, 19.6, 0)); // the central arched block
-  for (const x of [-15, 15]) for (const z of [-9, 9]) {
-    g.add(box(6, 14, 6, stone, x, 18.4, z));
-    const d = new THREE.Mesh(new THREE.SphereGeometry(3.6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), cu);
-    d.position.set(x, 32.4, z);
-    g.add(d);
-    g.add(cyl(0.3, 0.3, 4, cu, x, 35.5, z, 6));
+  B.add(seawall, bx(262.4, 2.0, 152.4, 0, -1.8, 0));
+  const L = 103, D = 30, H = 18;
+  B.add(brick, bx(L, H, D, 0, 0.4, 0));
+  B.add(stone, bx(L + 0.6, 1.6, D + 0.6, 0, 0.4, 0), bx(L + 1.2, 1.2, D + 1.2, 0, H + 0.4, 0));
+  // quoins at the corners and either side of the centre pavilion
+  for (const x of [-L / 2, -16, 16, L / 2]) for (const z of [-D / 2, D / 2]) for (let y = 2; y < H; y += 1.4) B.add(stone, bx(1.2, 0.7, 1.2, x, y + 0.4, z));
+  // two storeys of windows along both long fronts, stone sills and heads
+  for (let i = 0; i < 24; i++) {
+    const x = -L / 2 + 3 + i * ((L - 6) / 23);
+    if (Math.abs(x) < 17) continue;
+    for (const y of [4, 11]) for (const s of [1, -1]) {
+      B.add(glass, place(archPane(1.6, 3.6), x, y, s * (D / 2 + 0.03), s > 0 ? 0 : Math.PI));
+      B.add(stone, bx(2.0, 0.25, 0.4, x, y - 0.25, s * (D / 2 + 0.1)));
+    }
   }
+  // the centre: three tall arched windows of the Registry Room over the entrance canopy
+  B.add(brick, bx(32, H + 6, D + 2, 0, 0.4, 0));
+  for (const x of [-9, 0, 9]) for (const s of [1, -1]) B.add(glass, place(archPane(6, 12), x, 7, s * (D / 2 + 1.04), s > 0 ? 0 : Math.PI));
+  B.add(stone, bx(33, 1.4, D + 3, 0, H + 6.4, 0));
+  B.add(roof, place(new THREE.CylinderGeometry(0.01, 20, 7, 4, 1).rotateY(Math.PI / 4).scale(1.1, 1, 0.75).translate(0, 3.5, 0), 0, H + 7.8, 0));
+  B.add(cu, bx(20, 1.2, 4, 0, 4.2, D / 2 + 3)); // the entrance canopy
+  // the four towers: brick shafts with stone belts, open belfries, copper domes and lanterns
+  for (const x of [-15, 15]) for (const z of [-9, 9]) {
+    B.add(brick, bx(6, 14, 6, x, H + 0.4, z));
+    B.add(stone, bx(6.6, 0.8, 6.6, x, H + 8, z), bx(6.8, 1, 6.8, x, H + 14.4, z));
+    for (const ry of [0, Math.PI / 2, Math.PI, -Math.PI / 2]) B.add(glass, place(archPane(2.2, 4), x + Math.sin(ry) * 3.02, H + 9.2, z + Math.cos(ry) * 3.02, ry));
+    B.add(cu, place(new THREE.SphereGeometry(3.6, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 1.35, 1), x, H + 15.4, z));
+    B.add(cu, cy(0.6, 0.8, 2.4, x, H + 20.2, z, 10), place(new THREE.SphereGeometry(0.8, 10, 6), x, H + 23.2, z), cy(0.05, 0.12, 2.5, x, H + 23.6, z, 5));
+  }
+  // the hipped roofs of the wings
+  for (const s of [-1, 1]) B.add(roof, place(new THREE.CylinderGeometry(0.01, 22, 6, 4, 1).rotateY(Math.PI / 4).scale(1.0, 1, 0.72).translate(0, 3, 0), s * 34, H + 1.6, 0));
   // the ferry slip and the hospital wings across it
-  g.add(box(70, 12, 18, brick, 70, 0.4, 40));
-  return { group: g, glow: [brick, stone], haze: [brick, stone, cu, lawn] };
+  B.add(brick, bx(70, 12, 18, 70, 0.4, 40));
+  B.add(stone, bx(70.6, 1, 18.6, 70, 12.4, 40));
+  B.add(roof, place(new THREE.CylinderGeometry(0.01, 26, 4, 4, 1).rotateY(Math.PI / 4).scale(1.35, 1, 0.5).translate(0, 2, 0), 70, 13.4, 40));
+  for (let i = 0; i < 14; i++) for (const y of [3, 8]) B.add(glass, place(archPane(1.4, 2.8), 70 - 32 + i * 4.9, y, 49.03));
+  const g = new THREE.Group();
+  g.add(isl);
+  B.build(g);
+  return { group: g, glow: [brick, stone, cu, glass], haze: [brick, stone, roof, cu, glass, lawn, seawall] };
 }
 
 /** One tower: a box (or a set-back stack) with a lit window facade. */
