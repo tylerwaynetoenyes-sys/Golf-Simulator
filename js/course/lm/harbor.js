@@ -42,36 +42,75 @@ function statueofliberty() {
   g.add(box(17, 18, 17, granite, 0, 24, 0));
   g.add(box(19, 2.4, 19, granite, 0, 42, 0));
   g.add(box(14, 3, 14, granite, 0, 44.4, 0));
-  // the statue (46 m, facing south-east toward the Narrows): robe, body, head
+  // the statue (46 m heel to torch, facing south-east toward the Narrows):
+  // a draped robe with deep vertical folds, the raised right arm (12.8 m),
+  // the torch with its gold-leaf flame, the crown's seven rays, and the
+  // tablet (7.2 m) held against her left side
   const st = new THREE.Group();
   st.position.y = 47.4;
-  const robe = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 6.6, 22, 18, 1), cu);
-  robe.position.y = 11;
-  st.add(robe);
-  const torso = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 4.4, 9, 16), cu);
-  torso.position.y = 26.5;
-  st.add(torso);
-  st.add(sphere(2.2, cu, 0, 33.2, 0.3, 18));
-  // crown: seven rays
+  const prof = [[0, 0], [6.9, 0], [6.6, 3], [5.6, 9], [4.7, 14], [4.25, 17], [4.5, 21], [4.75, 24.5], [4.3, 27], [2.8, 28.8], [1.35, 29.6], [0, 29.8]]
+    .map(([r, y]) => new THREE.Vector2(r, y));
+  const robeGeo = new THREE.LatheGeometry(prof, 64);
+  {
+    const pp = robeGeo.attributes.position;
+    for (let i = 0; i < pp.count; i++) {
+      const x = pp.getX(i), y = pp.getY(i), z = pp.getZ(i);
+      const r = Math.hypot(x, z);
+      if (r < 0.01) continue;
+      const a = Math.atan2(z, x);
+      // folds hang from the shoulders and spread toward the hem
+      const k = Math.max(0, 1 - y / 27);
+      const fold = Math.sin(a * 11 + Math.sin(a * 3) * 1.5) * 0.42 * k + Math.sin(a * 23) * 0.12 * k;
+      // the cloak sweeps back on the left, the right foot steps forward
+      const sweep = (Math.cos(a - 2.4) > 0 ? Math.cos(a - 2.4) * 0.9 : 0) * k;
+      const nr = r + fold + sweep;
+      pp.setX(i, (x / r) * nr); pp.setZ(i, (z / r) * nr);
+    }
+    robeGeo.computeVertexNormals();
+  }
+  st.add(new THREE.Mesh(robeGeo, cu));
+  // head and neck, the face toward +Z (the front)
+  const head = new THREE.Mesh(new THREE.SphereGeometry(1.0, 20, 16), cu);
+  head.scale.set(1.75, 2.15, 1.95);
+  head.position.set(0, 31.3, 0.25);
+  st.add(head);
+  st.add(cyl(1.25, 1.45, 1.8, cu, 0, 29.2, 0.1, 14));
+  // the crown: a diadem and seven rays
+  const band = new THREE.Mesh(new THREE.TorusGeometry(2.05, 0.38, 8, 28), cu);
+  band.rotation.x = Math.PI / 2 - 0.12;
+  band.position.set(0, 32.9, 0.1);
+  st.add(band);
   for (let i = 0; i < 7; i++) {
-    const a = -0.95 + (i / 6) * 1.9;
-    const ray = new THREE.Mesh(new THREE.ConeGeometry(0.28, 3.4, 5), cu);
-    ray.position.set(Math.sin(a) * 2.3, 35.6 + Math.cos(a) * 0.6, Math.cos(a) * 1.6);
-    ray.rotation.set(Math.cos(a) * 0.7, 0, -Math.sin(a) * 0.9);
+    const a = (-0.85 + (i / 6) * 1.7);
+    const ray = new THREE.Mesh(new THREE.ConeGeometry(0.34, 3.1, 4), cu);
+    const dir = new THREE.Vector3(Math.sin(a) * 1, 0.55, Math.cos(a) * 0.55).normalize();
+    ray.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    ray.position.set(Math.sin(a) * 2.05, 33.0, Math.cos(a) * 1.4).addScaledVector(dir, 1.5);
     st.add(ray);
   }
-  // raised right arm with the torch (gold leaf flame)
-  const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 1.1, 12.8, 10), cu);
-  arm.position.set(3.4, 36.5, 0);
-  arm.rotation.z = -0.12;
-  st.add(arm);
-  st.add(cyl(1.1, 0.7, 2.6, cu, 4.1, 42.4, 0, 12));
-  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.95, 3, 12), gold);
-  flame.position.set(4.1, 46.2, 0);
+  // raised right arm: sleeve falling back from the shoulder to the hand
+  const limb = (from, to, r0, r1, m) => {
+    const d = new THREE.Vector3().subVectors(to, from);
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, d.length(), 14), m);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.clone().normalize());
+    mesh.position.copy(from).addScaledVector(d, 0.5);
+    return mesh;
+  };
+  const shoulder = new THREE.Vector3(3.9, 26.6, -0.2), hand = new THREE.Vector3(5.3, 39.2, -0.6);
+  st.add(limb(shoulder, new THREE.Vector3(4.6, 32.5, -0.4), 1.8, 1.25, cu)); // the loose sleeve
+  st.add(limb(new THREE.Vector3(4.6, 32.5, -0.4), hand, 1.0, 0.75, cu));
+  st.add(sphere(0.95, cu, hand.x, hand.y, hand.z, 12));
+  // the torch: handle, balcony and a gold-leaf flame
+  st.add(cyl(0.55, 0.45, 2.9, cu, 5.35, 39.6, -0.6, 10));
+  st.add(cyl(1.55, 0.7, 1.1, cu, 5.4, 42.4, -0.6, 16));
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(1.15, 3.3, 14), gold);
+  flame.position.set(5.4, 45.1, -0.6);
   st.add(flame);
-  // the tablet in the left arm
-  const tab = box(4.2, 7.2, 0.8, cu, -3.9, 23, 1.2);
-  tab.rotation.z = 0.18;
+  // left arm bent, holding the tablet (July IV MDCCLXXVI) against her side
+  st.add(limb(new THREE.Vector3(-3.9, 26.2, 0.2), new THREE.Vector3(-4.7, 21.5, 1.3), 1.4, 1.0, cu));
+  const tab = box(4.1, 7.2, 0.9, cu, -4.6, 17.6, 1.9);
+  tab.rotation.z = 0.2;
+  tab.rotation.x = -0.12;
   st.add(tab);
   st.rotation.y = -0.65; // she faces south-east, to the Narrows
   g.add(st);

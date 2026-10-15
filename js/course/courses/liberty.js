@@ -14,10 +14,14 @@ export default {
   // New York Harbor at mean sea level; landmarks at their real positions
   waterLevel: 0.3,
   waterTint: 0x23404c,
+  // Lower Manhattan and the Jersey City waterfront from OpenStreetMap footprints and heights
+  buildings: 'nyc',
+  // a long-lens view, as on the broadcasts: beyond 1.8 km, distances shrink to a third
+  cityPull: { from: 1800, k: 0.3 },
   far: [
-    { type: 'statueofliberty', ll: [40.68925, -74.0445], maxD: Infinity },
+    // drawn at 1 km on her true bearing (she's 2.6 km off), so she reads from the course
+    { type: 'statueofliberty', ll: [40.68925, -74.0445], maxD: 1000 },
     { type: 'ellisisland', ll: [40.6995, -74.0396], maxD: Infinity },
-    { type: 'manhattan', ll: [40.71274, -74.01338], maxD: Infinity },
   ],
   credit: 'Holes © OpenStreetMap contributors (ODbL); scorecard via OpenGolfAPI (ODbL); elevation: AWS Terrain Tiles; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',
   holes: [

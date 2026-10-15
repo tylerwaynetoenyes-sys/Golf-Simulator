@@ -90,9 +90,11 @@ function windowsGlow(lampColor) {
  * @param data   buildings.json ({buildings:[{p:[x,z,...], h, mh}]}), DEM frame
  * @param T      HoleTerrain (with its DEM frame T.F)
  * @param style  'paris' | 'nyc'
+ * @param pull   {from, k}: beyond `from` metres, distances shrink by k
+ *               (a long-lens view: the far skyline at true size, nearer)
  * @returns {{group, glow:THREE.Material[], haze:THREE.Material[]}}
  */
-export function buildCity(data, T, style = 'paris') {
+export function buildCity(data, T, style = 'paris', pull = null) {
   const S = STYLE[style] || STYLE.paris;
   rs = 7;
   const facadeTex = tex(256, 256, S.facade);
@@ -117,6 +119,18 @@ export function buildCity(data, T, style = 'paris') {
     if (n < 3) continue;
     let pts = [];
     for (let i = 0; i < n; i++) pts.push(F.toLocal(b.p[i * 2], b.p[i * 2 + 1]));
+    if (pull) {
+      // move the whole footprint in toward the course, keeping its shape
+      let mx = 0, mz = 0;
+      for (const [x, z] of pts) { mx += x; mz += z; }
+      mx /= n; mz /= n;
+      const d = Math.hypot(mx, mz);
+      if (d > pull.from) {
+        const s2 = (pull.from + (d - pull.from) * pull.k) / d;
+        const dx = mx * (s2 - 1), dz = mz * (s2 - 1);
+        pts = pts.map(([x, z]) => [x + dx, z + dz]);
+      }
+    }
     let cx = 0, cz = 0, area = 0;
     for (let i = 0; i < n; i++) {
       const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % n];

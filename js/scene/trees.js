@@ -366,7 +366,7 @@ export const THEME_TREES = {
   // the Bois de Boulogne: oaks, chestnuts, planes and the odd conifer
   paris: { broad: [0, 1, 2, 3], conifer: [4, 5], density: 0.95, scatter: 0.7 },
   urban: { broad: [0, 2, 3], conifer: [4], density: 0.85, scatter: 0.6 },
-  harbor: { broad: [0, 2], conifer: [4], density: 0.4, scatter: 0 }, // open to the water
+  harbor: { broad: [0, 2], conifer: [4], density: 0.15, scatter: 0 }, // links-style, open to the water
 };
 
 let cache = null;

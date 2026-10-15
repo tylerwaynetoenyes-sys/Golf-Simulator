@@ -372,8 +372,8 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     }
     // the real city round the course (OpenStreetMap footprints and heights)
     if (T.F && hole.buildings && T.F.d?.city) {
-      const city = buildCity(T.F.d.city, T, hole.buildings);
-      for (const m of city.haze) hazeLess(m, 0.7);
+      const city = buildCity(T.F.d.city, T, hole.buildings, hole.cityPull || null);
+      for (const m of city.haze) hazeLess(m, hole.buildings === 'nyc' ? 0.35 : 0.7);
       g.add(city.group);
       this.farLms.push(city);
     }
