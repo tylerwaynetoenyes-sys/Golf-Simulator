@@ -38,7 +38,7 @@ export const COURSE_MODELS = {
   // the scanned crowds at the riverfront and in the parks (instanced, js/scene/crowd.js)
   confluence: ['peopleLo', 'zooAnimals', 'zooRocks', 'cahokiaPeople'], // the zoo hole's animals and boulders; the Monks Mound hole's villagers
   alton: ['peopleLo'],
-  forestpark: ['peopleLo'],
+  forestpark: ['peopleLo', 'zooAnimals', 'zooRocks', 'zooMarine', 'zooMore'], // the zoo is in the park
   stlzoo: ['zooAnimals', 'zooRocks', 'zooMarine', 'zooMore', 'peopleLo'],
   cahokia: ['cahokiaPeople'],
 };

@@ -23,6 +23,8 @@ export default {
   far: [
     // the park's landmarks, laid out in map axes from their own origin
     { type: 'forestpark', ll: [38.6385, -90.2875], maxD: Infinity },
+    // the Saint Louis Zoo in its corner of the park: its buildings, exhibits and visitors
+    { type: 'zoogrounds', ll: [38.6385, -90.2875], maxD: Infinity },
   ],
   holes: [
   {

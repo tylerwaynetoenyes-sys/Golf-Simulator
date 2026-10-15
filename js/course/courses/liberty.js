@@ -19,8 +19,9 @@ export default {
   // a long-lens view, as on the broadcasts: beyond 1.8 km, distances shrink to a third
   cityPull: { from: 1800, k: 0.3 },
   far: [
-    // drawn at 1 km on her true bearing (she's 2.6 km off), so she reads from the course
-    { type: 'statueofliberty', ll: [40.68925, -74.0445], maxD: 1000 },
+    // drawn at 550 m on her true bearing (she's 2.6 km off) and a quarter larger, the way a long
+    // lens shows her from the course: she stands over the harbor holes
+    { type: 'statueofliberty', ll: [40.68925, -74.0445], maxD: 550, scale: 1.25 },
     { type: 'ellisisland', ll: [40.6995, -74.0396], maxD: Infinity },
   ],
   credit: 'Holes © OpenStreetMap contributors (ODbL); scorecard via OpenGolfAPI (ODbL); elevation: AWS Terrain Tiles; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',
