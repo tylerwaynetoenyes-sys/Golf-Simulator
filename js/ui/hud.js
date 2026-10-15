@@ -557,6 +557,41 @@ export class HUD {
         c.fillRect(x, y, cell, cell);
       }
     }
+    // the lie of the land: the ground sampled on a grid under the map, then
+    // hillshade (lit from the north-west) and contour lines from it
+    const G = 2, gw = Math.ceil(W / G) + 1, gh = Math.ceil(H / G) + 1;
+    const hg = new Float32Array(gw * gh), wet = new Uint8Array(gw * gh);
+    let lo = Infinity, hi = -Infinity;
+    for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+      const [wx, wz] = fromMap(i * G, j * G);
+      // no contours under water, nor past the course's own ground on a built course (its edge skirt)
+      const pr = T.project(wx, wz);
+      const off = !T.F && (Math.abs(pr.d) > T.oobLateral + 30 || pr.s < -40 || pr.s > T.length + 70);
+      const y = off ? NaN : T.meshHeight(wx, wz);
+      hg[j * gw + i] = y;
+      wet[j * gw + i] = T.seaLevel != null && y < T.seaLevel ? 1 : 0; // (ponds are painted back over the lines)
+      if (Number.isFinite(y)) { lo = Math.min(lo, y); hi = Math.max(hi, y); }
+    }
+    {
+      const sh = document.createElement('canvas'); sh.width = gw; sh.height = gh;
+      const sc = sh.getContext('2d'), img = sc.createImageData(gw, gh);
+      const m = G / scale; // metres per grid step
+      for (let j = 0; j < gh; j++) for (let i = 0; i < gw; i++) {
+        const a = hg[j * gw + Math.max(0, i - 1)], b = hg[j * gw + Math.min(gw - 1, i + 1)];
+        const u = hg[Math.max(0, j - 1) * gw + i], d = hg[Math.min(gh - 1, j + 1) * gw + i];
+        const dx = (b - a) / (2 * m), dy = (d - u) / (2 * m);
+        // light from the upper left of the map, low, so gentle slopes still show
+        const lum = Math.max(-1, Math.min(1, (dx * -0.7 + dy * -0.7) * 3.2));
+        const k = (j * gw + i) * 4;
+        const v = lum > 0 ? 255 : 0;
+        img.data[k] = img.data[k + 1] = img.data[k + 2] = v;
+        img.data[k + 3] = Math.abs(lum) * (this._mapPhoto ? 70 : 95);
+      }
+      sc.putImageData(img, 0, 0);
+      c.save(); c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+      c.drawImage(sh, 0, 0, gw * G, gh * G);
+      c.restore();
+    }
     const ribbon = (half, style, from = T.fwStart) => {
       const L = [], R = [];
       for (let s = from; s <= T.length + 0.1; s += 5) {
@@ -613,6 +648,67 @@ export class HUD {
     // green, fringe ring
     if (T.greenPoly) shape(T.greenPoly.pts, 'rgba(150,222,120,0.95)');
     else { blob(T.green, T.greenR + 1.8, T.greenR + 1.8, 'rgba(120,190,95,0.9)'); blob(T.green, T.greenR, T.greenR, 'rgba(160,228,128,0.95)'); }
+    // contour lines: an interval that gives a readable number of lines for this
+    // hole's relief, every fifth one bolder and labelled in feet from the tee
+    const iso = (level, path) => {
+      // marching squares over the grid, segments straight into the path
+      for (let j = 0; j < gh - 1; j++) for (let i = 0; i < gw - 1; i++) {
+        const a = hg[j * gw + i], b = hg[j * gw + i + 1], d = hg[(j + 1) * gw + i], e = hg[(j + 1) * gw + i + 1];
+        if (!(a === a && b === b && d === d && e === e) || wet[j * gw + i] || wet[j * gw + i + 1] || wet[(j + 1) * gw + i] || wet[(j + 1) * gw + i + 1]) continue;
+        const pts = [];
+        const cross = (p, q, x0, y0, x1, y1) => { if ((p < level) !== (q < level)) { const t = (level - p) / (q - p); pts.push([(x0 + (x1 - x0) * t) * G, (y0 + (y1 - y0) * t) * G]); } };
+        cross(a, b, i, j, i + 1, j); cross(b, e, i + 1, j, i + 1, j + 1); cross(e, d, i + 1, j + 1, i, j + 1); cross(d, a, i, j + 1, i, j);
+        for (let k = 0; k + 1 < pts.length; k += 2) { path.moveTo(pts[k][0], pts[k][1]); path.lineTo(pts[k + 1][0], pts[k + 1][1]); }
+      }
+    };
+    if (Number.isFinite(lo) && hi - lo > 0.3) {
+      const relief = hi - lo;
+      const step = [0.25, 0.5, 1, 2, 5, 10, 20].find((v) => relief / v <= 22) || 20;
+      const teeY = T.teeHeight;
+      const labels = [];
+      for (let lev = Math.ceil(lo / step) * step, n = Math.round(lo / step); lev < hi; lev += step, n++) {
+        if (T.seaLevel != null && lev < T.seaLevel) continue;
+        const index = n % 5 === 0;
+        const path = new Path2D();
+        iso(lev, path);
+        c.strokeStyle = index ? 'rgba(255,236,200,0.5)' : 'rgba(255,236,200,0.22)';
+        c.lineWidth = index ? 1.1 : 0.6;
+        c.stroke(path);
+        if (index) labels.push(lev);
+      }
+      // labels on index contours, where a line crosses the map's right third
+      c.font = '600 8px Jost, -apple-system, system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+      let lastY = -1e9;
+      for (const lev of labels) {
+        const i = Math.round(gw * 0.1);
+        for (let j = 2; j < gh - 2; j++) {
+          const a = hg[j * gw + i], b = hg[(j + 1) * gw + i];
+          if (a === a && b === b && !wet[j * gw + i] && (a < lev) !== (b < lev)) {
+            if (Math.abs(j * G - lastY) < 14) break; // contours bunched on a bank: label every other
+            lastY = j * G;
+            const ft = Math.round((lev - teeY) / 0.3048);
+            const txt = `${ft > 0 ? '+' : ''}${ft}`;
+            c.lineWidth = 2.5; c.strokeStyle = 'rgba(10,14,12,0.7)'; c.strokeText(txt, i * G, j * G);
+            c.fillStyle = 'rgba(255,236,200,0.85)'; c.fillText(txt, i * G, j * G);
+            break;
+          }
+        }
+      }
+    }
+    // ponds over the lines (no contours under water)
+    for (const w of T.ponds) w.poly ? shape(w.poly.pts, WATER) : blob(w, w.rx, w.rz, WATER);
+    // the green's own contours, fine (about 2 in), for reading it from the map
+    {
+      const [gxm, gym] = toMap(T.green.x, T.green.z), R = (T.greenR + 4) * scale;
+      c.save(); c.beginPath(); c.arc(gxm, gym, R, 0, Math.PI * 2); c.clip();
+      let glo = Infinity, ghi = -Infinity;
+      for (let a = 0; a < 6.28; a += 0.4) for (const rr of [0, 0.5, 1]) { const y = T.meshHeight(T.green.x + Math.cos(a) * T.greenR * rr, T.green.z + Math.sin(a) * T.greenR * rr); glo = Math.min(glo, y); ghi = Math.max(ghi, y); }
+      const gstep = ghi - glo > 0.9 ? 0.1 : 0.05;
+      const path = new Path2D();
+      for (let lev = Math.ceil(glo / gstep) * gstep; lev < ghi; lev += gstep) iso(lev, path);
+      c.strokeStyle = 'rgba(20,60,20,0.45)'; c.lineWidth = 0.7; c.stroke(path);
+      c.restore();
+    }
     // tee box
     const [tx, ty] = toMap(T.tee.x, T.tee.z);
     c.fillStyle = 'rgba(255,255,255,0.7)';
@@ -623,7 +719,7 @@ export class HUD {
     const T = course.T;
     const c = this.mapCtx, W = this.mapW, H = this.mapH, k = this.mapDpr;
     const world = course.game.world;
-    const key = `${course.hole.n}:${T.length.toFixed(1)}`;
+    const key = `${course.hole.n}:${T.length.toFixed(1)}:${W}x${H}`;
     if (this._courseKey !== key) {
       this._courseKey = key;
       this._frame = this._courseFrame(T);

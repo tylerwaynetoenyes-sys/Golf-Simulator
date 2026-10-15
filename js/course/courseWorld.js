@@ -32,7 +32,7 @@ const COL = {
   green: C(0.44, 0.71, 0.29), greenB: C(0.4, 0.67, 0.27), fringe: C(0.36, 0.6, 0.23),
   sand: C(0.93, 0.87, 0.72), tee: C(0.38, 0.6, 0.25), bed: C(0.3, 0.32, 0.22),
   // under the water: silt at the margin, olive mud, then the dark of deep water; the wet bank above it
-  bedShallow: C(0.42, 0.37, 0.25), bedMid: C(0.2, 0.23, 0.14), bedDeep: C(0.05, 0.09, 0.08), wetBank: C(0.2, 0.22, 0.13),
+  bedShallow: C(0.42, 0.37, 0.25), bedMid: C(0.2, 0.23, 0.14), bedDeep: C(0.1, 0.15, 0.13), wetBank: C(0.2, 0.22, 0.13),
   cut: C(0.31, 0.51, 0.2), // the first cut: between fairway and rough
 };
 
@@ -266,12 +266,12 @@ export class CourseWorld {
         // the mapped outline, grown a few metres so the sheet runs under the banks
         const k = (p.poly.R + 3) / p.poly.R;
         const shape = new THREE.Shape(p.poly.pts.map(([x, z]) => new THREE.Vector2(p.x + (x - p.x) * k, -(p.z + (z - p.z) * k))));
-        const m = new THREE.Mesh(new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2), this._water({ y: p.level, tint: 0x1d3036, clarity: 0.55 }));
+        const m = new THREE.Mesh(new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2), this._water({ y: p.level, tint: 0x1d3036, clarity: Math.max(p.rx || 0, p.rz || 0, p.poly ? p.poly.R : 0) > 80 ? 0.15 : 0.55 }));
         m.position.y = p.level;
         g.add(m);
         continue;
       }
-      const m = new THREE.Mesh(new THREE.CircleGeometry(1, 64).rotateX(-Math.PI / 2), this._water({ y: p.level, tint: 0x1d3036, clarity: 0.55 }));
+      const m = new THREE.Mesh(new THREE.CircleGeometry(1, 64).rotateX(-Math.PI / 2), this._water({ y: p.level, tint: 0x1d3036, clarity: Math.max(p.rx || 0, p.rz || 0, p.poly ? p.poly.R : 0) > 80 ? 0.15 : 0.55 }));
       m.scale.set(p.rx * 1.02, 1, p.rz * 1.02);
       m.rotation.y = Math.atan2(p.dirx, p.dirz);
       m.position.set(p.x, p.level, p.z);

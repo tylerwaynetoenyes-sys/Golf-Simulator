@@ -124,7 +124,7 @@ void main() {
  */
 export function createWaterMaterial({ y = 0, tint = 0x1c2a2c, flow = 0.3, clarity = 0 } = {}) {
   const mat = new THREE.MeshStandardMaterial({
-    color: new THREE.Color(tint).multiplyScalar(0.55), roughness: 0.035, metalness: 0, envMapIntensity: 1.1,
+    color: new THREE.Color(tint).multiplyScalar(0.95), roughness: 0.035, metalness: 0, envMapIntensity: 1.1,
     transparent: clarity > 0, depthWrite: clarity <= 0,
   });
   const uni = {
