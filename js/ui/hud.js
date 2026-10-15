@@ -11,12 +11,6 @@ import { esc as escape } from './dom.js';
 
 const STOCK_CARRY = { DR: 255, '3W': 235, '5I': 195, '7I': 168, '9I': 145, PW: 128, SW: 95 };
 
-function windArrow(fromDeg) {
-  // arrow shows where the wind is blowing TO, from the player's view (up = down-range)
-  const rot = fromDeg + 180;
-  return `<svg viewBox="0 0 12 12" style="transform:rotate(${rot}deg)"><path d="M6 1.5v9M6 1.5 3 4.5M6 1.5l3 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-}
-
 export class HUD {
   constructor({ onClub }) {
     this.onClub = onClub;
@@ -61,11 +55,7 @@ export class HUD {
     det.textContent = status.detail || '';
     det.style.display = status.detail ? '' : 'none';
     $('#modeChips').innerHTML = (status.chips || []).map((c) => {
-      if (c.kind === 'wind') {
-        if (c.mph < 0.5) return '<span class="chip">Calm</span>';
-        const v = U.isMetric() ? `${(c.mph * MPH).toFixed(1)} m/s` : `${c.mph.toFixed(0)} mph`;
-        return `<span class="chip">${windArrow(c.fromDeg)}<strong>${v}</strong></span>`;
-      }
+      if (c.kind === 'wind') return ''; // the wind dial shows it (one wind readout, not two)
       if (c.kind === 'score') return `<span class="chip score">${esc(c.label)} <strong>${c.value}</strong></span>`;
       return '';
     }).join('');
@@ -276,7 +266,7 @@ export class HUD {
       <span class="lb-name">${escape(r.name)}${r.sub ? `<small>${escape(r.sub)}</small>` : ''}</span>
       <span class="lb-val">${escape(r.display)}</span></li>`;
     el.classList.toggle('compact', lb.rows.length + (teams.length > 1 ? teams.length : 0) > 6 || window.innerHeight < 760);
-    el.innerHTML = `<div class="lb-head"><span class="lb-mascot" id="lbMascot"></span><span>${escape(lb.title || 'Leaderboard')}</span></div>
+    el.innerHTML = `<div class="lb-head"><span>${escape(lb.title || 'Leaderboard')}</span></div>
       ${teams.length > 1 ? `<ol class="lb-list teams">${teams.map((t, i) => row({ ...t, sub: t.members?.join(' · ') || t.sub }, i, 'team')).join('')}</ol>` : ''}
       <ol class="lb-list">${lb.rows.map((r, i) => row(r, i)).join('')}</ol>`;
     this.onLeaderboard?.(el);

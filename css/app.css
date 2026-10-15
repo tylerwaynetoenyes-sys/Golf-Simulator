@@ -459,7 +459,8 @@ body.putting .club-rail { opacity: 0; pointer-events: none; }
 
 body.putting .bottom-center { width: min(820px, calc(100vw - 32px)); }
 
-/* the Piasa */
+/* the Piasa mascot: retired from the HUD (no watermark on the play screen) */
+.piasa-mascot { display: none !important; }
 .piasa-mascot { position: absolute; left: var(--gutter); bottom: var(--gutter); width: 112px; height: 86px; color: var(--amber-hi); cursor: pointer; filter: drop-shadow(0 0 10px rgba(255, 170, 90, 0.25)); opacity: 0.78; transition: opacity 0.3s; }
 .piasa-mascot:hover { opacity: 1; }
 .pz-perch { width: 100%; height: 76px; transform-origin: 40% 100%; animation: pzBreathe 5s ease-in-out infinite; }
