@@ -228,3 +228,22 @@ tower and memorial are modelled from photographs.
 `tools/fetch-sat.py --source eox`, decoded with macOS `sips`). The holes were
 routed on open ground from the OpenStreetMap land cover baked for the
 riverfront (above); the riverfront itself stands at its mapped position.
+
+## Forest Park
+
+`assets/courses/forestpark/`: `dem.*`/`far.*` (Terrarium, USGS 3DEP) and
+`sat.*` (EOxCloudless) as above; `buildings.json` by
+`tools/fetch-buildings.mjs` (OSM, the Central West End and Clayton), with the
+modelled landmarks' footprints skipped. The back nine is The Highlands as
+mapped on OpenStreetMap, imported by `tools/import-course.mjs` (scorecard via
+OpenGolfAPI, ODbL); the front nine is routed over Probstein and Art Hill on
+the OSM land cover. `assets/landmarks/forestpark/` (`tools/bake-alton.mjs`
+in map axes): the park's lakes, drives, lots and footprints.
+
+## Built surfaces
+
+`assets/textures/pbr/` (Poly Haven, CC0; colour, roughness and normal,
+recompressed): white_sandstone_bricks, sandstone_blocks_08,
+concrete_wall_008, brushed_concrete, clay_roof_tiles_02, metal_plate,
+corrugated_iron, asphalt_02, granite_wall, red_bricks_02, white_plaster_02,
+roof_slates_02. Laid on in world space by `js/scene/pbr.js`.

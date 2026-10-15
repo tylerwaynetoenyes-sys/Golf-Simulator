@@ -16,6 +16,7 @@ import harbor from './harbor.js';
 import paris from './paris.js';
 import eaststl from './eaststl.js';
 import cassis from './cassis.js';
+import forestpark from './forestpark.js';
 
-const all = { zoo, delmar, arch, riverfront, riverboat, piasa, chainofrocks, cahokia, basilica, citymuseum, altonlegends, ...western, ...harbor, ...paris, ...eaststl, ...cassis };
+const all = { zoo, delmar, arch, riverfront, riverboat, piasa, chainofrocks, cahokia, basilica, citymuseum, altonlegends, forestpark, ...western, ...harbor, ...paris, ...eaststl, ...cassis };
 export const EXTRA = Object.fromEntries(Object.entries(all).filter(([, b]) => typeof b === 'function'));

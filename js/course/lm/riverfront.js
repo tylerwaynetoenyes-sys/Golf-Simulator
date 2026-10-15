@@ -33,6 +33,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, lit, seeded, canvasTex, tree, SLOT } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
 
 // the baked map, fetched as soon as the module loads (long before a hole is built)
 const BASE = new URL('../../../assets/landmarks/alton/', import.meta.url).href;
@@ -61,15 +62,15 @@ const WY = POOL;
 
 // ── helpers ─────────────────────────────────────────────────────────────────
 const _o = new THREE.Object3D();
-function place(g, x = 0, y = 0, z = 0, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) {
+export function place(g, x = 0, y = 0, z = 0, ry = 0, sx = 1, sy = 1, sz = 1, rx = 0, rz = 0) {
   _o.position.set(x, y, z); _o.rotation.set(rx, ry, rz); _o.scale.set(sx, sy, sz); _o.updateMatrix();
   return g.applyMatrix4(_o.matrix);
 }
-const bx = (w, h, d, x, y, z, ry = 0) => place(new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0), x, y, z, ry);
-const cy = (rt, rb, h, x, y, z, seg = 12) => place(new THREE.CylinderGeometry(rt, rb, h, seg).translate(0, h / 2, 0), x, y, z);
+export const bx = (w, h, d, x, y, z, ry = 0) => place(new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0), x, y, z, ry);
+export const cy = (rt, rb, h, x, y, z, seg = 12) => place(new THREE.CylinderGeometry(rt, rb, h, seg).translate(0, h / 2, 0), x, y, z);
 const _up = new THREE.Vector3(0, 1, 0);
 /** Cylinder from A to B. */
-function rod(A, B, r, seg = 4) {
+export function rod(A, B, r, seg = 4) {
   const d = new THREE.Vector3().subVectors(B, A);
   const L = d.length();
   const g = new THREE.CylinderGeometry(r, r, L, seg, 1, true);
@@ -78,7 +79,7 @@ function rod(A, B, r, seg = 4) {
   return g.translate((A.x + B.x) / 2, (A.y + B.y) / 2, (A.z + B.z) / 2);
 }
 /** Box spanning P→Q (top surface on the P–Q line), width across, depth below. */
-function span(P, Q, width, depth, lat = 0) {
+export function span(P, Q, width, depth, lat = 0) {
   const xa = new THREE.Vector3().subVectors(Q, P);
   const L = xa.length(); xa.normalize();
   const za = new THREE.Vector3().crossVectors(xa, _up).normalize();
@@ -87,7 +88,7 @@ function span(P, Q, width, depth, lat = 0) {
   const g = new THREE.BoxGeometry(L, depth, width).translate(0, -depth / 2, lat).applyMatrix4(m);
   return g.translate((P.x + Q.x) / 2, (P.y + Q.y) / 2, (P.z + Q.z) / 2);
 }
-class Batch {
+export class Batch {
   constructor() { this.m = new Map(); }
   add(material, ...geoms) { if (!this.m.has(material)) this.m.set(material, []); this.m.get(material).push(...geoms); }
   build(group, shadow = true) {
@@ -944,16 +945,17 @@ function faceUp(a) {
   }
 }
 /** Streets and paths draped on the ground; the lots as flat asphalt. */
-function pavingMeshes(D, gy, skipAt) {
+export function pavingMeshes(D, gy, skipAt, { paths = true } = {}) {
   const { x0, z0, step, nx, nz } = D.grid;
   const onMap = (x, z) => x > x0 + 6 && x < x0 + (nx - 1) * step - 6 && z > z0 + 6 && z < z0 + (nz - 1) * step - 6;
-  const asphalt = new THREE.MeshStandardMaterial({ color: 0x5f6062, roughness: 0.92, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-  const pathM = new THREE.MeshStandardMaterial({ color: 0xa79e8c, roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
-  const lotM = new THREE.MeshStandardMaterial({ color: 0x6a6c6e, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+  const asphalt = pbr('asphalt_02', { scale: 6, tint: 0xd8d8d8, offset: -2 });
+  const pathM = pbr('brushed_concrete', { scale: 4, tint: 0xe8e2d6, offset: -2 });
+  const lotM = pbr('asphalt_02', { scale: 6, tint: 0xc8c8c8, offset: -1 });
   const roads = { [asphalt.uuid]: [], [pathM.uuid]: [] };
   for (const r of D.roads) {
     if (r.b) continue; // bridges and ramps: the Clark Bridge is modelled, the rest are lost in the trees
     const path = ['footway', 'path', 'cycleway'].includes(r.k);
+    if (path && !paths && r.k !== 'cycleway') continue; // narrow paths: the imagery has them
     const list = roads[(path ? pathM : asphalt).uuid];
     const w = r.w / 2;
     // resample to <= 8 m so the ribbon follows the ground

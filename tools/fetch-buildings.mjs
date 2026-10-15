@@ -28,7 +28,7 @@ const box = (lat, lon, r) => { const dl = r / 111320, dn = r / (111320 * Math.co
 
 async function overpass(q) {
   for (let i = 0; i < 6; i++) {
-    for (const ep of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
+    for (const ep of ['https://maps.mail.ru/osm/tools/overpass/api/interpreter', 'https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter']) {
       try {
         const r = await fetch(ep, { method: 'POST', body: new URLSearchParams({ data: q }), headers: { 'User-Agent': 'Fairway-golf/1.0 (private, non-commercial)' }, signal: AbortSignal.timeout(180000) });
         if (r.ok) return (await r.json()).elements;

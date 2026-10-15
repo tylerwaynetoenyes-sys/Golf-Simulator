@@ -1,7 +1,12 @@
 // Bake the real ground and map features for the Alton riverfront landmark
 // (Confluence hole 4) into assets/landmarks/alton/.
 //
-//   node tools/bake-alton.mjs <osm.json>
+//   node tools/bake-alton.mjs <osm.json> [--out assets/landmarks/<id>] [--lat --lon]
+//        [--ux e,n --uz e,n] [--box x0,x1,z0,z1] [--step m] [--no-sat]
+//
+// Defaults are the Alton riverfront's. Other places use the same bake in
+// their own frame, e.g. Forest Park in map axes (+x east, +z south):
+//   --out assets/landmarks/forestpark --lat 38.6385 --lon -90.2875 --ux 1,0 --uz 0,-1
 //
 // <osm.json> is an Overpass `out geom` dump of both banks round the Clark
 // Bridge (bbox 38.850,-90.215,38.905,-90.145: buildings, parking, highways,
@@ -26,12 +31,17 @@ let PNG;
 try { ({ PNG } = await import('pngjs')); } catch { ({ PNG } = await import(process.env.PNGJS)); }
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const OUT = join(ROOT, 'assets/landmarks/alton');
-const LAT0 = 38.8877, LON0 = -90.1814; // the amphitheater
+const argv = process.argv.slice(3);
+const opt = (k, d) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : d; };
+const nums = (v) => v.split(',').map(Number);
+const OUT = join(ROOT, opt('out', 'assets/landmarks/alton'));
+// Alton: the amphitheater; the shore between the Argosy and the marina runs 128° (fit to OSM)
+const LAT0 = Number(opt('lat', 38.8877)), LON0 = Number(opt('lon', -90.1814));
 const KX = 111320 * Math.cos((LAT0 * Math.PI) / 180), KY = 110950;
-// the Alton shore between the Argosy and the marina runs 128° (fit to OSM)
-const UX = [0.616, 0.7876], UZ = [0.7876, -0.616];
-const STEP = 12, X0 = -2100, X1 = 1300, Z0 = -1700, Z1 = 1700;
+const UX = nums(opt('ux', '0.616,0.7876')), UZ = nums(opt('uz', '0.7876,-0.616'));
+const [X0, X1, Z0, Z1] = nums(opt('box', '-2100,1300,-1700,1700'));
+const STEP = Number(opt('step', 12));
+const SAT_ON = !argv.includes('--no-sat');
 const NX = Math.round((X1 - X0) / STEP) + 1, NZ = Math.round((Z1 - Z0) / STEP) + 1;
 
 const toLocal = (lat, lon) => {
@@ -39,7 +49,7 @@ const toLocal = (lat, lon) => {
   return [UX[0] * E + UX[1] * N, UZ[0] * E + UZ[1] * N];
 };
 const toGeo = (x, z) => {
-  // inverse of the rotation above
+  // inverse of the rotation above (orthonormal axes)
   const E = UX[0] * x + UZ[0] * z, N = UX[1] * x + UZ[1] * z;
   return [LAT0 + N / KY, LON0 + E / KX];
 };
@@ -155,7 +165,8 @@ for (const a of areas) if (!islands.includes(a) && a[0] !== C.field && a[1].some
 const [aLat, aLon] = toGeo(0, 0);
 const ref = await elev(aLat, aLon);
 const pools = [];
-for (const [x, z] of [[-400, -100], [-450, 200], [-500, -600], [-300, 900]]) pools.push(await elev(...toGeo(x, z)));
+const RIVER = !argv.includes('--no-river'); // a park has lakes at their own levels: no pool to flood
+for (const [x, z] of RIVER ? [[-400, -100], [-450, 200], [-500, -600], [-300, 900]] : [[0, 0], [0, 0]]) pools.push(await elev(...toGeo(x, z)));
 pools.sort((a, b) => a - b);
 const pool = pools[1] - ref; // the pool above Mel Price Lock, relative to the amphitheater
 console.log(`amphitheater ${ref.toFixed(1)} m, river pool ${(pool + ref).toFixed(1)} m (local ${pool.toFixed(2)})`);
@@ -167,8 +178,10 @@ for (let k = 0; k < jobs.length; k += 400) {
     const n = j * NX + i;
     let h = (await elev(...toGeo(X0 + i * STEP, Z0 + j * STEP))) - ref;
     // the DEM reads the water surface: drop the river bed below it, lift land clear
-    if (cls[n] === C.water) h = pool - 2.5;
-    else h = Math.max(h, pool + 0.5);
+    if (RIVER) {
+      if (cls[n] === C.water) h = pool - 2.5;
+      else h = Math.max(h, pool + 0.5);
+    }
     H[n] = Math.round(h * 10);
   }));
   process.stdout.write(`\r  heights ${Math.min(jobs.length, k + 400)}/${jobs.length}`);
@@ -196,6 +209,15 @@ for (const e of osm) {
   else if (t.man_made === 'breakwater' || t.man_made === 'groyne') feat.breakwaters.push(pts);
   else if (t.man_made === 'bridge' && t.name === 'Clark Bridge') feat.clarkOutline = pts;
   else if (t.man_made === 'tower' && t['tower:type'] === 'observation') feat.points.tower = [r1((b[0] + b[2]) / 2), r1((b[1] + b[3]) / 2)];
+  if ((t.natural === 'water' || t.water) && t.name) (feat.lakes ||= []).push({ n: t.name, p: pts });
+}
+// named lakes and basins mapped as multipolygons
+for (const e of osm) {
+  const t = e.tags || {};
+  if (e.type === 'relation' && (t.natural === 'water' || t.water) && t.name) {
+    const r = rings(e);
+    for (const o of r.outer) if (inGrid(bbox(o))) (feat.lakes ||= []).push({ n: t.name, p: o.map(([x, z]) => [r1(x), r1(z)]) });
+  }
 }
 for (const e of osm) {
   const t = e.tags || {};
@@ -208,6 +230,7 @@ feat.pool = r1(pool);
 
 // ── satellite colour, warped into the grid (EOxCloudless 2024, zoom 15) ──
 const SAT = 1024, sz = 15;
+if (SAT_ON) {
 const tmp = join(tmpdir(), 'alton-sat');
 await mkdir(tmp, { recursive: true });
 const satTiles = new Map();
@@ -258,6 +281,8 @@ console.log();
   execFileSync('sips', ['-s', 'format', 'jpeg', '-s', 'formatOptions', '82', bm, '--out', join(OUT, 'sat.jpg')], { stdio: 'ignore' });
 }
 await rm(tmp, { recursive: true, force: true });
+}
+await mkdir(OUT, { recursive: true });
 
 const bin = Buffer.alloc(NX * NZ * 3);
 Buffer.from(H.buffer).copy(bin, 0);
