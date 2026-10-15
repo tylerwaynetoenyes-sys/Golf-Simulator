@@ -178,12 +178,41 @@ add `&manual` to drive frames with `window.__advance(seconds)`.
   reaches, which also fixes crowns that hung into a neighbouring cell on the
   other courses.
 
+## One realistic world (October 15, night)
+
+- **Trees** are real models now (`js/scene/treeModels.js`): evolveduk's
+  Sketchfab set (oak, beech, maple, elm, spruce, juniper, ponderosa, acacia
+  for stone pine / Monterey cypress, palm, a dead snag) plus the Poly Haven
+  olive, exported by `tools/blender/trees.py`. Near trees are the models
+  (at most 110 / 520k triangles, the closest 45 cast shadows); the rest are
+  impostor cards baked from eight views at load. Species slots in
+  `js/scene/trees.js` (`SLOT_MODEL`) keep their old indices; the procedural
+  tree stands in if a model is missing. Per-course sets for Pebble and
+  Sawgrass in `THEME_TREES`. `tools/tree-preview.html` shows the set.
+- **Ground**: view-dependent mowing stripes, coarser patchy rough
+  (`courseWorld` ground shader); East St. Louis lots in scanned asphalt
+  with a scanned rubble heap and grass-tuft weeds.
+- **Grade**: one display-referred pass after tone mapping
+  (`GradeShader` in `js/scene/renderer.js`).
+- **Performance**: rough grass and shrubs in 40 m chunks with a far LOD
+  (`_chunked` / `_cullChunks`); `js/scene/merge.js` merges static parts by
+  material (imported models, landmarks without `update()`, scenery, decay);
+  glTF transmission is stripped on load (it doubles the whole frame);
+  spectators past 45 m use `people_lo.glb`. Tablets default to Medium.
+- **Measure**: `node tools/perf.mjs --base <url> course:hole ...` drives
+  headless Chrome on the Mac's GPU at iPad Air resolution and prints frame
+  time, draw calls, triangles and tree split per hole. On Medium every
+  course holds 60 fps on the M1 with 120–280 draw calls and 0.6–1.4M
+  triangles (shadow pass included).
+
 ## Next steps
 
 - Long and middle irons land 2–4° flatter than Trackman; closing that needs
   a Reynolds-dependent drag curve (see `docs/physics.md`).
-- More scanned trees (Poly Haven has few suitable for parkland); the
-  `HERO_SOURCES` list in `js/scene/trees.js` takes more.
+- More tree species: add a model to `SPECIES` in `js/scene/treeModels.js`
+  and point a slot at it in `SLOT_MODEL` (`js/scene/trees.js`).
+- Some landmark builders still plant round procedural trees (the riverfront
+  on the Confluence); they could use `treeModels.buildForest`.
 - Import more real courses with `tools/import-course.mjs` (US courses via
   OpenGolfAPI; anywhere OSM has `golf=hole` ways via `--lat/--lon`).
 - Back nines for the real-terrain courses.
