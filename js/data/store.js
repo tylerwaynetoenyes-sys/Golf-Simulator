@@ -11,10 +11,15 @@ function load() {
   } catch { return null; }
 }
 
+// iPads (iPadOS reports itself as a Mac with a touch screen) start on Medium:
+// 60 fps there matters more than the last 25% of pixels
+const TABLET = typeof navigator !== 'undefined' && (/iPad|Android(?!.*Mobile)/.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+
 const DEFAULT_SETTINGS = {
   units: 'imperial',
   camera: 'cinematic', // cinematic | follow | tee
-  quality: 'high', // high | medium | low
+  quality: TABLET ? 'medium' : 'high', // high | medium | low
   volume: 0.8,
   ambience: 0.6,
   ghostTracers: true,

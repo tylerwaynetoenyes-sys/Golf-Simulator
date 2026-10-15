@@ -86,8 +86,35 @@ and in the in-game course card.
   - `aerial_grass_rock` and `dense_sand` textures, processed in Blender
     (`tools/blender/detail.py`) to `assets/textures/ground_detail.jpg` and
     `sand_detail.jpg`
-- **Fairway logo, icons and every other model** (landmarks, trees, the club,
-  the course scenery): made for Fairway, in code, in this repository.
+- **Sketchfab models**, Creative Commons Attribution 4.0 (CC BY 4.0,
+  https://creativecommons.org/licenses/by/4.0/). Each was decimated, its
+  textures resized to 2K or less and exported Draco-compressed in Blender;
+  credit per model:
+
+  | File | Model | Author |
+  |---|---|---|
+  | `assets/models/trees/oak.glb` | [Oak tree](https://sketchfab.com/3d-models/6468dd4d3eb240ef902b9057d9913606) | evolveduk |
+  | `assets/models/trees/beech.glb` | [Beech tree](https://sketchfab.com/3d-models/0983d8933531491f9be71c669e8a907b) | evolveduk |
+  | `assets/models/trees/maple.glb` | [Maple Tree](https://sketchfab.com/3d-models/b5e945e7abcc471da6547c04e314774c) | evolveduk |
+  | `assets/models/trees/elm.glb` | [Elm tree](https://sketchfab.com/3d-models/f36443d3e59946bfa38b3f5cb90ea5fa) | evolveduk |
+  | `assets/models/trees/oldtree.glb` | [Old tree](https://sketchfab.com/3d-models/3cb4d59eb4844dc4802480e9ee53785e) | evolveduk |
+  | `assets/models/trees/acacia.glb` | [Acacia tree](https://sketchfab.com/3d-models/bb14c2bb679b4d0bb1c578a27e2ddabf) | evolveduk |
+  | `assets/models/trees/pine.glb` | [Pine Tree](https://sketchfab.com/3d-models/d45218a3fab349e5b1de040f29e7b6f9) | evolveduk |
+  | `assets/models/trees/spruce.glb` | [Spruce](https://sketchfab.com/3d-models/a50a5df3164246a5af97992cec33a143) | evolveduk |
+  | `assets/models/trees/juniper.glb` | [Juniper](https://sketchfab.com/3d-models/e74c7156984542c2a4cdf6ce8a0c8e96) | evolveduk |
+  | `assets/models/trees/palm.glb` | [Coconut Palm](https://sketchfab.com/3d-models/26e787f2ff2e4c0fb004c3b0210805a3) | evolveduk |
+  | `assets/models/eiffel_tower.glb` | [Eiffel Tower](https://sketchfab.com/3d-models/6830e60d2c1048f2a33e92679664f652) | Johnson-Martin |
+  | `assets/models/statue_of_liberty.glb` | [Statue of Liberty, New York, NY, USA](https://sketchfab.com/3d-models/8401e1c10480476e8d7e3085d1aec923) | CMBC |
+  | `assets/models/lowrider_impala.glb` | [Impala 1964 Lowrider](https://sketchfab.com/3d-models/c68508c056a34a34997992deb4355166) | mrkuza |
+  | `assets/models/abandoned_sedan.glb` | [Crashed Abandoned Car - Game Ready](https://sketchfab.com/3d-models/66ef51a84c9843dda53bf0b4b9020011) | rashad-brahimli |
+  | `assets/models/people_real.glb` | [Dennis Posed 004](https://sketchfab.com/3d-models/e211ffd52a96416e89c0cc415a388d61), [Mei Posed 001](https://sketchfab.com/3d-models/07f308b81bc045c8917104a72ce2ffe4), [Fabienne & Percy 001](https://sketchfab.com/3d-models/8c9bfd4fb8a444b3a42a4fc31935a2fb) | Renderpeople |
+  | `assets/models/people_real.glb` | an athletic man walking (scan) | deep3dstudio |
+
+  The tree set is drawn by `js/scene/treeModels.js`: models near the camera,
+  impostor cards baked from eight views of each model beyond 150 m.
+- **Fairway logo, icons and every other model** (landmarks, the club, the
+  course scenery, the procedural stand-in trees): made for Fairway, in code,
+  in this repository.
 
 ## Sound and music
 

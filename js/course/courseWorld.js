@@ -9,8 +9,11 @@ import { createWaterMaterial, waterMaterials } from '../scene/river.js';
 import { makeFlag, lightConeMaterial } from '../scene/rangeProps.js';
 import { CUP } from '../core/physics.js';
 import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
-import { plantTrees, updateTrees, THEME_TREES } from '../scene/trees.js';
+import { plantTrees, updateTrees, THEME_TREES, treesFor } from '../scene/trees.js';
 import { tuftGeometry, grassMaterial, GRASS } from './grass.js';
+
+/** Rough-grass tufts are drawn out to this distance from the camera (m). */
+const GRASS_FAR = 110;
 import { buildCity } from './buildings.js';
 import { dressLots } from './streetlife.js';
 import { dressScenery } from './scenery.js';
@@ -128,6 +131,7 @@ export class CourseWorld {
       });
     }
     this.hole = hole;
+    this.grassChunks = null;
     this.rings = null;
     this._ringKey = null;
     this.ringTarget = 0;
@@ -407,7 +411,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
         hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(),
       });
     };
-    const TT = THEME_TREES[hole.theme] || THEME_TREES.parkland;
+    const TT = treesFor(hole);
     const quality = (this.treeDensity ?? 1) * TT.density;
     const pickBroad = () => TT.broad[Math.floor(rand() * TT.broad.length)];
     const pickConifer = () => TT.conifer[Math.floor(rand() * TT.conifer.length)];
@@ -536,17 +540,6 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
       for (const p of far) {
         treeSpots.push({ x: p.x, z: p.z, y: T.baseGround(p.x, p.z) - 0.25, variant: bySite(p.x, p.z), rot: rand() * 6.28,
           scale: 0.75 + rand() * 0.5, squash: 0.85 + rand() * 0.3, hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(), far: true });
-      }
-    }
-    // scanned (Poly Haven) trees are ~35k triangles each: keep them to the
-    // trees that frame play, and let the procedural variant stand in beyond
-    {
-      let heroes = 0;
-      const cap = Math.round(30 * (this.treeDensity ?? 1));
-      for (const sp of treeSpots) {
-        if (sp.variant < 100) continue;
-        if (sp.far || heroes >= cap) sp.variant = 10; // procedural olive
-        else heroes++;
       }
     }
     const forest = plantTrees(treeSpots);
@@ -1141,6 +1134,9 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
     if (!this.tuftGeo) {
       this.tuftGeo = tuftGeometry(14);
       this.tuftGeo.userData.shared = true;
+      // half the blades for chunks past 45 m
+      this.tuftGeoLo = tuftGeometry(7);
+      this.tuftGeoLo.userData.shared = true;
       this.tuftMat = grassMaterial(0x6a8a3a);
     }
     const N = Math.round(15000 * (this.treeDensity ?? 1));
@@ -1149,8 +1145,11 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       this.tuftMats ||= {};
       this.tuftMats[tint] = grassMaterial(tint);
     }
-    const tufts = new THREE.InstancedMesh(this.tuftGeo, tint ? this.tuftMats[tint] : this.tuftMat, N);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    // binned into 40 m chunks so the ones out of view or too far to read
+    // (tufts are a few pixels at 100 m) aren't drawn at all
+    const CELL = 40;
+    const cells = new Map();
     let n = 0;
     for (let i = 0; i < N * 3 && n < N; i++) {
       const s = -10 + rand() * (T.length + 40);
@@ -1166,11 +1165,32 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       q.setFromAxisAngle(up, rand() * 6.28);
       const spread = 0.8 + rand() * 0.7;
       sc.set(spread, h, spread);
-      tufts.setMatrixAt(n++, m4.compose(p.set(x, this._coarseH(x, z) - 0.02, z), q, sc));
+      const key = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push(m4.compose(p.set(x, this._coarseH(x, z) - 0.02, z), q, sc).clone());
+      n++;
     }
-    tufts.count = n;
-    tufts.receiveShadow = true;
-    g.add(tufts);
+    this.grassChunks = [];
+    for (const list of cells.values()) {
+      const tufts = new THREE.InstancedMesh(this.tuftGeo, tint ? this.tuftMats[tint] : this.tuftMat, list.length);
+      list.forEach((m, k) => tufts.setMatrixAt(k, m));
+      tufts.computeBoundingSphere();
+      tufts.receiveShadow = true;
+      g.add(tufts);
+      this.grassChunks.push(tufts);
+    }
+  }
+
+  /** Rough-grass chunks beyond reading distance are skipped. */
+  _cullGrass(camera) {
+    if (!camera || !this.grassChunks) return;
+    const far = GRASS_FAR * (this.treeDensity >= 1 ? 1 : 0.8);
+    for (const c of this.grassChunks) {
+      const b = c.boundingSphere;
+      const d = camera.position.distanceTo(b.center) - b.radius;
+      c.visible = d < far;
+      c.geometry = d < 45 ? this.tuftGeo : this.tuftGeoLo;
+    }
   }
 
   /**
@@ -1379,6 +1399,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       }
     }
     // rough grass: wind (the way the air moves) and the ball it parts around
+    this._cullGrass(camera);
     GRASS.uTime.value = t;
     const wr = ((this.windFrom ?? 0) * Math.PI) / 180;
     GRASS.uWind.value.set(-Math.sin(wr), Math.cos(wr)).multiplyScalar(this.wind ?? 0);
@@ -1410,7 +1431,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
     for (const lm of this.farLms || []) lm.update?.(t, dt, this.day);
     for (const fp of this.flagpoles || []) fp.userData.update(t, this.wind);
     this.fireworks?.userData.update(dt, this.day);
-    updateTrees(t, this.wind);
+    updateTrees(t, this.wind, camera);
     if (this.rings) {
       const u = this.rings.material.uniforms;
       u.uTime.value = t;

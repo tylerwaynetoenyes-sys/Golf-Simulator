@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tree Preview</title>
+<style>html,body{margin:0;height:100%;background:#9fc3dc;overflow:hidden;font:13px system-ui;color:#fff}#hud{position:fixed;left:12px;top:10px;text-shadow:0 1px 2px #000;white-space:pre}</style>
+<script type="importmap">{"imports":{"three":"../vendor/three/three.module.js","three/addons/":"../vendor/three/addons/"}}</script>
+</head>
+<body>
+<div id="hud"></div>
+<script type="module">
+// Dev tool: the tree models in a row, then a forest out to the horizon, with
+// the draw-call and triangle counts the LOD split gives.
+// /tools/tree-preview.html?species=oak,elm&forest=3000&view=row|forest&near=150&cam=x,y,z&at=x,y,z
+import * as THREE from 'three';
+import { SPECIES, LOD, loadSpecies, species, buildForest, updateForests, setTreeWind, forestStats } from '../js/scene/treeModels.js';
+
+const q = new URLSearchParams(location.search);
+const names = (q.get('species') || Object.keys(SPECIES).join(',')).split(',');
+if (q.get('near')) LOD.near = +q.get('near');
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+r.setPixelRatio(Math.min(devicePixelRatio, 2));
+r.setSize(innerWidth, innerHeight);
+r.shadowMap.enabled = true;
+r.toneMapping = THREE.ACESFilmicToneMapping;
+document.body.appendChild(r.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xa9c8de);
+scene.fog = new THREE.Fog(scene.background, 300, 2500);
+scene.add(new THREE.HemisphereLight(0xdfeeff, 0x4a5a32, 1.1));
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.6);
+sun.position.set(120, 160, 80);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -120, right: 120, top: 120, bottom: -120, far: 600 });
+scene.add(sun);
+const lawn = new THREE.Mesh(new THREE.PlaneGeometry(8000, 8000).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x4f7a34, roughness: 1 }));
+lawn.receiveShadow = true;
+scene.add(lawn);
+const cam = new THREE.PerspectiveCamera(52, innerWidth / innerHeight, 0.1, 9000);
+const target = new THREE.Vector3();
+const ctl = { target, update: () => cam.lookAt(target) };
+// scripted views: window.__look([x, y, z], [tx, ty, tz])
+window.__look = (p, t) => { cam.position.set(...p); target.set(...t); ctl.update(); };
+
+await loadSpecies(names);
+const recs = names.map(species).filter(Boolean);
+const list = [];
+const tint = (h) => new THREE.Color().setHSL(0.25 + h * 0.05, 0.25, 0.92);
+recs.forEach((rec, i) => list.push({ rec, x: (i - (recs.length - 1) / 2) * 16, y: 0, z: 0, rot: i, sx: 1, sy: 1, tint: tint(Math.random()) }));
+const N = +(q.get('forest') || 2500);
+let seed = 7;
+const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+for (let i = 0; i < N; i++) {
+  const a = rnd() * Math.PI * 2, d = 40 + Math.sqrt(rnd()) * 1400;
+  const rec = recs[Math.floor(rnd() * recs.length)];
+  const s = 0.8 + rnd() * 0.5;
+  list.push({ rec, x: Math.cos(a) * d, y: 0, z: Math.sin(a) * d - 60, rot: rnd() * 6.28, sx: s * (0.85 + rnd() * 0.3), sy: s, tint: tint(rnd()) });
+}
+scene.add(buildForest(list));
+const view = q.get('view') || 'row';
+if (view === 'row') { cam.position.set(0, 9, 55); ctl.target.set(0, 7, 0); }
+else { cam.position.set(0, 2, 120); ctl.target.set(0, 4, 0); }
+if (q.get('cam')) cam.position.set(...q.get('cam').split(',').map(Number));
+if (q.get('at')) target.set(...q.get('at').split(',').map(Number));
+ctl.update();
+addEventListener('resize', () => { r.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+const hud = document.getElementById('hud');
+let last = performance.now(), acc = 0, frames = 0, ms = 0;
+window.__stats = {};
+r.setAnimationLoop((now) => {
+  const dt = now - last; last = now; acc += dt; frames++;
+  setTreeWind(now / 1000, 0.4);
+  updateForests(cam);
+  r.render(scene, cam);
+  if (acc > 500) { ms = acc / frames; acc = 0; frames = 0; }
+  const st = forestStats();
+  window.__stats = { calls: r.info.render.calls, tris: r.info.render.triangles, ms, ...st };
+  hud.textContent = `${recs.map((x) => `${x.name} ${Math.round(x.tris)}`).join('  ')}\ncalls ${r.info.render.calls}  tris ${(r.info.render.triangles / 1000).toFixed(0)}k  near ${st.near}  far ${st.far}  ${ms.toFixed(1)} ms`;
+});
+</script>
+</body>
+</html>

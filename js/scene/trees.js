@@ -1,54 +1,39 @@
-// Procedural parkland trees for the course: a few hand-tuned variants of
-// Mississippi-bluff species (white oak, sugar maple, sycamore, eastern red
-// cedar), each a trunk with real branches and a canopy of lumpy leaf clusters
-// shaded with baked ambient occlusion. Variants are merged once and drawn
-// with instancing; leaves sway in the wind in the vertex shader.
+// Course trees. Each species slot (an index into VARIANTS) draws with a
+// real model from js/scene/treeModels.js (bark and alpha-tested leaf cards,
+// near models plus impostor cards at range); the procedural tree of the same
+// slot below stands in while models load or if one is missing.
 //
 // Every planted tree is also returned as a collision record
 // {x, z, y0, top, r, kind} so the ball can be stopped by canopies and the
 // camera can stay out of them.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { loadSpecies, species, buildForest, updateForests, setTreeWind } from './treeModels.js';
 
-/**
- * Scanned trees from Poly Haven (CC0), thinned and re-exported in Blender by
- * tools/blender/tree.py. They join the procedural set as extra variants once
- * loaded (index VARIANTS.length + i); until then their spots use `fallback`.
- */
-const HERO_SOURCES = [
-  // a gnarled Mediterranean tree that reads as an old olive (Poly Haven "Island Tree 02")
-  { url: 'assets/models/island_tree_02.glb', height: 6.5, fallback: 10 },
+/** The model each species slot draws with (VARIANTS index → SPECIES name). */
+const SLOT_MODEL = [
+  'oak', 'beech', 'maple', 'elm', // white oak, younger oak, sugar maple, sycamore
+  'juniper', 'spruce', // eastern red cedar, conifer
+  'elm', 'juniper', 'pine', // cottonwood, Rocky Mountain juniper, ponderosa
+  'acacia', 'olive', 'juniper', // stone pine / Monterey cypress, olive, Italian cypress
+  'palm', 'oldtree', // sabal palm, a dead snag
 ];
-const heroes = [];
-let heroLoad = null;
-export function loadHeroTrees() {
-  if (heroLoad) return heroLoad;
-  const loader = new GLTFLoader();
-  heroLoad = Promise.all(HERO_SOURCES.map((src, i) => new Promise((res) => {
-    loader.load(src.url, (g) => {
-      const parts = [];
-      const box = new THREE.Box3().setFromObject(g.scene);
-      const k = src.height / Math.max(0.01, box.max.y - box.min.y);
-      g.scene.updateMatrixWorld(true);
-      g.scene.traverse((o) => {
-        if (!o.isMesh) return;
-        const geo = o.geometry.clone().applyMatrix4(o.matrixWorld).scale(k, k, k);
-        geo.translate(0, -box.min.y * k, 0);
-        const m = o.material;
-        if (m.transparent || m.alphaTest > 0 || /leaves/i.test(m.name)) { m.transparent = false; m.alphaTest = 0.5; m.side = THREE.DoubleSide; }
-        geo.userData.shared = true;
-        parts.push({ geometry: geo, material: m });
-      });
-      const w = Math.max(box.max.x - box.min.x, box.max.z - box.min.z) * k;
-      heroes[i] = { parts, height: src.height, radius: w * 0.42, crownY: src.height * 0.35, kind: 'broad' };
-      res();
-    }, undefined, () => res()); // missing model: the fallback variant stands in
-  })));
-  return heroLoad;
+
+/** Index of the scanned olive (kept for older THEME_TREES lists). */
+export const HERO = () => 10;
+
+let loading = null;
+/**
+ * Load the models a course's trees need (browser only); pass the course id
+ * and theme, or nothing for every species.
+ */
+export function loadHeroTrees(courseId, theme) {
+  const sets = [THEME_TREES[courseId], THEME_TREES[theme]].filter(Boolean);
+  const slots = sets.length ? sets.flatMap((t) => [...t.broad, ...t.conifer]) : SLOT_MODEL.map((_, i) => i);
+  const names = [...new Set(slots.map((i) => SLOT_MODEL[i >= 100 ? 10 : i]))];
+  loading = Promise.all([loading, loadSpecies(names)]);
+  return loading;
 }
-/** Variant index of hero tree i (use in THEME_TREES lists). */
-export const HERO = (i) => 100 + i;
 
 function seeded(seed) {
   let s = seed >>> 0;
@@ -352,6 +337,10 @@ const VARIANTS = [
   (s) => stonepine(s + 9, { height: 14 }),
   (s) => olive(s + 10, { height: 6 }),
   (s) => cypressTree(s + 11, { height: 13 }),
+  // Florida: sabal palm (an umbrella crown stands in until the model loads)
+  (s) => stonepine(s + 12, { height: 11 }),
+  // derelict lots: a dead tree
+  (s) => broadleaf(s + 13, { height: 10, spread: 0.7, tint: 0x5d6640 }),
 ];
 
 /** Tree species index sets per course theme. */
@@ -360,14 +349,22 @@ export const THEME_TREES = {
   western: { broad: [6], conifer: [7, 7, 8], density: 0.45, conifersFirst: true, scatter: 1 },
   // Provence: umbrella pines and Aleppo pines on the slopes, olives and
   // cypresses lower down
-  coastal: { broad: [9, 10, HERO(0), HERO(0)], conifer: [9, 8, 11], density: 0.6, conifersFirst: true, scatter: 0.8 },
-  // East St. Louis bottomland: cottonwood, silver maple, sycamore
-  industrial: { broad: [6, 2, 3], conifer: [4], density: 0.55, scatter: 0.5 },
+  coastal: { broad: [9, 10, 10, 10], conifer: [9, 8, 11], density: 0.6, conifersFirst: true, scatter: 0.8 },
+  // East St. Louis bottomland: cottonwood, silver maple, sycamore, dead snags
+  industrial: { broad: [6, 2, 3, 13], conifer: [4], density: 0.55, scatter: 0.5 },
   // the Bois de Boulogne: oaks, chestnuts, planes and the odd conifer
   paris: { broad: [0, 1, 2, 3], conifer: [4, 5], density: 0.95, scatter: 0.7 },
   urban: { broad: [0, 2, 3], conifer: [4], density: 0.85, scatter: 0.6 },
   harbor: { broad: [0, 2], conifer: [4], density: 0.15, scatter: 0 }, // links-style, open to the water
+  // per course, ahead of the theme:
+  // Pebble Beach: Monterey cypress on the cliffs, Monterey pine inland
+  pebble: { broad: [9, 9, 0], conifer: [8, 9], density: 0.5, conifersFirst: true, scatter: 0.7 },
+  // TPC Sawgrass: live oaks, sabal palms and slash pine
+  sawgrass: { broad: [0, 12, 12, 1], conifer: [8], density: 0.75, scatter: 0.6 },
 };
+
+/** The tree set for a hole: its course's own, else its theme's. */
+export const treesFor = (hole) => THEME_TREES[hole.course] || THEME_TREES[hole.theme] || THEME_TREES.parkland;
 
 let cache = null;
 function variants() {
@@ -421,29 +418,25 @@ export function plantTrees(spots) {
   const sycBarkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   const by = vs.map(() => []);
-  const byHero = HERO_SOURCES.map(() => []);
+  const modelled = [];
+  const tint = new THREE.Color(), white = new THREE.Color(1, 1, 1);
   for (const s of spots) {
-    if (s.variant >= 100) {
-      const i = s.variant - 100;
-      if (heroes[i]) { byHero[i].push(s); continue; }
-      s.variant = HERO_SOURCES[i]?.fallback ?? 0;
+    const slot = s.variant >= 100 ? 10 : s.variant % vs.length;
+    const rec = species(SLOT_MODEL[slot]);
+    if (!rec) { s.variant = slot; by[slot].push(s); continue; }
+    // the model at the slot's design height, or at the surveyed one
+    let sy = s.scale * (vs[slot].height / rec.height), sx = sy * s.squash;
+    if (s.height) {
+      sy = s.height / rec.height;
+      sx = s.crown ? sy * Math.min(1.8, Math.max(0.55, s.crown / (rec.radius * sy))) : sy;
     }
-    by[s.variant % vs.length].push(s);
+    // a little variety in the foliage: hue, and a lighter or darker crown
+    tint.setHSL(s.hue, 0.3 + s.sat * 0.2, 0.55);
+    const t = white.clone().lerp(tint, 0.22).multiplyScalar(0.86 + s.light * 0.24);
+    modelled.push({ rec, x: s.x, y: s.y, z: s.z, rot: s.rot, sx, sy, tint: t });
+    records.push({ far: !!s.far, x: s.x, z: s.z, y0: s.y + rec.crownY * sy, top: s.y + rec.height * sy, r: rec.radius * sx, kind: rec.kind });
   }
-  byHero.forEach((list, i) => {
-    if (!list.length) return;
-    const h = heroes[i];
-    const meshes = h.parts.map((p) => new THREE.InstancedMesh(p.geometry, p.material, list.length));
-    list.forEach((s, k) => {
-      fit(s, h.height, h.radius);
-      q.setFromAxisAngle(up, s.rot);
-      sc.set(s.scale * s.squash, s.scale, s.scale * s.squash);
-      m4.compose(p.set(s.x, s.y, s.z), q, sc);
-      for (const m of meshes) m.setMatrixAt(k, m4);
-      records.push({ far: !!s.far, x: s.x, z: s.z, y0: s.y + h.crownY * s.scale, top: s.y + h.height * s.scale, r: h.radius * s.scale * s.squash, kind: h.kind });
-    });
-    for (const m of meshes) { m.castShadow = true; m.receiveShadow = true; group.add(m); }
-  });
+  if (modelled.length) group.add(buildForest(modelled));
   const tc = new THREE.Color();
   vs.forEach((v, i) => {
     const list = by[i];
@@ -470,8 +463,10 @@ export function plantTrees(spots) {
 
 export const TREE_VARIANTS = VARIANTS.length;
 
-/** Shared wind sway for all leaves. */
-export function updateTrees(t, wind) {
+/** Shared wind sway for all leaves; with a camera, the near / impostor split too. */
+export function updateTrees(t, wind, camera = null) {
   swayUniforms.uTime.value = t;
   swayUniforms.uWind.value = wind;
+  setTreeWind(t, wind);
+  if (camera) updateForests(camera);
 }

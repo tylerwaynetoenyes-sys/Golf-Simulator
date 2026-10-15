@@ -36,9 +36,9 @@ export async function loadCourse(id) {
   const c = courseById(id);
   // imported models (Eiffel Tower, statue, cars, people), browser only
   const models = typeof window !== 'undefined' ? import('../scene/models.js').then((m) => m.preloadCourseModels(c.id)) : null;
-  if (!c.dem) { await models; loaded.set(id, c); return c; }
-  // scanned trees load alongside the terrain (browser only; the Node tools skip them)
-  const trees = typeof window !== 'undefined' ? import('../scene/trees.js').then((m) => m.loadHeroTrees()) : null;
+  // the course's tree models load alongside the terrain (browser only; the Node tools skip them)
+  const trees = typeof window !== 'undefined' ? import('../scene/trees.js').then((m) => m.loadHeroTrees(c.id, c.theme)) : null;
+  if (!c.dem) { await Promise.all([models, trees]); loaded.set(id, c); return c; }
   const [d] = await Promise.all([loadDem(c.id), trees, models]);
   const out = { ...c, holes: prepareDemHoles(c, d) };
   loaded.set(id, out);

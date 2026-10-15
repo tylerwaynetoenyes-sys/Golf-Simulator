@@ -1,4 +1,4 @@
-# Poly Haven assets through Blender
+# Poly Haven and Sketchfab assets through Blender
 
 Scanned assets from [Poly Haven](https://polyhaven.com) (CC0) are prepared in
 Blender (4.3, run headless) before they ship in `assets/`.
@@ -28,3 +28,14 @@ the scan adds texture without changing the palette.
 
 Downloads come from `https://api.polyhaven.com/files/<asset>`; check their
 MD5 against the API when refreshing them.
+
+## Course trees (Sketchfab, CC BY)
+
+`trees.py` turns a Sketchfab tree into a game-ready GLB for
+`js/scene/treeModels.js`: bark decimated to ~2,600 triangles with 512 px
+textures, leaf cards kept whole with 1024 px colour and alpha, Draco and WebP.
+The ten trees in `assets/models/trees/` (evolveduk's set; credits in
+`docs/SOURCES.md`) were imported through the Blender MCP add-on and exported
+with `fairway_export`, then removed again with `fairway_remove`, which only
+touches the import's own objects and data. Each is 150–320 KB and 2.6–6.6 k
+triangles.
