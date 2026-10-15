@@ -92,6 +92,8 @@ function swap(uni, kind) {
 
 /** Give a hole's ground (and the land beyond it) real rock on its steep faces. */
 export function patchRock(root, courseId) {
+  // Cahokia's mounds are grassed earth, built by hand: no cliff rock on their faces
+  if (courseId === 'cahokia') return;
   const kind = BY_COURSE[courseId] || 'limestone';
   root.traverse((o) => {
     if (!o.isMesh || o.isInstancedMesh) return;

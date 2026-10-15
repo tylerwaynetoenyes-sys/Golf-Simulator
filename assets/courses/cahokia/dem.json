@@ -1,0 +1,31 @@
+{
+  "lat": 38.65711,
+  "lon": -90.06698,
+  "size": 2400.0,
+  "step": 2.0,
+  "n": 1201,
+  "min": 120.88,
+  "max": 158.15,
+  "lidar": true,
+  "source": "USGS 3DEP 1 m bare-earth DEM (IL_10CountyNRCS_D23, IL_HicksDome_FluorsparDistrict_2019_D19), public domain",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 15 x75y429 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 658209
+    },
+    {
+      "tile": "USGS 1 Meter 16 x23y429 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 110
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y429 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 784082
+    }
+  ]
+}

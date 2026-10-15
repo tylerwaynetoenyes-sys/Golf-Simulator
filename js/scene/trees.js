@@ -364,6 +364,8 @@ export const THEME_TREES = {
   pebble: { broad: [9, 9, 0], conifer: [8, 9], density: 0.5, conifersFirst: true, scatter: 0.7 },
   // Forest Park: open lawns under big oaks, maples and sycamores, the odd pine
   forestpark: { broad: [0, 2, 3, 1], conifer: [4, 5], density: 0.55, scatter: 0.4 },
+  // Cahokia: open mown grounds, woods along the creeks and ponds
+  cahokia: { broad: [0, 2, 3, 6], conifer: [4], density: 0.45, scatter: 0.35 },
   // Confluence Point: the open farmland of the American Bottom, tree lines along the ditches
   confluencepoint: { broad: [6, 2, 3], conifer: [4], density: 0.3, scatter: 0.25 },
   // Alton: river-bottom cottonwoods, silver maples and sycamores, open parks along the water

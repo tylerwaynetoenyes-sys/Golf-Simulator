@@ -279,3 +279,13 @@ Courthouse's footprint skipped for the model). `assets/landmarks/gatewayarch/`
 (`tools/bake-alton.mjs`, map axes, OSM from the main API): the grounds' ponds,
 walks and streets. The Arch's form is scene/skyline.js (the published
 catenary); its axis from the OSM leg nodes.
+
+## Cahokia Mounds
+
+`assets/courses/cahokia/dem.*`: USGS 3DEP 1 m LiDAR (IL MadisonCo 2014,
+public domain) by `tools/fetch-lidar.py`, 2 m over 2.4 km; `far.*` its
+overviews and Terrarium; `sat.*` EOxCloudless. `assets/landmarks/cahokia/`
+(`tools/bake-alton.mjs`, map axes, OSM from the main API): the mounds as
+mapped (holes are routed at least 60 m off every one, the Grand Plaza left
+unplayed), the paths and the Interpretive Center's footprint. Hole notes from
+the Cahokia Mounds State Historic Site and UNESCO World Heritage listing.

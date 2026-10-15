@@ -1,0 +1,121 @@
+{
+  "lat": 38.65711,
+  "lon": -90.06698,
+  "size": 16000,
+  "step": 32,
+  "n": 501,
+  "min": 118.45,
+  "max": 190.9,
+  "lidar": false,
+  "source": "USGS 3DEP 1 m bare-earth DEM (IL_10CountyNRCS_D23, IL_HicksDome_FluorsparDistrict_2019_D19, IL_MadisonCo_2014), public domain; 0.3% from Terrarium tiles (AWS Open Data)",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 15 x74y429 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 20447
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y430 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 1761
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y429 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 69125
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y430 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 7810
+    },
+    {
+      "tile": "USGS 1 Meter 15 x76y429 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 21270
+    },
+    {
+      "tile": "USGS 1 Meter 15 x76y430 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 2953
+    },
+    {
+      "tile": "USGS 1 Meter 16 x23y429 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 29
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y428 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 13967
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y429 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 7628
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y428 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 50736
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y429 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 27904
+    },
+    {
+      "tile": "USGS 1 Meter 15 x76y428 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 16670
+    },
+    {
+      "tile": "USGS 1 Meter 15 x76y429 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 9714
+    },
+    {
+      "tile": "USGS 1 Meter 16 x23y428 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 2
+    },
+    {
+      "tile": "USGS 1 Meter 16 x23y429 IL_HicksDome_FluorsparDistrict_2019_D19",
+      "project": "IL_HicksDome_FluorsparDistrict_2019_D19",
+      "published": "2022-03-19",
+      "samples": 2
+    },
+    {
+      "tile": "USGS one meter x23y429 IL MadisonCo 2014",
+      "project": "IL_MadisonCo_2014",
+      "published": "2020-03-30",
+      "samples": 5
+    },
+    {
+      "tile": "USGS one meter x74y429 IL MadisonCo 2014",
+      "project": "IL_MadisonCo_2014",
+      "published": "2020-03-30",
+      "samples": 12
+    },
+    {
+      "tile": "USGS one meter x75y429 IL MadisonCo 2014",
+      "project": "IL_MadisonCo_2014",
+      "published": "2020-03-30",
+      "samples": 192
+    }
+  ]
+}
