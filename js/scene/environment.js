@@ -296,6 +296,7 @@ export class Environment {
     r.renderer.toneMappingExposure = THREE.MathUtils.lerp(NIGHT.exposure, DAY.exposure, d);
     r.bloom.strength = THREE.MathUtils.lerp(NIGHT.bloom, DAY.bloom, d);
     r.bloom.threshold = THREE.MathUtils.lerp(NIGHT.bloomThreshold, DAY.bloomThreshold, d);
+    if (r.grade) r.grade.uniforms.uNight.value = 1 - d;
 
     // the set pieces
     w.skyline.setDay(d);

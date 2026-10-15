@@ -225,7 +225,7 @@ export function buildDecay(T, rand, ground, clear) {
     const c = box.getCenter(new THREE.Vector3());
     heap.position.set(-c.x, -box.min.y, -c.z);
     // the scan's own light is baked in brighter and bluer than the scene's
-    heap.traverse((o) => { if (o.isMesh) { o.material.color.setRGB(0.66, 0.64, 0.6); o.material.roughness = 1; o.castShadow = true; } });
+    heap.traverse((o) => { if (o.isMesh) { o.material.color.setRGB(0.46, 0.44, 0.41); o.material.roughness = 1; o.castShadow = true; } });
     heap = new THREE.Group().add(heap);
   }
   for (let i = 0; i < 5; i++) {

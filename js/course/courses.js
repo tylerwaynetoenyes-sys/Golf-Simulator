@@ -32,12 +32,13 @@ const loaded = new Map([[CONFLUENCE.id, CONFLUENCE]]);
 
 /** Resolve a course with playable holes (fetches and prepares DEM courses once). */
 export async function loadCourse(id) {
-  if (loaded.has(id)) return loaded.get(id);
   const c = courseById(id);
+  // the course's tree models (browser only; the Node tools skip them). The
+  // Confluence is registered up front, so it needs them asked for here too
+  const trees = typeof window !== 'undefined' ? import('../scene/trees.js').then((m) => m.loadHeroTrees(c.id, c.theme)) : null;
+  if (loaded.has(id)) { await trees; return loaded.get(id); }
   // imported models (Eiffel Tower, statue, cars, people), browser only
   const models = typeof window !== 'undefined' ? import('../scene/models.js').then((m) => m.preloadCourseModels(c.id)) : null;
-  // the course's tree models load alongside the terrain (browser only; the Node tools skip them)
-  const trees = typeof window !== 'undefined' ? import('../scene/trees.js').then((m) => m.loadHeroTrees(c.id, c.theme)) : null;
   if (!c.dem) { await Promise.all([models, trees]); loaded.set(id, c); return c; }
   const [d] = await Promise.all([loadDem(c.id), trees, models]);
   const out = { ...c, holes: prepareDemHoles(c, d) };
@@ -47,3 +48,6 @@ export async function loadCourse(id) {
 
 /** Already-loaded course, or null. */
 export const loadedCourse = (id) => loaded.get(id) || null;
+
+// a round can start on the Confluence without loadCourse(): have its trees ready
+if (typeof window !== 'undefined') import('../scene/trees.js').then((m) => m.loadHeroTrees(CONFLUENCE.id, CONFLUENCE.theme));

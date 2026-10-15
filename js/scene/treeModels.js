@@ -378,7 +378,8 @@ export function buildForest(list) {
       });
       return { meshes, cap };
     };
-    const nearCap = Math.min(n, LOD.maxNear, Math.max(4, Math.floor(LOD.nearTris / rec.tris)));
+    // no one species takes more than half the budget (the scanned olive is 35k)
+    const nearCap = Math.min(n, LOD.maxNear, Math.max(4, Math.floor(LOD.nearTris * 0.5 / rec.tris)));
     const tiers = [tier(Math.min(nearCap, LOD.maxShadow), true), tier(nearCap, false)];
     // far: one impostor card per tree
     let imp = null;

@@ -4,6 +4,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { mergeByMaterial } from './merge.js';
 
 // full-detail meshes ship Draco-compressed; the decoder is vendored
 let draco = null;
@@ -20,14 +21,15 @@ const FILES = {
   lowrider: 'lowrider_impala.glb',
   wreck: 'abandoned_sedan.glb',
   people: 'people_real.glb', // Renderpeople and deep3dstudio scans
+  peopleLo: 'people_lo.glb', // the same four at ~1.5k triangles, for range
   rubble: 'rubble_concrete.glb', // a scanned heap of broken concrete (albentan2012)
 };
 /** Which models each course uses. */
 export const COURSE_MODELS = {
   paris: ['eiffel'],
   liberty: ['statue'],
-  eaststl: ['lowrider', 'wreck', 'people', 'rubble'],
-  sawgrass: ['people'],
+  eaststl: ['lowrider', 'wreck', 'people', 'peopleLo', 'rubble'],
+  sawgrass: ['people', 'peopleLo'],
 };
 
 const cache = new Map(); // name → THREE.Object3D (the loaded scene)
@@ -38,7 +40,25 @@ function load(name) {
   if (pending.has(name)) return pending.get(name);
   const url = new URL(`../../assets/models/${FILES[name]}`, import.meta.url).href;
   const p = gltfLoader().loadAsync(url).then((g) => {
-    g.scene.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    // one draw call per material for each model (each figure in the people set)
+    for (const top of [...g.scene.children]) mergeByMaterial(top);
+    g.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+      // glTF transmission (the lowrider's glass) makes three.js render the
+      // whole opaque scene a second time every frame to refract it: plain
+      // tinted transparency reads the same at this size
+      for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+        if (m.transmission > 0) {
+          m.opacity = Math.min(m.opacity, 0.25 + 0.4 * (1 - m.transmission));
+          m.transmission = 0;
+          m.transparent = true;
+          m.depthWrite = false;
+          o.castShadow = false;
+        }
+      }
+    });
     cache.set(name, g.scene);
     return g.scene;
   }).catch((e) => { console.warn(`model ${name} unavailable`, e); return null; });

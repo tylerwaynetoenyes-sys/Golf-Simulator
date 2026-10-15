@@ -27,6 +27,31 @@ const SanitizeShader = {
     }`,
 };
 
+// One finish over every course, so scanned models, real trees and the
+// procedural pieces sit in the same picture: a gentle filmic S-curve, foliage
+// saturation pulled back from ACES's neon, shadows a touch cool and
+// highlights a touch warm, and a soft vignette. Display-referred (runs after
+// tone mapping); `uAmount` 0 leaves the frame untouched.
+const GradeShader = {
+  uniforms: { tDiffuse: { value: null }, uAmount: { value: 1 }, uNight: { value: 0 } },
+  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uAmount; uniform float uNight; varying vec2 vUv;
+    void main() {
+      vec4 src = texture2D(tDiffuse, vUv);
+      vec3 c = clamp(src.rgb, 0.0, 1.0);
+      float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
+      vec3 g = mix(c, c * c * (3.0 - 2.0 * c), 0.16);
+      // greens and yellows lose a little saturation, skin and sky keep theirs
+      float green = smoothstep(0.02, 0.12, c.g - max(c.r, c.b) * 0.92);
+      g = mix(vec3(l), g, 1.0 - 0.1 * green - 0.03);
+      g += (vec3(-0.010, 0.0, 0.016) * (1.0 - l) + vec3(0.018, 0.007, -0.016) * l) * (1.0 - uNight);
+      vec2 q = vUv - 0.5;
+      g *= 1.0 - dot(q, q) * mix(0.32, 0.5, uNight);
+      gl_FragColor = vec4(mix(src.rgb, g, uAmount), src.a);
+    }`,
+};
+
 export const QUALITY = {
   high: { pixelRatio: 2, bloom: true, shadows: true, shadowSize: 2048, waterLights: 64, trees: 1 },
   medium: { pixelRatio: 1.5, bloom: true, shadows: true, shadowSize: 1024, waterLights: 40, trees: 0.7 },
@@ -58,6 +83,8 @@ export class Renderer {
     this.composer.addPass(this.sanitize);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
+    this.grade = new ShaderPass(GradeShader);
+    this.composer.addPass(this.grade);
 
     this.resize();
     // Coalesce resize bursts (iPad toolbar show/hide, rotation, AirPlay) into

@@ -4,6 +4,7 @@
 // hydraulics), and people hanging out by them in everyday streetwear, a few
 // with gold chains. All of it stands outside the field of play.
 import * as THREE from 'three';
+import { mergeByMaterial } from '../scene/merge.js';
 import { model } from '../scene/models.js';
 
 const M = {};
@@ -205,6 +206,7 @@ function importedCar(kind, rand) {
     g.userData.update = null;
     return g;
   }
+  mergeByMaterial(body); // it moves as one, on the pivot below
   // hydraulics: the nose lifts about the rear axle now and then
   const pivot = new THREE.Group();
   pivot.position.x = -L * 0.3;
@@ -229,10 +231,23 @@ export function person(rand, { chain = false } = {}) {
     // real scanned people (textured), standing on the origin, facing +Z: turn to +X
     const fig = P.children[Math.floor(rand() * P.children.length)];
     const g = new THREE.Group();
+    // each scan keeps its own transform (glTF's Z-up turn and scale); a
+    // wrapper turns it from facing +Z to facing +X
+    const turn = new THREE.Group();
+    turn.rotation.y = Math.PI / 2;
+    g.add(turn);
     fig.position.set(0, 0, 0);
-    fig.rotation.set(0, Math.PI / 2, 0);
     fig.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
-    g.add(fig);
+    // the scan is ~15k triangles: past 45 m the same figure at ~1.5k
+    const lo = model('peopleLo')?.getObjectByName(fig.name);
+    if (lo) {
+      lo.position.set(0, 0, 0);
+      lo.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+      const lod = new THREE.LOD();
+      lod.addLevel(fig, 0);
+      lod.addLevel(lo, 45);
+      turn.add(lod);
+    } else turn.add(fig);
     if (chain) {
       const m = mats();
       const c = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.011, 6, 24), m.gold);
@@ -314,7 +329,8 @@ export function dressLots(spots, rand, ground) {
       return obj;
     };
     const wrecks = 1 + (rand() < 0.5 ? 1 : 0);
-    for (let k = 0; k < wrecks; k++) place(car('blocks', rand), (rand() - 0.5) * 14, (rand() - 0.5) * 10, rand() * 6.28);
+    // a wreck never moves: car and cinder blocks draw one call per material
+    for (let k = 0; k < wrecks; k++) place(mergeByMaterial(car('blocks', rand)), (rand() - 0.5) * 14, (rand() - 0.5) * 10, rand() * 6.28);
     if (i % 2 === 0) {
       const cx = (rand() - 0.5) * 6, cz = 4 + rand() * 3;
       const lr = place(car('lowrider', rand), cx, cz, 0);

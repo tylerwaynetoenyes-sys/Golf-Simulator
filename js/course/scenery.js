@@ -7,6 +7,7 @@
 //   crowds   spectators on the mounds round the greens (tournament courses)
 import * as THREE from 'three';
 import { person as figure } from './streetlife.js';
+import { mergeByMaterial } from '../scene/merge.js';
 
 function sailboat(rand) {
   const g = new THREE.Group();
@@ -71,6 +72,8 @@ export function dressScenery(T, hole, rand, ground, buildLandmark) {
   };
   const lm = (type, at, yaw) => {
     const o = buildLandmark(type);
+    // static set pieces (nothing here animates their parts): one draw per material
+    mergeByMaterial(o.group);
     put(o.group, at, yaw);
     return o;
   };
@@ -95,7 +98,7 @@ export function dressScenery(T, hole, rand, ground, buildLandmark) {
     for (let i = 0; i < 9; i++) {
       const at = spot(T.oobLateral + 120, T.oobLateral + 1400, { sea: true, tries: 40 });
       if (!at) continue;
-      const b = put(sailboat(rand), at, rand() * Math.PI * 2);
+      const b = put(mergeByMaterial(sailboat(rand), 2), at, rand() * Math.PI * 2);
       b.scale.setScalar(0.9 + rand() * 0.6);
       movers.push({ kind: 'boat', o: b, y: at.y, phase: rand() * 10 });
     }

@@ -12,12 +12,14 @@ import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
 import { plantTrees, updateTrees, THEME_TREES, treesFor } from '../scene/trees.js';
 import { tuftGeometry, grassMaterial, GRASS } from './grass.js';
 
-/** Rough-grass tufts are drawn out to this distance from the camera (m). */
+/** Rough-grass tufts and shrubs are drawn out to these distances from the camera (m). */
 const GRASS_FAR = 110;
+const SHRUB_FAR = 260;
 import { buildCity } from './buildings.js';
 import { dressLots } from './streetlife.js';
 import { dressScenery } from './scenery.js';
 import { buildDecay } from './decay.js';
+import { mergeByMaterial } from '../scene/merge.js';
 import { dressPinFlag, flagpole, fireworks } from './usa.js';
 
 const C = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
@@ -131,7 +133,7 @@ export class CourseWorld {
       });
     }
     this.hole = hole;
-    this.grassChunks = null;
+    this.chunkSets = null;
     this.rings = null;
     this._ringKey = null;
     this.ringTarget = 0;
@@ -240,8 +242,8 @@ float passB = smoothstep(0.5 - aw, 0.5 + aw, abs(fract(w) - 0.5) * 2.0) * 2.0 - 
 // stripes fade out where they'd shimmer (far away, grazing)
 float keep = 1.0 - smoothstep(0.25, 0.6, au);
 float stripes = 1.0 + vFw * keep * (passA * lay * 0.12 + passB * layX * 0.045);
-float turf = mix(0.78 + 0.44 * detail, 0.66 + 0.62 * detail, vRough);
-turf *= mix(0.95 + 0.1 * mottle, 0.86 + 0.26 * mottle, vRough);
+float turf = mix(0.72 + 0.54 * detail, 0.64 + 0.66 * detail, vRough);
+turf *= mix(0.9 + 0.18 * mottle, 0.84 + 0.3 * mottle, vRough);
 diffuseColor.rgb *= stripes * turf;`);
     };
     groundMat.customProgramCacheKey = () => 'courseGround';
@@ -360,6 +362,8 @@ diffuseColor.rgb *= stripes * turf;`);
     // ── landmark ──
     const lmSpec = hole.lm;
     this.landmark = buildLandmark(lmSpec.type);
+    // a set piece with no moving parts draws one call per material
+    if (!this.landmark.update) mergeByMaterial(this.landmark.group);
     const holder = new THREE.Group();
     holder.add(this.landmark.group);
     let lx, lz;
@@ -384,6 +388,7 @@ diffuseColor.rgb *= stripes * turf;`);
     if (T.F) {
       for (const f of hole.far || []) {
         const lm = buildLandmark(f.type);
+        if (!lm.update) mergeByMaterial(lm.group);
         let [x, z] = T.F.toLocal(f.dem[0], f.dem[1]);
         const d = Math.hypot(x, z);
         const D = Math.min(d, f.maxD ?? 2000);
@@ -590,7 +595,8 @@ diffuseColor.rgb *= stripes * turf;`);
         if (T.greenEdge(x, z) < 40 || Math.hypot(x, z) < 40) return true;
         return T.terrain(x, z).surface === 'water';
       };
-      const decay = buildDecay(T, rand, (x, z) => T.meshHeight(x, z), clear);
+      // static: fences, poles, containers and warehouses draw one call per material
+      const decay = mergeByMaterial(buildDecay(T, rand, (x, z) => T.meshHeight(x, z), clear));
       g.add(decay);
       // the wrecks, the lowriders and the people round them, in the lots
       this.streetLife = dressLots(decay.userData.lots || [], rand, (x, z) => T.meshHeight(x, z));
@@ -1168,10 +1174,9 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       this.tuftMats[tint] = grassMaterial(tint);
     }
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
-    // binned into 40 m chunks so the ones out of view or too far to read
-    // (tufts are a few pixels at 100 m) aren't drawn at all
-    const CELL = 40;
-    const cells = new Map();
+    // drawn in chunks: the ones out of view or too far to read (tufts are a
+    // few pixels at 100 m) aren't drawn at all
+    const placed = [];
     let n = 0;
     for (let i = 0; i < N * 3 && n < N; i++) {
       const s = -10 + rand() * (T.length + 40);
@@ -1187,31 +1192,50 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       q.setFromAxisAngle(up, rand() * 6.28);
       const spread = 0.8 + rand() * 0.7;
       sc.set(spread, h, spread);
-      const key = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
-      if (!cells.has(key)) cells.set(key, []);
-      cells.get(key).push(m4.compose(p.set(x, this._coarseH(x, z) - 0.02, z), q, sc).clone());
+      placed.push(m4.compose(p.set(x, this._coarseH(x, z) - 0.02, z), q, sc).clone());
       n++;
     }
-    this.grassChunks = [];
-    for (const list of cells.values()) {
-      const tufts = new THREE.InstancedMesh(this.tuftGeo, tint ? this.tuftMats[tint] : this.tuftMat, list.length);
-      list.forEach((m, k) => tufts.setMatrixAt(k, m));
-      tufts.computeBoundingSphere();
-      tufts.receiveShadow = true;
-      g.add(tufts);
-      this.grassChunks.push(tufts);
-    }
+    this._chunked(g, placed, this.tuftGeo, this.tuftGeoLo, tint ? this.tuftMats[tint] : this.tuftMat, { lodAt: 45, far: GRASS_FAR });
   }
 
-  /** Rough-grass chunks beyond reading distance are skipped. */
-  _cullGrass(camera) {
-    if (!camera || !this.grassChunks) return;
-    const far = GRASS_FAR * (this.treeDensity >= 1 ? 1 : 0.8);
-    for (const c of this.grassChunks) {
-      const b = c.boundingSphere;
-      const d = camera.position.distanceTo(b.center) - b.radius;
-      c.visible = d < far;
-      c.geometry = d < 45 ? this.tuftGeo : this.tuftGeoLo;
+  /**
+   * Instances binned into square cells, one InstancedMesh each, so the ones
+   * out of view (or out of the shadow camera's) aren't drawn; past `lodAt`
+   * a cell draws `lo`, past `far` (scaled down on lighter quality) nothing.
+   */
+  _chunked(g, matrices, hi, lo, mat, { cell = 40, lodAt = 50, far = 150, shadow = false } = {}) {
+    const cells = new Map();
+    const v = new THREE.Vector3();
+    for (const m of matrices) {
+      v.setFromMatrixPosition(m);
+      const key = `${Math.floor(v.x / cell)},${Math.floor(v.z / cell)}`;
+      if (!cells.has(key)) cells.set(key, []);
+      cells.get(key).push(m);
+    }
+    const meshes = [];
+    for (const list of cells.values()) {
+      const im = new THREE.InstancedMesh(hi, mat, list.length);
+      list.forEach((m, k) => im.setMatrixAt(k, m));
+      im.computeBoundingSphere();
+      im.receiveShadow = true;
+      im.castShadow = shadow;
+      g.add(im);
+      meshes.push(im);
+    }
+    (this.chunkSets ||= []).push({ meshes, hi, lo, lodAt, far });
+  }
+
+  /** Per frame: which chunks draw, and at which detail. */
+  _cullChunks(camera) {
+    if (!camera || !this.chunkSets) return;
+    const k = this.treeDensity >= 1 ? 1 : 0.8;
+    for (const set of this.chunkSets) {
+      for (const c of set.meshes) {
+        const b = c.boundingSphere;
+        const d = camera.position.distanceTo(b.center) - b.radius;
+        c.visible = d < set.far * k;
+        c.geometry = d < set.lodAt ? set.hi : set.lo;
+      }
     }
   }
 
@@ -1251,12 +1275,16 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       const geo = mergeGeometries(parts);
       geo.computeVertexNormals();
       geo.userData.shared = true;
-      this[key] = { geo, mat: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }) };
+      // past 60 m: six lobes instead of eleven
+      const lo = mergeGeometries(parts.slice(0, 6));
+      lo.computeVertexNormals();
+      lo.userData.shared = true;
+      this[key] = { geo, lo, mat: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }) };
     }
-    const { geo, mat } = this[key];
+    const { geo, lo, mat } = this[key];
     const b = T.bounds(200);
     const N = Math.round(11000 * (this.treeDensity ?? 1));
-    const mesh = new THREE.InstancedMesh(geo, mat, N);
+    const placed = [];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     const corridor = Math.max(T.fwHalf, 12);
     let n = 0;
@@ -1276,12 +1304,10 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       q.setFromAxisAngle(up, rand() * 6.28);
       sc.set(s * (0.9 + rand() * 0.4), s * (0.8 + rand() * 0.4), s * (0.9 + rand() * 0.4));
       const y = this._coarseH ? this._coarseH(x, z) : T.meshHeight(x, z);
-      mesh.setMatrixAt(n++, m4.compose(p.set(x, y - 0.05, z), q, sc));
+      placed.push(m4.compose(p.set(x, y - 0.05, z), q, sc).clone());
+      n++;
     }
-    mesh.count = n;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    g.add(mesh);
+    this._chunked(g, placed, geo, lo, mat, { lodAt: 60, far: SHRUB_FAR, shadow: true });
   }
 
   _buildStakes(T, g) {
@@ -1421,7 +1447,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       }
     }
     // rough grass: wind (the way the air moves) and the ball it parts around
-    this._cullGrass(camera);
+    this._cullChunks(camera);
     GRASS.uTime.value = t;
     const wr = ((this.windFrom ?? 0) * Math.PI) / 180;
     GRASS.uWind.value.set(-Math.sin(wr), Math.cos(wr)).multiplyScalar(this.wind ?? 0);
