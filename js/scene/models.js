@@ -33,6 +33,7 @@ const FILES = {
 export const COURSE_MODELS = {
   paris: ['eiffel'],
   liberty: ['statue'],
+  centralpark: ['peopleLo'],
   eaststl: ['lowrider', 'wreck', 'people', 'peopleLo', 'rubble'],
   sawgrass: ['people', 'peopleLo'],
   // the scanned crowds at the riverfront and in the parks (instanced, js/scene/crowd.js)

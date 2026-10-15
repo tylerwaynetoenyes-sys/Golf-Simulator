@@ -619,6 +619,7 @@ export class CourseWorld {
     // ── night floodlights along the hole ──
     this.floods = [];
     this.poles = [];
+    this.mastMeshes = []; // shown only after dark: by day a course has no light towers
     this.coneMat = lightConeMaterial(0xffc58a, 0.04);
     this.lampMat = new THREE.MeshBasicMaterial({ color: 0xffd29a });
     const poleMat = new THREE.MeshStandardMaterial({ color: 0x23262b, metalness: 0.6, roughness: 0.5 });
@@ -639,6 +640,7 @@ export class CourseWorld {
       head.position.set(x, y0 + 20.4, z);
       head.lookAt(pt.x, y0 + 20, pt.z);
       g.add(head);
+      this.mastMeshes.push(mast, head);
       const target = new THREE.Vector3(pt.x - pt.dx * 10, T.meshHeight(pt.x, pt.z), pt.z - pt.dz * 10);
       const spot = new THREE.SpotLight(0xffc890, 2600, 220, 0.7, 0.8, 1.7);
       spot.position.set(x, y0 + 20, z);
@@ -1621,7 +1623,8 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
   setDay(d) {
     this.day = d;
     if (!this.hole) return;
-    for (const s of this.floods) s.intensity = 2600 * (1 - d);
+    for (const s of this.floods) { s.intensity = 2600 * (1 - d); s.visible = d < 0.6; }
+    for (const m of this.mastMeshes || []) m.visible = d < 0.6;
     this.lampMat.color.setRGB(0.5 + 4.5 * (1 - d), 0.48 + 3.6 * (1 - d), 0.42 + 2.6 * (1 - d));
     if (this.pinLight) this.pinLight.intensity = 6 * (1 - d);
     if (this.landmark) setLandmarkDay(this.landmark, d);

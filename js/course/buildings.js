@@ -56,23 +56,33 @@ const STYLE = {
     lamp: '#ffcf8a', wall: 0xffffff, zinc: 0x6f7b85, cap: 0x5d666e,
   },
   nyc: {
-    bay: 3.0, floor: 3.6, roof: 'flat',
-    facade: (g, w, h) => {
-      g.fillStyle = '#8f8476'; g.fillRect(0, 0, w, h);
+    bay: 3.0, floor: 3.4, roof: 'flat',
+    // pre-war Manhattan: limestone, buff brick and brown brick, punched windows with sills
+    // and a cornice band every few floors; glass only on the supertall and the odd modern tower
+    walls: [['#c9bea9', '#b3a78f'], ['#b39a7a', '#9d8467'], ['#8c6250', '#76503f'], ['#a9a59d', '#928e86']].map(([base, band]) => (g, w, h) => {
+      g.fillStyle = base; g.fillRect(0, 0, w, h);
+      // brick or stone grain
+      for (let i = 0; i < 1400; i++) { g.fillStyle = `rgba(${rnd() < 0.5 ? '255,255,255' : '0,0,0'},${0.03 + rnd() * 0.05})`; g.fillRect(rnd() * w, rnd() * h, 3 + rnd() * 6, 1.5); }
+      g.fillStyle = band; g.fillRect(0, 0, w, 5); // the band course at each second floor
       const bw = w / 4, fh = h / 2;
       for (let f = 0; f < 2; f++) for (let b = 0; b < 4; b++) {
-        g.fillStyle = '#2c333b'; g.fillRect(b * bw + bw * 0.2, f * fh + fh * 0.2, bw * 0.6, fh * 0.6);
+        const x = b * bw + bw * 0.25, y = f * fh + fh * 0.2, ww = bw * 0.5, wh = fh * 0.58;
+        g.fillStyle = '#262c31'; g.fillRect(x, y, ww, wh);
+        g.fillStyle = 'rgba(190,205,215,0.22)'; g.fillRect(x + 2, y + 2, ww * 0.45, wh * 0.5); // a sky reflection in the upper sash
+        g.fillStyle = '#d9d0bf'; g.fillRect(x - 2, y + wh, ww + 4, 3); // the sill
+        g.fillStyle = 'rgba(30,30,30,0.35)'; g.fillRect(x, y + wh * 0.5, ww, 2); // the meeting rail
       }
-    },
+    }),
     glass: (g, w, h) => {
-      const gr = g.createLinearGradient(0, 0, 0, h);
-      gr.addColorStop(0, '#5f7f99'); gr.addColorStop(1, '#3a5168');
+      const gr = g.createLinearGradient(0, 0, w, h);
+      gr.addColorStop(0, '#8a9ba3'); gr.addColorStop(0.5, '#5d6f78'); gr.addColorStop(1, '#748890');
       g.fillStyle = gr; g.fillRect(0, 0, w, h);
-      g.fillStyle = 'rgba(20,28,36,0.85)';
-      for (let y = 0; y < h; y += h / 2) g.fillRect(0, y, w, 5); // spandrels
+      g.fillStyle = 'rgba(25,30,34,0.7)';
+      for (let y = 0; y < h; y += h / 2) g.fillRect(0, y, w, 4); // spandrels
       for (let x = 0; x < w; x += w / 4) g.fillRect(x, 0, 2, h); // mullions
     },
-    lamp: '#fff1d0', wall: 0xffffff, zinc: 0x555a60, cap: 0x4a4e54,
+    glassOver: 150, // metres: Billionaires' Row and the Midtown towers
+    lamp: '#fff1d0', wall: 0xffffff, zinc: 0x555a60, cap: 0x5e5a55,
   },
 };
 
@@ -97,20 +107,21 @@ function windowsGlow(lampColor) {
 export function buildCity(data, T, style = 'paris', pull = null) {
   const S = STYLE[style] || STYLE.paris;
   rs = 7;
-  const facadeTex = tex(256, 256, S.facade);
+  const glowTex = windowsGlow(S.lamp);
+  const walls = (S.walls || [S.facade]).map((fn) => new THREE.MeshStandardMaterial({ map: tex(256, 256, fn), emissiveMap: glowTex, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.85 }));
   const mats = {
-    wall: new THREE.MeshStandardMaterial({ map: facadeTex, emissiveMap: windowsGlow(S.lamp), emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.85 }),
+    wall: walls[0],
     glass: S.glass ? new THREE.MeshStandardMaterial({ map: tex(256, 256, S.glass), emissiveMap: windowsGlow(S.lamp), emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.22, metalness: 0.55 }) : null,
     zinc: new THREE.MeshStandardMaterial({ color: S.zinc, roughness: 0.5, metalness: 0.5 }),
     cap: new THREE.MeshStandardMaterial({ color: S.cap, roughness: 0.9 }),
   };
   for (const m of Object.values(mats)) if (m) m.side = THREE.DoubleSide;
-  mats.wall.userData.night = 1.0;
+  for (const m of walls) { m.side = THREE.DoubleSide; m.userData.night = 1.0; }
   if (mats.glass) mats.glass.userData.night = 1.2;
   const cells = new Map();
   const cell = (x, z) => {
     const k = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
-    if (!cells.has(k)) cells.set(k, { wall: [], glass: [], zinc: [], cap: [] });
+    if (!cells.has(k)) cells.set(k, { wall: walls.map(() => []), glass: [], zinc: [], cap: [] });
     return cells.get(k);
   };
   const F = T.F;
@@ -145,11 +156,11 @@ export function buildCity(data, T, style = 'paris', pull = null) {
     if (inPlay(cx, cz) || pts.some(([x, z], i) => { const [x2, z2] = pts[(i + 1) % n]; return inPlay(x, z) || inPlay((x + x2) / 2, (z + z2) / 2); })) continue;
     const h0 = Math.min(...pts.map(([x, z]) => T.baseGround(x, z))) - 0.4;
     let h = b.h || (style === 'paris' ? 18.5 + rnd() * 3.5 : 14 + rnd() * 8);
-    const tall = h > 45;
+    const tall = S.glassOver ? h > S.glassOver || (h > 70 && rnd() < 0.18) : h > 45;
     const mansard = S.roof === 'mansard' && h > 11 && h < 45 && Math.abs(area) > 60;
     const wallTop = h0 + (mansard ? h - 3.6 : h);
     const C = cell(cx, cz);
-    const W = tall && mats.glass ? C.glass : C.wall;
+    const W = tall && mats.glass ? C.glass : C.wall[Math.floor(rnd() * walls.length)];
     // walls: u in bays round the perimeter, v in floors
     let run = 0;
     for (let i = 0; i < n; i++) {
@@ -195,9 +206,9 @@ export function buildCity(data, T, style = 'paris', pull = null) {
   }
   const group = new THREE.Group();
   for (const [, C] of cells) {
-    for (const key of ['wall', 'glass', 'zinc', 'cap']) {
-      const list = C[key];
-      if (!list.length || !mats[key]) continue;
+    const sets = [...walls.map((m, i) => [m, C.wall[i]]), ...['glass', 'zinc', 'cap'].map((k) => [mats[k], C[k]])];
+    for (const [material, list] of sets) {
+      if (!list.length || !material) continue;
       const pos = new Float32Array(list.length * 3), uv = new Float32Array(list.length * 2);
       list.forEach((v, i) => { pos.set([v[0], v[1], v[2]], i * 3); uv.set([v[3], v[4]], i * 2); });
       const geo = new THREE.BufferGeometry();
@@ -205,11 +216,11 @@ export function buildCity(data, T, style = 'paris', pull = null) {
       geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
       geo.computeVertexNormals();
       geo.computeBoundingSphere();
-      const mesh = new THREE.Mesh(geo, mats[key]);
+      const mesh = new THREE.Mesh(geo, material);
       mesh.receiveShadow = true;
       group.add(mesh);
     }
   }
-  const all = Object.values(mats).filter(Boolean);
-  return { group, glow: [mats.wall, mats.glass].filter(Boolean), haze: all };
+  const all = [...walls, ...Object.values(mats).filter((m) => m && !walls.includes(m))];
+  return { group, glow: [...walls, mats.glass].filter(Boolean), haze: all };
 }

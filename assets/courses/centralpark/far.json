@@ -1,0 +1,91 @@
+{
+  "lat": 40.7812,
+  "lon": -73.9665,
+  "size": 16000,
+  "step": 32,
+  "n": 501,
+  "min": -2.73,
+  "max": 101.36,
+  "lidar": false,
+  "source": "USGS 3DEP 1 m bare-earth DEM (NJ_NE6County_B23, NJ_SdL5_2014, NY_CMPG_2013), public domain; 0.2% from Terrarium tiles (AWS Open Data)",
+  "tiles": [
+    {
+      "tile": "USGS one meter x58y451 NY CMPG 2013",
+      "project": "NY_CMPG_2013",
+      "published": "2020-03-30",
+      "samples": 25696
+    },
+    {
+      "tile": "USGS one meter x58y452 NY CMPG 2013",
+      "project": "NY_CMPG_2013",
+      "published": "2020-03-30",
+      "samples": 60728
+    },
+    {
+      "tile": "USGS one meter x58y453 NY CMPG 2013",
+      "project": "NY_CMPG_2013",
+      "published": "2020-03-30",
+      "samples": 9228
+    },
+    {
+      "tile": "USGS one meter x59y451 NY CMPG 2013",
+      "project": "NY_CMPG_2013",
+      "published": "2020-03-30",
+      "samples": 15304
+    },
+    {
+      "tile": "USGS one meter x59y452 NY CMPG 2013",
+      "project": "NY_CMPG_2013",
+      "published": "2020-03-30",
+      "samples": 50983
+    },
+    {
+      "tile": "USGS one meter x59y453 NY CMPG 2013",
+      "project": "NY_CMPG_2013",
+      "published": "2020-03-30",
+      "samples": 15220
+    },
+    {
+      "tile": "USGS 1 Meter 18 x57y451 NJ_NE6County_B23",
+      "project": "NJ_NE6County_B23",
+      "published": "2026-09-17",
+      "samples": 2284
+    },
+    {
+      "tile": "USGS 1 Meter 18 x57y452 NJ_NE6County_B23",
+      "project": "NJ_NE6County_B23",
+      "published": "2026-09-17",
+      "samples": 8076
+    },
+    {
+      "tile": "USGS 1 Meter 18 x57y453 NJ_NE6County_B23",
+      "project": "NJ_NE6County_B23",
+      "published": "2026-09-17",
+      "samples": 2519
+    },
+    {
+      "tile": "USGS 1 Meter 18 x58y451 NJ_NE6County_B23",
+      "project": "NJ_NE6County_B23",
+      "published": "2026-09-17",
+      "samples": 4028
+    },
+    {
+      "tile": "USGS 1 Meter 18 x58y452 NJ_NE6County_B23",
+      "project": "NJ_NE6County_B23",
+      "published": "2026-09-17",
+      "samples": 36931
+    },
+    {
+      "tile": "USGS 1 Meter 18 x58y453 NJ_NE6County_B23",
+      "project": "NJ_NE6County_B23",
+      "published": "2026-09-17",
+      "samples": 19590
+    },
+    {
+      "tile": "USGS one meter x58y453 NJ SdL5 2014",
+      "project": "NJ_SdL5_2014",
+      "published": "2020-03-30",
+      "samples": 2
+    }
+  ]
+}

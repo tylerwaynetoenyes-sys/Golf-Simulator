@@ -240,6 +240,21 @@ OpenGolfAPI, ODbL); the front nine is routed over Probstein and Art Hill on
 the OSM land cover. `assets/landmarks/forestpark/` (`tools/bake-alton.mjs`
 in map axes): the park's lakes, drives, lots and footprints.
 
+## Central Park
+
+`assets/courses/centralpark/`: `dem.*` from USGS 3DEP 1-metre LiDAR (NY CMPG
+2013, public domain; a few edge samples from Terrarium tiles), `far.*`
+(Terrarium), `sat.*` (EOxCloudless) as above; `buildings.json` by
+`tools/fetch-buildings.mjs` (OSM: the blocks round the park and the Midtown
+towers), with Belvedere Castle and the Delacorte skipped.
+`assets/landmarks/centralpark/` (`tools/bake-alton.mjs` in the course's DEM
+frame, from OpenStreetMap API tiles because Overpass was down): the lakes,
+drives, paths and footprints. The nine holes are not a real golf course:
+they are routed on the park's lawns, clear of its drives, buildings and
+water, by a search over that map. The landmarks (Bethesda Terrace and the
+Angel of the Waters, Bow Bridge, Belvedere Castle, Cleopatra's Needle) are
+modelled in `js/course/lm/centralpark.js` from published descriptions.
+
 ## Built surfaces
 
 `assets/textures/pbr/` (Poly Haven, CC0; colour, roughness and normal,
