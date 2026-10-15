@@ -102,7 +102,9 @@ function rings(rel) {
         if (s[0][0] !== b[0] || s[0][1] !== b[1]) s = s.reverse();
         cur = cur.concat(s.slice(1));
       }
-      out[role].push(cur.map(([la, lo]) => toLocal(la, lo)));
+      // a ring the download cut off at its edge would close across the map: leave it out
+      const closed = cur.length > 3 && cur[0][0] === cur[cur.length - 1][0] && cur[0][1] === cur[cur.length - 1][1];
+      if (closed) out[role].push(cur.map(([la, lo]) => toLocal(la, lo)));
     }
   }
   return out;

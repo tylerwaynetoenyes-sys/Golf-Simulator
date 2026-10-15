@@ -1,0 +1,11 @@
+{
+  "lat": 38.6247,
+  "lon": -90.1848,
+  "size": 16000,
+  "step": 64,
+  "n": 251,
+  "min": 115.05,
+  "max": 186.68,
+  "zoom": 11,
+  "source": "Terrarium elevation tiles (AWS Open Data: USGS 3DEP/NED, SRTM, national DEMs)"
+}

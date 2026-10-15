@@ -18,6 +18,7 @@ import eaststl from './eaststl.js';
 import cassis from './cassis.js';
 import forestpark from './forestpark.js';
 import confluencepoint from './confluencepoint.js';
+import gatewayarch from './gatewayarch.js';
 
-const all = { zoo, delmar, arch, riverfront, riverboat, piasa, chainofrocks, cahokia, basilica, citymuseum, altonlegends, forestpark, confluencepoint, ...western, ...harbor, ...paris, ...eaststl, ...cassis };
+const all = { zoo, delmar, arch, riverfront, riverboat, piasa, chainofrocks, cahokia, basilica, citymuseum, altonlegends, forestpark, confluencepoint, gatewayarch, ...western, ...harbor, ...paris, ...eaststl, ...cassis };
 export const EXTRA = Object.fromEntries(Object.entries(all).filter(([, b]) => typeof b === 'function'));

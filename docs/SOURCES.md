@@ -270,3 +270,12 @@ converted to the same JSON. The Confluence Tower's form (two shafts, lookouts
 at 50, 100 and 150 ft, 180 ft) from KAI Design / Building Design+Construction
 and the National Park Service; bark and plank textures (bark_brown_02,
 brown_planks_08) from Poly Haven, CC0.
+
+## Gateway Arch
+
+`assets/courses/gatewayarch/`: `dem.*`/`far.*` (Terrarium), `sat.*`
+(EOxCloudless), `buildings.json` (OSM, downtown St. Louis, the Old
+Courthouse's footprint skipped for the model). `assets/landmarks/gatewayarch/`
+(`tools/bake-alton.mjs`, map axes, OSM from the main API): the grounds' ponds,
+walks and streets. The Arch's form is scene/skyline.js (the published
+catenary); its axis from the OSM leg nodes.
