@@ -53,7 +53,11 @@ export class Game {
     this._buildAimLine();
 
     bus.on('r10:shot', (launch) => this.onR10Shot(launch));
-    bus.on('r10:misread', () => toast("R10 saw the swing but not the ball", { kind: 'warn', sub: 'Swing again — check alignment and distance' }));
+    bus.on('r10:misread', () => {
+      // slow putts are the R10's weak spot: on the green, point to the fallbacks
+      if (this.setup?.putting && this.mode.course) toast('R10 missed that putt', { kind: 'warn', sub: 'Putt again, or use Auto putt (Enter), Hold to putt (Space) or Skip (K)' });
+      else toast("R10 saw the swing but not the ball", { kind: 'warn', sub: 'Swing again — check alignment and distance' });
+    });
     bus.on('r10:connected', () => {
       this.r10 = true;
       this.updatePrompt();
@@ -474,7 +478,14 @@ export class Game {
       const slope = Math.abs(read.uphill) < 0.03 ? '' : read.uphill > 0 ? ' uphill' : ' downhill';
       const cost = this.mode.skipCost?.(this.player);
       this.hud.setSkipCost(cost);
-      this.hud.setPrompt(`<b>${U.proximity(read.distance)}</b>${slope} · ${brk}${playsTxt} · ${key('Enter')} auto putt · hold ${key('Space')} to putt · ${key('K')} skip (+${cost}) · ${key('← →')} aim · ${key('G')} slopes`, this.r10);
+      if (this.r10 && store.settings.r10Putts !== 'screen') {
+        // paired: putt on the mat. The ball speed for hole pace (slope included) lets the player calibrate their stroke
+        const mph = (puttSpeedFor(Math.max(0.2, plays)) + 0.15) / 0.44704;
+        this.hud.setPrompt(`<b>${U.proximity(read.distance)}</b>${slope} · ${brk}${playsTxt} · <b>putt on your mat</b> · hole pace ≈ <b>${mph.toFixed(1)} mph</b> · ${key('← →')} aim · R10 missed it? ${key('Enter')} auto · ${key('K')} skip (+${cost})`, true);
+        this._puttWait();
+      } else {
+        this.hud.setPrompt(`<b>${U.proximity(read.distance)}</b>${slope} · ${brk}${playsTxt} · ${key('Enter')} auto putt · hold ${key('Space')} to putt · ${key('K')} skip (+${cost}) · ${key('← →')} aim · ${key('G')} slopes`, this.r10);
+      }
       this.hud.setPuttMode(true);
       return;
     }
@@ -570,6 +581,8 @@ export class Game {
 
   onR10Shot(launch) {
     if (this.state === 'idle') return;
+    // on the green with radar putting turned off: the putts are made on screen, a stray reading is ignored
+    if (this.setup?.putting && this.mode.course && store.settings.r10Putts === 'screen') return;
     // R10 direction is relative to the unit's alignment; apply the virtual aim.
     const l = { ...launch, launchDirection: launch.launchDirection + this.aimDeg };
     if (l.faceAngle != null) l.faceAngle += this.aimDeg;
@@ -602,9 +615,10 @@ export class Game {
     // a putting stroke picked up by the radar (or a tap of the demo meter)
     if (s.putting && this.mode.course) {
       // a stroke on the green is a putt: the radar's ball speed and start line, rolled for real
+      // (onR10Shot has already turned the radar's start line by the aim)
       const res = source === 'demo' || !this.mode.radarPutt
-        ? this.mode.manualPutt(this.player, Math.min(1.1, launch.ballSpeed / 4), this.aimDeg + (launch.launchDirection || 0))
-        : this.mode.radarPutt(this.player, launch.ballSpeed, this.aimDeg + (launch.launchDirection || 0));
+        ? this.mode.manualPutt(this.player, Math.min(1.1, launch.ballSpeed / 4), launch.launchDirection || 0)
+        : this.mode.radarPutt(this.player, launch.ballSpeed, launch.launchDirection || 0);
       this._play(res, { ...launch, putt: true }, source);
       return;
     }
@@ -635,6 +649,16 @@ export class Game {
     const b = this.setup.origin;
     const res = simulatePutt({ x: b.x, y: b.y, z: b.z }, 0, 0, this.mode.T.terrain, null);
     this._play(res, { putt: true, skip: true, ballSpeed: 0, launchAngle: 0, launchDirection: 0, totalSpin: 0, spinAxis: 0 }, 'skip');
+  }
+
+  /** Paired and waiting on a putt: if none comes in 25 s, a gentle nudge toward the fallbacks. */
+  _puttWait() {
+    clearTimeout(this._puttWaitT);
+    const at = this.setup?.origin && `${this.player?.id}:${this.setup.origin.x.toFixed(2)}`;
+    this._puttWaitT = setTimeout(() => {
+      if (this.state !== 'ready' || !this.setup?.putting || at !== `${this.player?.id}:${this.setup.origin.x.toFixed(2)}`) return;
+      toast('No putt from the R10 yet', { kind: 'info', sub: 'Very slow putts can slip past the radar: Auto putt (Enter), Hold to putt (Space) or Skip (K)', ms: 5000 });
+    }, 25000);
   }
 
   /** Auto or manual putt for the current player (course only). */

@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS = {
   timeOfDay: 'night', // night | day
   weather: 'clear', // clear | cloudy | breezy | windy | rain
   rings: 'putt', // on the green: putt (putt it out, optional) | tight | standard | generous (rings settle it)
+  r10Putts: 'radar', // paired: radar (putt on the mat) | screen (putts on screen, the R10 for full swings only)
   gimme: 'two', // putting it out: picked up inside off | two | three | five feet
   mulligans: 'nine', // off | nine | hole | free
   courseLength: 9,
