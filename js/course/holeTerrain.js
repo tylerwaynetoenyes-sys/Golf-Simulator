@@ -96,6 +96,19 @@ export class Outline {
   }
 }
 
+/** Distance from (x, z) to a polygon [[x, z], ...]: 0 inside. */
+function polyDist(p, x, z) {
+  let inside = false, d = Infinity;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+    const [xi, zi] = p[i], [xj, zj] = p[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    const ex = xi - xj, ez = zi - zj, L = ex * ex + ez * ez;
+    const t = L ? Math.max(0, Math.min(1, ((x - xj) * ex + (z - zj) * ez) / L)) : 0;
+    d = Math.min(d, Math.hypot(x - xj - t * ex, z - zj - t * ez));
+  }
+  return inside ? 0 : d;
+}
+
 export class HoleTerrain {
   constructor(hole) {
     // made-up courses get the design pass (js/course/design.js)
@@ -374,6 +387,22 @@ export class HoleTerrain {
     for (const m of this.mounds) {
       const q = ((x - m.x) ** 2 + (z - m.z) ** 2) / (2 * m.r * m.r);
       if (q < 9) h += m.h * Math.exp(-q);
+    }
+    // landmark pads: the ground under a set piece levelled to its base, eased
+    // out toward the field of play so the hole itself keeps its shape
+    if (this.pads?.length) {
+      const field = pr.s > -15 && pr.s < this.length + 20 ? ad : 1e9;
+      const wc = smooth(corridor + 6, corridor + 26, field);
+      if (wc > 0) for (const P of this.pads) {
+        const e = P.inv, lx = e[0] * x + e[8] * z + e[12], lz = e[2] * x + e[10] * z + e[14];
+        let w = 0;
+        for (const [x0, x1, z0, z1] of P.rects || []) {
+          const dx = Math.max(x0 - lx, 0, lx - x1), dz = Math.max(z0 - lz, 0, lz - z1);
+          w = Math.max(w, smooth(P.feather, 0, Math.hypot(dx, dz)));
+        }
+        if (P.poly) w = Math.max(w, smooth(P.feather, 0, polyDist(P.poly, lx, lz)));
+        if (w > 0) h += (P.y - h) * w * wc;
+      }
     }
     // tee box: flat pad
     const dt = Math.hypot(x - this.tee.x, z - this.tee.z);

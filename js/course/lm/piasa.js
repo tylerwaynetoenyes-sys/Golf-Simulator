@@ -8,6 +8,9 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, seeded, canvasTex, tree, SLOT, boulderGeometry } from './kit.js';
 import { pbr } from '../../scene/pbr.js';
 import { piasaCanvas, piasaEngravedCanvas } from '../../ui/piasa.js';
+import { crowdAt } from '../../scene/crowd.js';
+import { carsAt } from '../../scene/cars.js';
+import { tow } from './riverfront.js';
 
 // ---- small deterministic noise --------------------------------------------
 function hash(n) { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
@@ -518,6 +521,63 @@ export default function build() {
     g.add(verge);
   }
 
+  // ---- Piasa Park across the road: its lot, the stone restroom, and visitors ----
+  // The little park on the river side of the Great River Road, where people
+  // pull in to look at the painting; on the golfer's side of the guard rail.
+  {
+    const lotM = pbr('asphalt_02', { scale: 4, tint: 0x8a8e94 });
+    const stripe = mat(0xeeeeea, { roughness: 0.8 });
+    const LX0 = 64, LX1 = 124, LZ0 = 19, LZ1 = 37;
+    const lot = new THREE.Mesh(new THREE.PlaneGeometry(LX1 - LX0, LZ1 - LZ0).rotateX(-Math.PI / 2), lotM);
+    lot.position.set((LX0 + LX1) / 2, 0.09, (LZ0 + LZ1) / 2);
+    lot.receiveShadow = true;
+    g.add(lot);
+    // its drive from the road, and a row of stalls along the back
+    const drive = new THREE.Mesh(new THREE.PlaneGeometry(8, 7).rotateX(-Math.PI / 2), lotM);
+    drive.position.set(LX0 + 6, 0.085, 15.5);
+    g.add(drive);
+    const lines = [];
+    for (let x = LX0 + 14; x <= LX1 - 2; x += 2.7) lines.push(new THREE.BoxGeometry(0.12, 0.02, 5.2).translate(x, 0.11, LZ1 - 2.8), new THREE.BoxGeometry(0.12, 0.02, 5.2).translate(x, 0.11, LZ0 + 8.2));
+    g.add(new THREE.Mesh(mergeGeometries(lines), stripe));
+    const spots = [];
+    let rc = seeded(1100);
+    for (let x = LX0 + 15.35; x < LX1 - 2; x += 2.7) {
+      if (rc() < 0.65) spots.push([x, 0.1, LZ1 - 2.8, rc() < 0.5 ? 0 : Math.PI]);
+      if (rc() < 0.5) spots.push([x, 0.1, LZ0 + 8.2, rc() < 0.5 ? 0 : Math.PI]);
+    }
+    carsAt(spots, rc, { max: 30 }).then((cg) => cg && g.add(cg));
+    // the restroom: limestone walls to match the bluff, a hipped standing-seam roof
+    const stone = pbr('sandstone_blocks_08', { scale: 1.4, tint: 0xe2d6c0 });
+    const roofM = pbr('metal_plate', { scale: 1.5, tint: 0x3d4a40, metal: 0.4 });
+    const rr = new THREE.Group();
+    rr.add(new THREE.Mesh(new THREE.BoxGeometry(9, 3.2, 5.4), stone).translateY(1.6));
+    rr.add(new THREE.Mesh(new THREE.ConeGeometry(Math.SQRT1_2, 1, 4, 1, true).rotateY(Math.PI / 4).translate(0, 0.5, 0).scale(10.6, 2.0, 7), roofM).translateY(3.2));
+    const door = mat(0x4a3a2a, { roughness: 0.7 });
+    for (const dx of [-2.2, 2.2]) rr.add(new THREE.Mesh(new THREE.BoxGeometry(1.1, 2.2, 0.1), door).translateX(dx).translateY(1.1).translateZ(2.72));
+    const sign = new THREE.MeshStandardMaterial({ map: canvasTex(256, 64, (c, w, h) => { c.fillStyle = '#2f4a36'; c.fillRect(0, 0, w, h); c.font = 'bold 30px Helvetica'; c.fillStyle = '#f2ead2'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('RESTROOMS', w / 2, h / 2 + 2); }), roughness: 0.8 });
+    rr.add(new THREE.Mesh(new THREE.PlaneGeometry(3.2, 0.8), sign).translateY(2.75).translateZ(2.75));
+    rr.position.set(LX0 - 4, 0, LZ0 + 9);
+    rr.rotation.y = Math.PI / 2;
+    rr.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    g.add(rr);
+    // a picnic shelter beside it
+    const wood = pbr('brown_planks_08', { scale: 2 });
+    const sh = new THREE.Group();
+    for (const [px, pz] of [[-3.5, -2.5], [3.5, -2.5], [-3.5, 2.5], [3.5, 2.5]]) sh.add(new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.8, 0.3), wood).translateX(px).translateY(1.4).translateZ(pz));
+    sh.add(new THREE.Mesh(new THREE.ConeGeometry(Math.SQRT1_2, 1, 4, 1, true).rotateY(Math.PI / 4).translate(0, 0.5, 0).scale(9, 1.8, 7), roofM).translateY(2.8));
+    for (const pz of [-1, 1]) sh.add(new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.08, 0.9), wood).translateY(0.75).translateZ(pz * 1.1));
+    sh.position.set(LX0 - 18, 0, LZ0 + 9);
+    sh.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    g.add(sh);
+    // visitors: along the viewing walk and at its rail, looking up at the painting; round the lot and shelter
+    const people = [];
+    for (let i = 0; i < 26; i++) { const x = -60 + rc() * 120; people.push([x, 1.1, -6.6 - rc() * 1.4, Math.PI + (rc() - 0.5) * 0.6]); }
+    for (let i = 0; i < 10; i++) { const x = -40 + rc() * 80; people.push([x, 0.05, -2.9 + (rc() - 0.5) * 1.6, rc() < 0.5 ? Math.PI / 2 : -Math.PI / 2]); } // on the bike trail
+    for (let i = 0; i < 12; i++) { const x = LX0 - 24 + rc() * 40, z = LZ0 + 2 + rc() * 14; people.push([x, 0.08, z, Math.PI + (rc() - 0.5) * 1.6]); }
+    const crowd = crowdAt(people, rc);
+    if (crowd) g.add(crowd);
+  }
+
   // ---- bald eagles soaring along the bluff --------------------------------
   const birds = [];
   {
@@ -551,11 +611,34 @@ export default function build() {
     }
   }
 
+  // ---- a towboat working the river across the hole (placed on the hole's water by fit) ----
+  const towG = tow(glow);
+  towG.rotation.y = Math.PI / 2; // running along the river, across the line of play
+  towG.visible = false;
+  g.add(towG);
+  const river = { x0: -420, x1: 420, z: 0, y: 0, ok: false };
+
   return {
+    pad: true, // stands on a flat base: the course levels the ground under it
     group: g,
     glow,
     trees: treeList,
+    fit(holder, T) {
+      // the river channel is the hole's water: find its middle and level in this frame
+      holder.updateMatrix();
+      const Li = holder.matrix.clone().invert(), w = new THREE.Vector3();
+      for (const f of [0.5, 0.45, 0.55, 0.4, 0.6]) {
+        const p = T.pointAt(T.length * f), tr = T.terrain(p.x, p.z);
+        if (tr.surface !== 'water') continue;
+        w.set(p.x, tr.height, p.z).applyMatrix4(Li);
+        river.z = w.z; river.y = w.y; river.ok = true;
+        break;
+      }
+      towG.visible = river.ok;
+      towG.position.set(-200, river.y + 0.2, river.z - 12);
+    },
     update(t, dt, day) {
+      if (river.ok) { towG.position.x = -300 + ((t * 2.2) % 600); }
       washMat.opacity = 0.6 * (1 - day);
       wash.visible = day < 0.98;
       for (const e of birds) {

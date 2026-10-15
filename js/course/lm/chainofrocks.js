@@ -524,7 +524,13 @@ export default function build() {
     }
   }
 
+  // the ground under it: the banks level with its base, the river's bed dropped
+  // well under its water so the hole's ground never shows through (holeTerrain pads)
+  const along = new THREE.Vector2(0.545, 0.839), Q = 700;
+  const riverPoly = [NEAR.clone().addScaledVector(along, -Q), NEAR.clone().addScaledVector(along, Q), FAR.clone().addScaledVector(along, Q), FAR.clone().addScaledVector(along, -Q)].map((v) => [v.x, v.y]);
+  const pads = [{ rects: [[XMIN, XMAX, ZMIN, ZMAX]] }, { poly: riverPoly, dy: -3.5, feather: 6 }];
   return {
+    pads,
     group: g,
     glow,
     trees: treeList,

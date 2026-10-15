@@ -35,7 +35,7 @@ export const COURSE_MODELS = {
   eaststl: ['lowrider', 'wreck', 'people', 'peopleLo', 'rubble'],
   sawgrass: ['people', 'peopleLo'],
   // the scanned crowds at the riverfront and in the parks (instanced, js/scene/crowd.js)
-  confluence: ['peopleLo'],
+  confluence: ['peopleLo', 'zooAnimals', 'zooRocks', 'cahokiaPeople'], // the zoo hole's animals and boulders; the Monks Mound hole's villagers
   alton: ['peopleLo'],
   forestpark: ['peopleLo'],
   stlzoo: ['zooAnimals', 'zooRocks', 'zooMarine', 'peopleLo'],

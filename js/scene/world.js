@@ -124,6 +124,10 @@ export class World {
     this.theme = hole.theme || 'parkland';
     // the St. Louis skyline belongs to the Confluence Course only
     this.skyline.group.visible = !hole.course || hole.course === 'confluence';
+    // a hole can turn the skyline about the tee, to sit where it reads from there (Chain of Rocks)
+    this.skyline.group.rotation.y = hole.skylineYaw || 0;
+    // ...or move it nearer: the Riverboat hole stands directly across the river from the Arch
+    this.skyline.group.position.set(...(hole.skylineShift ? [hole.skylineShift[0], 0, hole.skylineShift[1]] : [0, 0, 0]));
     const T = this.course.load(hole);
     // trees, shrubs and long grass fade where they'd hide the ball
     patchOccluders(this.course.root);

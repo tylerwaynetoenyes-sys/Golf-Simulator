@@ -249,7 +249,7 @@ function muny(m) {
 }
 
 // ── the Flight Cage: a 69 x 25 m mesh vault on steel ribs (long axis east-west) ──
-function flightCage(m) {
+export function flightCage(m) {
   const B = new Batch();
   const meshTex = canvasTex(64, 64, (c, w, h) => { c.clearRect(0, 0, w, h); c.strokeStyle = 'rgba(40,44,46,0.95)'; c.lineWidth = 2; for (let i = 0; i <= w; i += 8) { c.beginPath(); c.moveTo(i, 0); c.lineTo(i, h); c.stroke(); c.beginPath(); c.moveTo(0, i); c.lineTo(w, i); c.stroke(); } }, [60, 18]);
   const net = new THREE.MeshStandardMaterial({ map: meshTex, transparent: true, alphaTest: 0.2, side: THREE.DoubleSide, roughness: 0.7, metalness: 0.4 });

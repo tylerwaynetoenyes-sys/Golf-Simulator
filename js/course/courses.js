@@ -42,9 +42,10 @@ export async function loadCourse(id) {
   // the course's tree models (browser only; the Node tools skip them). The
   // Confluence is registered up front, so it needs them asked for here too
   const trees = typeof window !== 'undefined' ? import('../scene/trees.js').then((m) => m.loadHeroTrees(c.id, c.theme)) : null;
-  if (loaded.has(id)) { await trees; return loaded.get(id); }
-  // imported models (Eiffel Tower, statue, cars, people), browser only
+  // imported models (Eiffel Tower, statue, cars, people), browser only; asked
+  // for here even for a course already registered (the Confluence's crowds)
   const models = typeof window !== 'undefined' ? import('../scene/models.js').then((m) => m.preloadCourseModels(c.id)) : null;
+  if (loaded.has(id)) { await Promise.all([trees, models]); return loaded.get(id); }
   if (!c.dem) { await Promise.all([models, trees]); loaded.set(id, c); return c; }
   const [d] = await Promise.all([loadDem(c.id), trees, models]);
   const out = { ...c, holes: prepareDemHoles(c, d) };

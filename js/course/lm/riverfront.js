@@ -1121,9 +1121,12 @@ export function pavingMeshes(D, gy, skipAt, { paths = true, sidewalks = false } 
     if (p.length > 2 && p[0][0] === p[p.length - 1][0] && p[0][1] === p[p.length - 1][1]) p = p.slice(0, -1);
     if (p.length < 3) continue;
     const cx = p.reduce((s, q) => s + q[0], 0) / p.length, cz = p.reduce((s, q) => s + q[1], 0) / p.length;
-    if (skipAt(cx, cz)) continue;
     const tris = THREE.ShapeUtils.triangulateShape(p.map(([x, z]) => new THREE.Vector2(x, z)), []);
-    for (const t of tris) for (const k of t) lots.push(p[k][0], gy(p[k][0], p[k][1]) + 0.22, p[k][1]);
+    for (const t of tris) {
+      // a lot reaching into the field of play stops at its edge (triangle by triangle)
+      if (skipAt((p[t[0]][0] + p[t[1]][0] + p[t[2]][0]) / 3, (p[t[0]][1] + p[t[1]][1] + p[t[2]][1]) / 3)) continue;
+      for (const k of t) lots.push(p[k][0], gy(p[k][0], p[k][1]) + 0.22, p[k][1]);
+    }
   }
   if (lots.length) {
     const g = new THREE.BufferGeometry();
@@ -1144,19 +1147,19 @@ function parkedCars(D, gy, skipAt, rnd, near) {
     const p = p0.length > 2 && p0[0][0] === p0[p0.length - 1][0] ? p0.slice(0, -1) : p0;
     if (p.length < 3) continue;
     const cx = p.reduce((s, q) => s + q[0], 0) / p.length, cz = p.reduce((s, q) => s + q[1], 0) / p.length;
-    if (skipAt(cx, cz) || Math.hypot(cx, cz) > 1500) continue;
+    if (Math.hypot(cx, cz) > 1500) continue;
     let best = 0, ang = 0;
     for (let i = 0; i < p.length; i++) { const [x1, z1] = p[i], [x2, z2] = p[(i + 1) % p.length]; const l = Math.hypot(x2 - x1, z2 - z1); if (l > best) { best = l; ang = Math.atan2(z2 - z1, x2 - x1); } }
     const ca = Math.cos(ang), sa = Math.sin(ang);
     let a0 = Infinity, a1 = -Infinity, b0 = Infinity, b1 = -Infinity;
     for (const [x, z] of p) { const a = (x - cx) * ca + (z - cz) * sa, b = -(x - cx) * sa + (z - cz) * ca; a0 = Math.min(a0, a); a1 = Math.max(a1, a); b0 = Math.min(b0, b); b1 = Math.max(b1, b); }
-    const busy = near(cx, cz) ? 0.5 : 0.28; // the casino's lots are fullest
+    const busy = near(cx, cz) ? 0.72 : 0.3; // the casino's lot is fullest
     // double rows of 2.7 m stalls, a 7 m aisle between each pair
     for (let b = b0 + 3; b < b1 - 2; b += 17) for (const side of [0, 5.4]) for (let a = a0 + 2; a < a1 - 2; a += 2.7) {
       const x = cx + a * ca - (b + side) * sa, z = cz + a * sa + (b + side) * ca;
       let inside = false;
       for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const [xi, zi] = p[i], [xj, zj] = p[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside; }
-      if (!inside || rnd() > busy) continue;
+      if (!inside || rnd() > busy || skipAt(x, z)) continue;
       spots.push([x, gy(x, z) + 0.22, z, ang + Math.PI / 2 + (rnd() < 0.5 ? 0 : Math.PI)]);
     }
   }
@@ -1615,8 +1618,8 @@ export default function build() {
     let gy, skipAt, cut = null;
     if (onCourse) {
       gy = onCourse.gy;
-      skipAt = onCourse.inPlay;
-      edge = (x, z) => (onCourse.inPlay(x, z) ? -1 : 1e9);
+      skipAt = onCourse.inPlay; // paving and parked cars: off the field itself
+      edge = (x, z) => onCourse.beyond(x, z) + 45; // buildings: 25 m back from the field (skipB keeps edge >= 70)
       sync = false; // no extra trees: the course plants its own woods
     } else {
       const sg = shapeGround(D, edge, holeY);
@@ -1625,7 +1628,8 @@ export default function build() {
       for (const m of groundMeshes(D, sg.Hf, sg.cut, sg.blend, glow)) ext.add(m.isMesh ? m : Object.assign(new THREE.Mesh(m, water), { receiveShadow: true }));
     }
     // set-piece areas the town keeps out of
-    const keep = [[-240, -80, -905, -565], [-262, -135, -615, -380], [-75, 75, -75, 75]];
+    // (the riverfront downstream of the amphitheater is park and marina: no town houses on it)
+    const keep = [[-240, -80, -905, -565], [-262, -135, -615, -380], [-75, 75, -75, 75], [-160, 10, 60, 175]];
     // the parks keep their own buildings (pavilions, restrooms: parkDressing), not the town's houses
     const parks = (PARK?.parks || []).map((p) => p.p);
     const inPark = (x, z) => parks.some((p) => inPoly(x, z, p));
@@ -1729,7 +1733,7 @@ export default function build() {
 
     // parked cars (the casino's lots fullest) and the traffic on the bridge
     // real cars (js/scene/cars.js): the casino's lot fills first, then the nearest lots; traffic on the bridge
-    carsAt(parkedCars(D, gy, skipAt, rnd, (x, z) => Math.hypot(x + 150, z + 470) < 260), rnd, { max: 80, near: [-150, -470] }).then((g) => ext.add(g));
+    carsAt(parkedCars(D, gy, skipAt, rnd, (x, z) => Math.hypot(x + 107, z + 229) < 140), rnd, { max: 220, near: [-107, -229] }).then((g) => ext.add(g));
     carsAt(carSpots, rnd, { max: 26 }).then((g) => ext.add(g));
 
     // walkers on the riverfront trail
@@ -1806,8 +1810,10 @@ export default function build() {
         const L = holder.matrix.clone();
         const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
         const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
-        const inPlay = (x, z) => { toW(x, z); const pr = T.project(w.x, w.z); return Math.abs(pr.d) < T.oobLateral + 6 && pr.s > -40 && pr.s < T.length + 60; };
-        const go = (d) => addWorld(d, null, null, false, { gy, inPlay });
+        // how far outside the field of play (fairway or green, and the short rough at its edge) a point lies
+        const beyond = (x, z) => { toW(x, z); const pr = T.project(w.x, w.z); if (pr.s < -25 || pr.s > T.length + 30) return 1e9; return Math.abs(pr.d) - Math.max(T.fwHalf || 0, 14) - 6; };
+        const inPlay = (x, z) => beyond(x, z) < 0;
+        const go = (d) => addWorld(d, null, null, false, { gy, inPlay, beyond });
         if (DATA) go(DATA); else ready.then((d) => d && go(d));
         return;
       }

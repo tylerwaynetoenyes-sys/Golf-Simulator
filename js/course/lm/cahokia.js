@@ -9,6 +9,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { box, cyl, seeded, canvasTex } from './kit.js';
 import { pbr } from '../../scene/pbr.js';
+import { houses, figures, KINDS } from './mississippian.js';
+import { Batch } from './riverfront.js';
 
 /** A stepped, rounded-rectangle earthwork terrace. */
 function terrace(w, d, h, inset, r = 6) {
@@ -271,8 +273,64 @@ export default function build() {
   }
 
   return {
+    pad: true, // stands on a flat base: the course levels the ground under it
     group: g,
     glow,
+    /**
+     * The city along the hole itself: neighbourhoods of thatched houses either
+     * side, people in their yards, a chunkey game with its crowd, and villagers
+     * lining the approach to watch you play in.
+     */
+    fit(holder, T) {
+      holder.updateMatrix();
+      const Lm = holder.matrix.clone(), Li = Lm.clone().invert(), w = new THREE.Vector3(), y0 = holder.position.y, k = holder.scale.y;
+      const at = (s, d) => { const p = T.pointAt(s); w.set(p.x + p.rx * d, 0, p.z + p.rz * d).applyMatrix4(Li); return [w.x, w.z]; };
+      const gy = (x, z) => { w.set(x, 0, z).applyMatrix4(Lm); return (T.meshHeight(w.x, w.z) - y0) / k; };
+      const yawAlong = (s) => { const a = at(s, 0), b = at(s + 1, 0); return Math.atan2(b[0] - a[0], b[1] - a[1]); };
+      const r = seeded(1050);
+      const L = T.length;
+      // house lots: [s fraction, d, columns, rows], clear of the hole's own mounds
+      const hoods = [[0.18, 52, 3, 2], [0.56, 50, 3, 2], [0.28, -56, 3, 2], [0.8, -50, 2, 2]];
+      const lots = [];
+      for (const [f, d, c, rows] of hoods) for (let i = 0; i < c * rows; i++) {
+        const s = f * L + (i % c) * 22 + (r() - 0.5) * 6, dd = d + Math.sign(d) * Math.floor(i / c) * 22 + (r() - 0.5) * 6;
+        const [x, z] = at(s, dd);
+        lots.push([x, z, yawAlong(s) + (d > 0 ? -Math.PI / 2 : Math.PI / 2) + (r() - 0.5) * 0.5]); // doors toward the hole
+      }
+      const B = new Batch();
+      const yards = houses(B, lots, gy, r);
+      const hg = new THREE.Group();
+      B.build(hg);
+      hg.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+      g.add(hg);
+      const placed = {};
+      const put = (kind, x, z, yaw) => (placed[kind] ||= []).push([x, gy(x, z) - 0.02, z, yaw, 0.96 + r() * 0.08]);
+      const facing = (x, z, tx, tz) => Math.atan2(tx - x, tz - z);
+      // in the yards, at the hearths
+      yards.forEach(([hx, hz, ry], i) => {
+        const kind = ['woman_basket', 'elder_potter', 'man_thatch', 'girl', 'woman_jar', 'elder_man'][i % 6];
+        const a = ry + (r() - 0.5) * 1.2, rr = 1.4 + r() * 0.8;
+        put(kind, hx + Math.sin(a) * rr, hz + Math.cos(a) * rr, ry + Math.PI + (r() - 0.5) * 0.8);
+      });
+      // a chunkey game on the open ground left of the fairway, its crowd round it
+      {
+        const [cx, cz] = at(0.47 * L, -36), ya = yawAlong(0.47 * L);
+        for (const [ds, dd, back] of [[-14, -2, 0], [-12, 2, 0], [14, -2, 1], [12, 2, 1]]) { const [x, z] = at(0.47 * L + ds, -36 + dd); put('man_chunkey', x, z, ya + (back ? Math.PI : 0)); }
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2, x = cx + Math.cos(a) * 9, z = cz + Math.sin(a) * 20;
+          put(KINDS[(i * 3 + 1) % KINDS.length] === 'man_chunkey' ? 'girl' : KINDS[(i * 3 + 1) % KINDS.length], x, z, facing(x, z, cx, cz));
+        }
+      }
+      // villagers lining the approach to the green, turned to watch the golfer
+      for (let i = 0; i < 18; i++) {
+        const side = i % 2 ? 1 : -1, s = L - 70 + Math.floor(i / 2) * 9 + (r() - 0.5) * 3, d = side * (30 + r() * 4);
+        const [x, z] = at(s, d), [tx, tz] = at(s - 30, 0);
+        put(['elder_man', 'woman_jar', 'girl', 'man_thatch', 'woman_basket', 'elder_potter'][i % 6], x, z, facing(x, z, tx, tz));
+      }
+      const pg = new THREE.Group();
+      figures(pg, placed);
+      g.add(pg);
+    },
     update(t, dt, day) {
       // mist lies heaviest in the morning/evening light and at night
       mistMat.opacity = 0.22 + 0.28 * (1 - day);

@@ -153,6 +153,8 @@ export class CourseWorld {
     this._ringKey = null;
     this.ringTarget = 0;
     const T = (this.T = new HoleTerrain(hole));
+    // the landmark is placed first so the ground under it can be levelled (pads)
+    const lmPre = this._placeLandmark(hole, T);
     this._nearAt = null;
     this._nearPrev = null;
     this.streetLife = null;
@@ -374,26 +376,9 @@ diffuseColor.rgb *= stripes * turf;`);
     this.pinLight.position.set(T.pin.x, pinY + 6, T.pin.z);
     g.add(this.pinLight);
 
-    // ── landmark ──
-    const lmSpec = hole.lm;
-    this.landmark = buildLandmark(lmSpec.type);
-    // a set piece with no moving parts draws one call per material
-    if (!this.landmark.update) mergeByMaterial(this.landmark.group);
-    const holder = new THREE.Group();
-    holder.add(this.landmark.group);
-    let lx, lz;
-    if (lmSpec.onCreek && T.creeks.length) {
-      const pt = T.pointAt(T.creeks[0].s);
-      lx = pt.x + pt.rx * (lmSpec.at[0] || -75);
-      lz = pt.z + pt.rz * (lmSpec.at[0] || -75);
-      holder.position.set(lx, T.creeks[0].level - 1, lz);
-    } else {
-      lx = T.green.x + T.finalRight.x * lmSpec.at[0] - T.finalDir.x * lmSpec.at[1];
-      lz = T.green.z + T.finalRight.z * lmSpec.at[0] - T.finalDir.z * lmSpec.at[1];
-      holder.position.set(lx, T.meshHeight(lx, lz) - 0.3, lz);
-    }
-    holder.rotation.y = Math.atan2(-T.finalDir.x, -T.finalDir.z) + (lmSpec.rot || 0);
-    holder.scale.setScalar(lmSpec.scale || 1);
+    // ── landmark (placed before the ground: see _placeLandmark) ──
+    this.landmark = lmPre.lm;
+    const holder = lmPre.holder;
     g.add(holder);
     // a landmark laid on its own real ground meets the hole's here (and keeps
     // its far-flung parts out of the footprint that keeps trees off it)
@@ -669,6 +654,7 @@ diffuseColor.rgb *= stripes * turf;`);
       const off = Math.max(T.fwHalf, 14) + 26;
       let x = pt.x + pt.rx * off * side, z = pt.z + pt.rz * off * side;
       if (inLandmark(x, z)) { x = pt.x - pt.rx * off * side; z = pt.z - pt.rz * off * side; }
+      if (T.terrain(x, z).surface === 'water') return; // no masts standing in a river
       const y0 = T.meshHeight(x, z);
       this.poles.push({ x, z });
       const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 20, 8), poleMat);
@@ -689,6 +675,62 @@ diffuseColor.rgb *= stripes * turf;`);
     this.setDay(this.day);
     this.setWind(this.wind, this.windFrom);
     return T;
+  }
+
+  /**
+   * Build the hole's landmark and place it beside the hole. On the drawn
+   * (non-DEM) holes, the ground under it is then levelled to its base: a
+   * pad on the terrain over its footprint, eased out toward the field of play,
+   * so walls, roads and plazas stand on the ground instead of in it. A
+   * landmark can give its own footprint (`pads`: local [x0, x1, z0, z1]
+   * rects) or opt out (`pad: false`); one that drapes itself on the ground
+   * (fit) is left alone unless it asks.
+   */
+  _placeLandmark(hole, T) {
+    const lmSpec = hole.lm;
+    const lm = buildLandmark(lmSpec.type);
+    // a set piece with no moving parts draws one call per material
+    if (!lm.update) mergeByMaterial(lm.group);
+    const holder = new THREE.Group();
+    holder.add(lm.group);
+    let lx, lz;
+    if (lmSpec.onCreek && T.creeks.length) {
+      const pt = T.pointAt(T.creeks[0].s);
+      lx = pt.x + pt.rx * (lmSpec.at[0] || -75);
+      lz = pt.z + pt.rz * (lmSpec.at[0] || -75);
+      holder.position.set(lx, T.creeks[0].level - 1, lz);
+    } else {
+      lx = T.green.x + T.finalRight.x * lmSpec.at[0] - T.finalDir.x * lmSpec.at[1];
+      lz = T.green.z + T.finalRight.z * lmSpec.at[0] - T.finalDir.z * lmSpec.at[1];
+      holder.position.set(lx, T.meshHeight(lx, lz) - 0.3, lz);
+    }
+    holder.rotation.y = Math.atan2(-T.finalDir.x, -T.finalDir.z) + (lmSpec.rot || 0);
+    holder.scale.setScalar(lmSpec.scale || 1);
+    holder.updateMatrix();
+    const wantPad = !T.F && !lmSpec.onCreek && lm.pad !== false && (lm.pads || lm.pad === true || !lm.fit);
+    if (wantPad) {
+      let rects = lm.pads;
+      if (!rects) {
+        // the footprint of what stands on the ground (not the sky: birds, mist, far haze)
+        const box = new THREE.Box3(), bb = new THREE.Box3();
+        lm.group.updateMatrixWorld(true);
+        lm.group.traverse((o) => {
+          if (!(o.isMesh || o.isInstancedMesh) || !o.geometry) return;
+          if (!o.geometry.boundingBox) o.geometry.computeBoundingBox();
+          bb.copy(o.geometry.boundingBox).applyMatrix4(o.matrixWorld);
+          if (bb.min.y > 6 || bb.max.y < -3) return;
+          box.union(bb);
+        });
+        rects = box.isEmpty() ? [] : [[box.min.x - 2, box.max.x + 2, box.min.z - 2, box.max.z + 2]];
+      }
+      // levelled just under the set piece's base (its local y = 0); a landmark's own
+      // pads may be plain rects or {rects | poly, dy} (dy below its base: a riverbed)
+      const inv = holder.matrix.clone().invert().elements, k = holder.scale.y;
+      T.pads = (rects.length && !Array.isArray(rects[0]) ? rects : [{ rects }])
+        .filter((q) => q.rects?.length || q.poly)
+        .map((q) => ({ inv, rects: q.rects, poly: q.poly, y: holder.position.y - 0.04 + (q.dy || 0) * k, feather: q.feather ?? 10 }));
+    }
+    return { lm, holder };
   }
 
   /**
@@ -1230,6 +1272,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       if (T.terrain(x, z).surface !== 'rough') continue;
       if (T.greenEdge(x, z) < 3) continue;
       if (this._mownCarry(x, z)) continue;
+      if (this.landmark?.clear?.(x, z)) continue; // the landmark's paving (a street, a plaza)
       const deep = T.roughDepth(x, z) === 'deep';
       const h = (deep ? 0.2 : 0.1) + rand() * (deep ? 0.2 : 0.07);
       q.setFromAxisAngle(up, rand() * 6.28);

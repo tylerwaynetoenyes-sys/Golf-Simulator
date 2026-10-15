@@ -31,7 +31,8 @@ export function cull(inst, radius, { scaled = false } = {}) {
     set(i, m4) { m4.toArray(this.src, i * 16); this.dirty = true; },
   };
   inst.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  inst.userData.cull = rec;
+  // kept out of JSON: three.js copies userData through JSON when a parent is cloned
+  Object.defineProperty(inst.userData, 'cull', { value: rec, enumerable: false, writable: true, configurable: true });
   sets.add(rec);
   return rec;
 }

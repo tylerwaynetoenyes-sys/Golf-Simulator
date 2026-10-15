@@ -93,7 +93,7 @@ export default function build() {
       c.fillStyle = '#f3efe6'; c.fillRect(0, 0, w, h);
       c.strokeStyle = '#9a2b22'; c.lineWidth = 6; c.strokeRect(4, 4, w - 8, h - 8);
       c.font = 'bold 52px Georgia'; c.fillStyle = '#9a2b22'; c.textAlign = 'center'; c.textBaseline = 'middle';
-      c.fillText('CONFLUENCE', w / 2, h / 2 + 2);
+      c.fillText('TOM SAWYER', w / 2, h / 2 + 2);
     }),
     roughness: 0.6,
   });
@@ -160,33 +160,56 @@ export default function build() {
   const people = crowdAt(pax, rnd);
   if (people) boat.add(people);
 
-  boat.position.set(0, 0, -6);
+  // moored below the tee, off to the left so the shot to the island is clear
+  const BOAT_X = -48;
+  boat.position.set(BOAT_X, 0, -112);
   g.add(boat);
 
-  // ── the levee: cobblestone slope, bollards, gangway, river ──
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(130, 46), landmarkWater());
-  water.rotation.x = -Math.PI / 2;
-  water.position.set(0, 0.06, -14);
-  water.receiveShadow = true;
-  g.add(water);
+  // ── the floating restaurant on the right: a riverboat front on a steel barge, in the
+  // spirit of the old McBarge that served burgers below the Arch from 1980 to 2000 ──
+  const barge = new THREE.Group();
+  {
+    const red = pbr('metal_plate', { scale: 2, tint: 0xc4302a, metal: 0.15 });
+    const gold = pbr('metal_plate', { scale: 2, tint: 0xf2b630, metal: 0.25, bright: 1.3 });
+    const hullM = pbr('metal_plate', { scale: 2.5, tint: 0x3c3f44, metal: 0.4 });
+    const glass = lit(0x24303a, 0xffd59a, { night: 1.5, roughness: 0.12, metalness: 0.3 });
+    glow.push(glass);
+    barge.add(box(60, 2.2, 20, hullM, 0, -1.1, 0)); // the steel barge
+    barge.add(box(60.4, 0.25, 20.4, red, 0, 1.0, 0));
+    barge.add(box(52, 4.2, 15, white, 0, 1.1, 0)); // the dining hall
+    barge.add(box(50, 2.2, 15.1, glass, 0, 2.2, 0)); // its long windows
+    barge.add(box(54, 0.35, 17, red, 0, 5.3, 0)); // the deck above
+    barge.add(box(30, 3.2, 11, white, 4, 5.6, 0));
+    barge.add(box(28, 1.4, 11.1, glass, 4, 6.6, 0));
+    barge.add(box(32, 0.3, 13, gold, 4, 8.8, 0)); // a bright yellow roof edge
+    // the false riverboat front: twin stacks with feathered crowns and a dummy stern wheel
+    for (const z of [-3.2, 3.2]) { barge.add(cyl(0.7, 0.8, 9, dark, 16, 9, z, 14)); barge.add(cyl(1.3, 0.75, 1.2, gold, 16, 18, z, 14)); }
+    const wheelF = new THREE.Mesh(new THREE.CylinderGeometry(5, 5, 12, 20, 1, true).rotateX(Math.PI / 2).rotateY(Math.PI / 2), red);
+    wheelF.position.set(-31, 4, 0);
+    barge.add(wheelF);
+    const sign = new THREE.MeshStandardMaterial({ map: canvasTex(512, 96, (c, w, h) => { c.fillStyle = '#c4302a'; c.fillRect(0, 0, w, h); c.font = 'bold 62px Georgia'; c.fillStyle = '#ffd24a'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('RIVERFRONT EATS', w / 2, h / 2 + 4); }), roughness: 0.7 });
+    const sm = new THREE.Mesh(new THREE.PlaneGeometry(22, 4.1), sign);
+    sm.position.set(4, 10.6, 6.6);
+    barge.add(sm);
+    const pax2 = [];
+    for (let i = 0; i < 14; i++) pax2.push([-20 + rnd() * 40, 5.65, -4 + rnd() * 8, rnd() * 6.28]);
+    const crowd2 = crowdAt(pax2, rnd);
+    if (crowd2) barge.add(crowd2);
+    barge.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  }
+  barge.position.set(56, 0, -120);
+  barge.rotation.y = 0.2;
+  g.add(barge);
+
+  // ── the levee: cobblestone slope, bollards, gangway; the river is the hole's own ──
   // the levee's granite setts, sloping down to the water
-  const levee = new THREE.Mesh(new THREE.PlaneGeometry(130, 16), pbr('cobblestone_floor_08', { scale: 2.5, tint: 0xd8d0c4 }));
+  const levee = new THREE.Mesh(new THREE.PlaneGeometry(300, 16), pbr('cobblestone_floor_08', { scale: 2.5, tint: 0xd8d0c4 }));
   levee.rotation.x = -Math.PI / 2 + 0.2;
   levee.position.set(0, 1.2, 9.5);
   levee.receiveShadow = true;
   g.add(levee);
   const iron = pbr('metal_plate', { scale: 1, tint: 0x2c2e32, metal: 0.6 });
-  for (let x = -50; x <= 50; x += 12.5) g.add(cyl(0.35, 0.45, 0.9, iron, x, 0.2, 3, 10));
-  const gw = box(2.2, 0.2, 9, deck, 8, 1.9, 3.2);
-  gw.rotation.x = 0.16;
-  g.add(gw);
-  // mooring lines
-  const lines = [];
-  for (const x of [-25, 25]) {
-    const c = new THREE.QuadraticBezierCurve3(new THREE.Vector3(x, 2.4, -0.2), new THREE.Vector3(x, 0.8, 1.8), new THREE.Vector3(x + (x > 0 ? 0 : 0), 0.9, 3));
-    lines.push(new THREE.TubeGeometry(c, 8, 0.05, 4, false));
-  }
-  g.add(new THREE.Mesh(mergeGeometries(lines), mat(0xd9cdb0)));
+  for (let x = -140; x <= 140; x += 12.5) g.add(cyl(0.35, 0.45, 0.9, iron, x, 0.2, 3, 10));
 
   // soft stack smoke
   const smokeTex = canvasTex(64, 64, (c, w, h) => {
@@ -202,12 +225,25 @@ export default function build() {
     puffs.push(s);
   }
 
+  // both boats ride on the hole's river: its level, in this frame, found by fit
+  let floatY = 0;
   return {
     group: g,
     glow,
+    pad: false, // the levee meets the river: no levelling
+    fit(holder, T) {
+      holder.updateMatrix();
+      const M = holder.matrix, w = new THREE.Vector3();
+      for (const z of [-100, -110, -90]) {
+        w.set(0, 0, z).applyMatrix4(M);
+        const tr = T.terrain(w.x, w.z);
+        if (tr.surface === 'water') { floatY = (tr.height - holder.position.y) / holder.scale.y + 0.3; break; }
+      }
+      barge.position.y = floatY;
+    },
     update(t, dt) {
       wheel.rotation.z = -t * 0.35;
-      boat.position.y = Math.sin(t * 0.6) * 0.06;
+      boat.position.y = floatY + Math.sin(t * 0.6) * 0.06;
       boat.rotation.x = Math.sin(t * 0.45) * 0.004;
       for (const s of puffs) {
         const u = (t * 0.08 + s.userData.phase) % 1;
