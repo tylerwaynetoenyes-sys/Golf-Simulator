@@ -1046,7 +1046,7 @@ export class Game {
           w.ball.spinRate *= 0.3;
         } else if (e.type === 'tree') {
           audio.leaves(e.speed, d);
-          w.effects.burst(e.x, e.y, e.z, { n: 26, color: 0x4f7a2e, speed: 2.2, up: 0.6, life: 1.6, gravity: 1.2 });
+          w.effects.leaves(e.x, e.y, e.z, e.speed);
         } else if (e.type === 'edge') {
           s.landed = true;
         } else if (e.type === 'bounce' && e.surface !== 'water' && e.surface !== 'oob') {
@@ -1066,7 +1066,7 @@ export class Game {
           if (!s.tapping || s.ring) this._holeOutMoment(s);
           else audio.cheer(0.12);
         } else if (e.type === 'splash') {
-          if (e.surface === 'water') { w.effects.splash(e.x, e.y, e.z); audio.splash(Math.max(0.2, 1 - d / 600)); }
+          if (e.surface === 'water') { w.effects.splash(e.x, e.y, e.z, e.speed || 30); audio.splash(Math.max(0.2, 1 - d / 600)); }
           w.ball.setVisible(false);
           s.t = Math.max(s.t, r.duration);
         }

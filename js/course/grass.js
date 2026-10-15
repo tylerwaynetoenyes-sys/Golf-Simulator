@@ -66,6 +66,8 @@ export function grassMaterial(color) {
     Object.assign(sh.uniforms, GRASS);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nuniform float uTime; uniform vec2 uWind; uniform vec3 uBall;')
+      // blades shade like the ground they grow from (a thin double-sided blade lit from behind goes black)
+      .replace('#include <beginnormal_vertex>', 'vec3 objectNormal = normalize(mix(normal, vec3(0.0, 1.0, 0.0), 0.8));')
       .replace('#include <project_vertex>', `
         vec4 mvPosition = vec4(transformed, 1.0);
         #ifdef USE_INSTANCING

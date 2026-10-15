@@ -13,6 +13,7 @@ export default {
   place: 'Central Park · Manhattan, New York',
   theme: 'parkland',
   dem: true,
+  noShore: true, // the park's landmarks plant its lakes' shores (the formal basins stay clean)
   enrich: true,
   origin: [40.7812, -73.9665],
   blurb: 'Nine holes through the middle of Manhattan: Bethesda Fountain, Bow Bridge, Belvedere Castle and the Reservoir, with the skyline over the trees on every side.',

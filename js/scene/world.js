@@ -38,6 +38,8 @@ export class World {
     this.ball = new Ball(scene);
     this.tracer = new Tracer(scene);
     this.effects = new Effects(scene);
+    this.effects.ground = (x, z) => (this.groundFn ? this.groundFn(x, z) : 0);
+    this.effects.camera = camera;
     this.rig = new CameraRig(camera);
     this.characters = new Characters(scene);
     this.club = new Club(scene);

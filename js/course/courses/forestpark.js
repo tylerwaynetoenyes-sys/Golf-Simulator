@@ -14,6 +14,7 @@ export default {
   place: 'Forest Park · St. Louis, Missouri',
   theme: 'parkland',
   dem: true,
+  noShore: true, // the park's landmarks plant its lakes' shores (the formal basins stay clean)
   enrich: true,
   origin: [38.64, -90.28677],
   blurb: "Eighteen holes through St. Louis's great park: the Art Museum on Art Hill, the Grand Basin, the lakes and the 1904 World's Fair, then The Highlands as it is.",

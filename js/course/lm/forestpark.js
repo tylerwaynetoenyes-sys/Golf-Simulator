@@ -26,6 +26,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, lit, canvasTex } from './kit.js';
 import { pbr } from '../../scene/pbr.js';
+import { createWaterMaterial } from '../../scene/river.js';
+import { shoreLife } from '../../scene/shore.js';
+let _lakeWater = null; // one water for every hole's lakes
 import { place, bx, cy, rod, span, Batch, pavingMeshes } from './riverfront.js';
 
 const BASE = new URL('../../../assets/landmarks/forestpark/', import.meta.url).href;
@@ -333,13 +336,15 @@ export default function build() {
       g.putImageData(img, 0, 0);
     });
     ripple.colorSpace = THREE.NoColorSpace; ripple.wrapS = ripple.wrapT = THREE.RepeatWrapping;
-    const water = new THREE.MeshStandardMaterial({ color: 0x40564f, roughness: 0.08, metalness: 0.2, normalMap: ripple, normalScale: new THREE.Vector2(0.18, 0.18) });
+    const water = (_lakeWater ||= createWaterMaterial({ tint: 0x3a5048, flow: 0.1 })); // the shared water: sky reflections, sun glint, ripples
     const coping = m.granite;
+    const shoreRings = [];
     for (const lake of D.lakes || []) {
       let p = lake.p;
       if (p.length > 2 && p[0][0] === p[p.length - 1][0] && p[0][1] === p[p.length - 1][1]) p = p.slice(0, -1);
       if (p.length < 3) continue;
       const shore = Math.min(...p.map(([x, z]) => gy(x, z)));
+      if (!/Grand Basin|Fountain/.test(lake.n)) shoreRings.push({ pts: p, level: shore - 0.25 });
       const tris = THREE.ShapeUtils.triangulateShape(p.map(([x, z]) => new THREE.Vector2(x, z)), []);
       const pos = [], uv = [];
       for (const t of tris) {
@@ -378,6 +383,8 @@ export default function build() {
         }
       }
     }
+    // reeds, cattails and lily pads round the natural lakes (the hole's own pond grows its own)
+    group.add(shoreLife(shoreRings, { skip: inPlay, budget: 700 }));
     // the park's drives and paths (lots too), kept off the field of play
     for (const mesh of pavingMeshes(D, gy, inPlay, { paths: false })) group.add(mesh);
   }

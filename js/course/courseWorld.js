@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HoleTerrain } from './holeTerrain.js';
 import { buildLandmark, setLandmarkDay } from './landmarks.js';
 import { createWaterMaterial, waterMaterials } from '../scene/river.js';
+import { shoreLife, ellipseRing } from '../scene/shore.js';
 import { makeFlag, lightConeMaterial } from '../scene/rangeProps.js';
 import { CUP } from '../core/physics.js';
 import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
@@ -25,10 +26,13 @@ import { dressPinFlag, flagpole, fireworks } from './usa.js';
 
 const C = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
 const COL = {
-  fwA: C(0.36, 0.58, 0.24), fwB: C(0.3, 0.52, 0.2),
-  rough: C(0.25, 0.42, 0.16), deep: C(0.19, 0.33, 0.13),
-  green: C(0.42, 0.7, 0.28), greenB: C(0.39, 0.66, 0.26), fringe: C(0.34, 0.58, 0.22),
-  sand: C(0.88, 0.8, 0.62), tee: C(0.38, 0.6, 0.25), bed: C(0.3, 0.32, 0.22),
+  // well-kept turf as it photographs: lime fairways, a deeper, cooler rough, bright greens, cream sand
+  fwA: C(0.41, 0.62, 0.25), fwB: C(0.35, 0.56, 0.21),
+  rough: C(0.25, 0.43, 0.18), deep: C(0.2, 0.35, 0.15),
+  green: C(0.44, 0.71, 0.29), greenB: C(0.4, 0.67, 0.27), fringe: C(0.36, 0.6, 0.23),
+  sand: C(0.93, 0.87, 0.72), tee: C(0.38, 0.6, 0.25), bed: C(0.3, 0.32, 0.22),
+  // under the water: silt at the margin, olive mud, then the dark of deep water; the wet bank above it
+  bedShallow: C(0.42, 0.37, 0.25), bedMid: C(0.2, 0.23, 0.14), bedDeep: C(0.05, 0.09, 0.08), wetBank: C(0.2, 0.22, 0.13),
   cut: C(0.31, 0.51, 0.2), // the first cut: between fairway and rough
 };
 
@@ -262,20 +266,26 @@ export class CourseWorld {
         // the mapped outline, grown a few metres so the sheet runs under the banks
         const k = (p.poly.R + 3) / p.poly.R;
         const shape = new THREE.Shape(p.poly.pts.map(([x, z]) => new THREE.Vector2(p.x + (x - p.x) * k, -(p.z + (z - p.z) * k))));
-        const m = new THREE.Mesh(new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2), this._water({ y: p.level, tint: 0x1d3036 }));
+        const m = new THREE.Mesh(new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2), this._water({ y: p.level, tint: 0x1d3036, clarity: 0.55 }));
         m.position.y = p.level;
         g.add(m);
         continue;
       }
-      const m = new THREE.Mesh(new THREE.CircleGeometry(1, 64).rotateX(-Math.PI / 2), this._water({ y: p.level, tint: 0x1d3036 }));
+      const m = new THREE.Mesh(new THREE.CircleGeometry(1, 64).rotateX(-Math.PI / 2), this._water({ y: p.level, tint: 0x1d3036, clarity: 0.55 }));
       m.scale.set(p.rx * 1.02, 1, p.rz * 1.02);
       m.rotation.y = Math.atan2(p.dirx, p.dirz);
       m.position.set(p.x, p.level, p.z);
       g.add(m);
     }
+    // the life at its edges: cattails, reeds, lily pads, duckweed
+    if (T.ponds.length && !hole.noShore) {
+      const rings = T.ponds.map((p) => ({ pts: p.poly ? p.poly.pts : ellipseRing(p), level: p.level }));
+      const skip = (x, z) => T.greenEdge(x, z) < 6 || Math.hypot(x, z) < 12;
+      g.add(shoreLife(rings, { skip, budget: this.r?.quality?.pixelRatio < 1.5 ? 500 : 900 }));
+    }
     for (const cr of T.creeks) {
       const pt = T.pointAt(cr.s);
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(T.oobLateral * 2 + 200, cr.half * 2 + 1).rotateX(-Math.PI / 2), this._water({ y: cr.level, tint: 0x24332c, flow: 0.8 }));
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(T.oobLateral * 2 + 200, cr.half * 2 + 1).rotateX(-Math.PI / 2), this._water({ y: cr.level, tint: 0x24332c, flow: 0.8, clarity: 0.6 }));
       m.rotation.y = Math.atan2(pt.dx, pt.dz);
       m.position.set(pt.x, cr.level, pt.z);
       g.add(m);
@@ -284,7 +294,7 @@ export class CourseWorld {
     // the sea or a river at its real level: one wide sheet of water; the
     // real ground (and the hole mesh) runs down beneath it at the shore
     if (T.seaLevel != null) {
-      const m = new THREE.Mesh(new THREE.CircleGeometry(9000, 96).rotateX(-Math.PI / 2), this._water({ y: T.seaLevel, tint: hole.waterTint ?? 0x1f3a48 }));
+      const m = new THREE.Mesh(new THREE.CircleGeometry(9000, 96).rotateX(-Math.PI / 2), this._water({ y: T.seaLevel, tint: hole.waterTint ?? 0x1f3a48, clarity: 0.35 }));
       m.position.set(0, T.seaLevel, 0);
       g.add(m);
     }
@@ -961,6 +971,20 @@ diffuseColor.rgb *= stripes * turf;`)
   }
 
   _colorAt(T, x, z, c) {
+    const surf = this._colorAt0(T, x, z, c);
+    // the water's bed by depth, and the wet strip of bank just above the water line
+    const w = T._water(x, z, T.project(x, z));
+    if (w && !w.sea) {
+      const y = T.meshHeight(x, z), dep = w.level - y;
+      if (dep > 0) {
+        const k = THREE.MathUtils.smoothstep(dep, 0, 0.5), k2 = THREE.MathUtils.smoothstep(dep, 0.5, 1.4);
+        c.copy(COL.bedShallow).lerp(COL.bedMid, k).lerp(COL.bedDeep, k2);
+      } else if (dep > -0.6) c.lerp(COL.wetBank, 0.55 * (1 + dep / 0.6));
+    }
+    return surf;
+  }
+
+  _colorAt0(T, x, z, c) {
     const t = T.terrain(x, z);
     const pr = T.project(x, z);
     // the meshes paint the turf under sand and fairway; the shader lays those on crisply (_buildSurfMask)

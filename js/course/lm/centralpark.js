@@ -21,6 +21,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, lit, canvasTex, boulderGeometry } from './kit.js';
 import { pbr } from '../../scene/pbr.js';
+import { createWaterMaterial } from '../../scene/river.js';
+import { shoreLife } from '../../scene/shore.js';
+let _lakeWater = null; // one water for every hole's lakes
 import { place, bx, cy, rod, span, Batch, pavingMeshes } from './riverfront.js';
 import { crowdAt } from '../../scene/crowd.js';
 import { cull } from '../../scene/instanceCull.js';
@@ -335,13 +338,15 @@ export default function build() {
       g.putImageData(img, 0, 0);
     });
     ripple.colorSpace = THREE.NoColorSpace; ripple.wrapS = ripple.wrapT = THREE.RepeatWrapping;
-    const water = new THREE.MeshStandardMaterial({ color: 0x3c5249, roughness: 0.07, metalness: 0.25, normalMap: ripple, normalScale: new THREE.Vector2(0.16, 0.16) });
+    const water = (_lakeWater ||= createWaterMaterial({ tint: 0x34483f, flow: 0.1 })); // the shared water: sky reflections, sun glint, ripples
     const levels = new Map();
+    const shoreRings = [];
     for (const l of D.lakes || []) {
       const p = open(l.p);
       if (p.length < 3) continue;
       const shore = shoreOf(p);
       levels.set(l, shore - 0.25);
+      if (!/Fountain|Conservatory|Reservoir/.test(l.n) && p.some(([x, z]) => near(x, z, 400))) shoreRings.push({ pts: p, level: shore - 0.25 });
       const tris = THREE.ShapeUtils.triangulateShape(p.map(([x, z]) => new THREE.Vector2(x, z)), []);
       const pos = [], uv = [];
       for (const [i0, i1, i2] of tris) {
@@ -362,6 +367,8 @@ export default function build() {
         K.build(group);
       }
     }
+
+    group.add(shoreLife(shoreRings, { skip: (x, z) => inPlay(x, z) || !near(x, z, 400), budget: 700 }));
 
     // ── Bethesda Fountain and Terrace ──
     const bf = lake(/Bethesda Fountain/);

@@ -111,30 +111,74 @@ void main() {
   #include <fog_fragment>
 }`;
 
-/** A pond / creek surface sharing the river's look (no reflected light streaks). */
-export function createWaterMaterial({ y = 0, tint = 0x1c2a2c, flow = 0.3 } = {}) {
-  const mat = new THREE.ShaderMaterial({
-    vertexShader: vert,
-    fragmentShader: frag,
-    uniforms: THREE.UniformsUtils.merge([
-      THREE.UniformsLib.fog,
-      {
-        uTime: { value: 0 },
-        uLights: { value: Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4()) },
-        uLightCol: { value: Array.from({ length: MAX_LIGHTS }, () => new THREE.Vector4()) },
-        uCount: { value: 0 },
-        uMoonDir: { value: MOON_DIR },
-        uCityDir: { value: CITY_DIR },
-        uWaterY: { value: y },
-        uDay: { value: 0 },
-        uCloud: { value: 0.2 },
-        uSunDir: { value: SUN_DIR },
-        uTint: { value: new THREE.Color(tint) },
-        uFlow: { value: flow },
-      },
-    ]),
-    fog: true,
+/**
+ * Ponds, lakes, creeks and the sea: physically based water. It reflects the real
+ * sky (the scene's HDRI environment) by Fresnel, takes the sun's glint and the
+ * trees' shadows, and moves with wind-driven ripples (procedural normals, in
+ * three octaves that ease off with distance so they never shimmer). With
+ * `clarity` the water is see-through where you look down into it, so the bed the
+ * terrain paints under it (shallow mud at the margin, darkening with depth)
+ * shows at the edges and the sheet meets the bank softly.
+ * The returned material keeps the old `uniforms` (uTime, uDay, uCloud) so the
+ * environment can drive it like the river.
+ */
+export function createWaterMaterial({ y = 0, tint = 0x1c2a2c, flow = 0.3, clarity = 0 } = {}) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color(tint).multiplyScalar(0.55), roughness: 0.035, metalness: 0, envMapIntensity: 1.1,
+    transparent: clarity > 0, depthWrite: clarity <= 0,
   });
+  const uni = {
+    uTime: { value: 0 }, uDay: { value: 1 }, uCloud: { value: 0.2 }, uFlow: { value: flow },
+    uClarity: { value: clarity }, uDeep: { value: new THREE.Color(tint) },
+  };
+  mat.uniforms = uni;
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, uni);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWWPos;')
+      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+varying vec3 vWWPos;
+uniform float uTime; uniform float uFlow; uniform float uClarity; uniform float uCloud; uniform vec3 uDeep;
+float wh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float wn(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(wh(i), wh(i + vec2(1, 0)), u.x), mix(wh(i + vec2(0, 1)), wh(i + vec2(1, 1)), u.x), u.y); }
+// the slope of a ripple field: a few octaves of drifting noise, the wind from the west
+vec2 wslope(vec2 p, float t, float fade) {
+  vec2 g = vec2(0.0);
+  float e = 0.05;
+  vec2 d1 = vec2(t * 0.35 + t * uFlow * 0.6, t * 0.08), d2 = vec2(-t * 0.21, t * 0.29), d3 = vec2(t * 0.9, -t * 0.4);
+  for (int k = 0; k < 3; k++) {
+    float sc = k == 0 ? 0.8 : k == 1 ? 2.3 : 6.5;
+    float amp = (k == 0 ? 0.22 : k == 1 ? 0.16 : 0.1) * (k == 2 ? fade : 1.0);
+    vec2 q = p * sc + (k == 0 ? d1 : k == 1 ? d2 : d3);
+    float c = wn(q);
+    g += amp * vec2(wn(q + vec2(e, 0.0)) - c, wn(q + vec2(0.0, e)) - c) / e * sc * 0.12;
+  }
+  return g;
+}`)
+      .replace('#include <normal_fragment_maps>', `
+      {
+        float dist = length(vWWPos - cameraPosition);
+        float fade = clamp(1.0 - dist / 260.0, 0.0, 1.0);
+        float calm = mix(0.45, 0.85, uCloud); // a breezy, overcast day ruffles it more
+        vec2 g = wslope(vWWPos.xz, uTime, fade) * calm * mix(0.35, 1.0, clamp(1.0 - dist / 1400.0, 0.0, 1.0));
+        vec3 wn3 = normalize(vec3(-g.x, 1.0, -g.y));
+        normal = normalize((viewMatrix * vec4(wn3, 0.0)).xyz);
+      }`)
+      .replace('#include <opaque_fragment>', `
+      {
+        // looking down into it you see through the top of the water; at a low angle it is all reflection
+        vec3 V = normalize(cameraPosition - vWWPos);
+        float cosV = clamp(V.y, 0.0, 1.0);
+        float fr = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);
+        float a = uClarity > 0.0 ? mix(1.0 - uClarity, 1.0, clamp(fr * 1.6, 0.0, 1.0)) : 1.0;
+        diffuseColor.a = a;
+      }
+      #include <opaque_fragment>`);
+  };
+  mat.customProgramCacheKey = () => 'fairwayWater2';
   waterMaterials.add(mat);
   return mat;
 }
