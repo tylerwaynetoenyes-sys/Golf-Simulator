@@ -26,16 +26,41 @@ const FOLLOW = 0.55; // s from impact to the finish
 
 const ease = (t) => t * t * (3 - 2 * t);
 
-function headMesh(spec, mats) {
+/**
+ * Club sets: the look of the bag. Ball flight is the same for every set (the
+ * launch comes from the R10 or the swing meter), so this is purely visual.
+ * Each is modelled on a well-known style of club rather than a brand.
+ */
+export const CLUB_SETS = [
+  { id: 'tour', name: 'Tour Blades', blurb: 'Forged chrome muscle-backs, a black titanium driver: the classic tour bag.', iron: 'blade', finish: 'chrome', wood: 'titanium' },
+  { id: 'cavity', name: 'Players Cavity', blurb: 'Satin cavity-back irons with a wide sole, the modern game-improvement look.', iron: 'cavity', finish: 'satin', wood: 'titanium' },
+  { id: 'black', name: 'Black Tour', blurb: 'All-black PVD heads and stealth shafts.', iron: 'blade', finish: 'black', wood: 'carbon' },
+  { id: 'persimmon', name: 'Persimmon Classic', blurb: '1970s persimmon woods with brass sole plates, chrome blades, steel shafts and leather grips.', iron: 'blade', finish: 'chrome', wood: 'persimmon' },
+  { id: 'hockey', name: 'Hockey Stick', blurb: 'One taped wooden hockey stick for every shot, after Happy Gilmore.', hockey: true },
+];
+export const clubSet = (id) => CLUB_SETS.find((x) => x.id === id) || CLUB_SETS[0];
+
+function headMesh(spec, mats, set) {
   const g = new THREE.Group();
+  if (set.hockey) return hockeyBlade(mats);
   if (spec.kind === 'driver' || spec.kind === 'wood') {
     // 460 cc driver: ~118 mm heel-to-toe, ~112 mm face-to-back, ~62 mm tall
     const big = spec.kind === 'driver';
     const w = big ? 0.118 : 0.1, d = big ? 0.112 : 0.085, h = big ? 0.062 : 0.04;
-    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.5, 28, 16), mats.crown);
-    crown.scale.set(w, h, d);
-    crown.position.set(w * 0.46, h * 0.5, d * 0.36);
+    const persimmon = set.wood === 'persimmon';
+    // persimmon heads were small: about 190 cc
+    const k = persimmon ? 0.78 : 1;
+    const crown = new THREE.Mesh(new THREE.SphereGeometry(0.5, 28, 16), persimmon ? mats.persimmon : mats.crown);
+    crown.scale.set(w * k, h * k, d * k);
+    crown.position.set(w * 0.46 * k, h * 0.5 * k, d * 0.36 * k);
     g.add(crown);
+    if (persimmon) {
+      // brass sole plate and the face insert
+      const sole = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.004, 24), mats.brass);
+      sole.scale.set(w * k * 0.8, 1, d * k * 0.75);
+      sole.position.set(w * 0.46 * k, 0.002, d * 0.36 * k);
+      g.add(sole);
+    }
     const face = new THREE.Mesh(new THREE.BoxGeometry(w * 0.84, h * 0.8, 0.004), mats.face);
     face.position.set(w * 0.46, h * 0.5, -0.002 + d * 0.0);
     g.add(face);
@@ -47,22 +72,50 @@ function headMesh(spec, mats) {
     const shape = new THREE.Shape();
     shape.moveTo(0, 0); shape.lineTo(w, 0); shape.quadraticCurveTo(w + 0.006, h * 0.6, w * 0.9, h);
     shape.lineTo(w * 0.15, h * 0.55); shape.lineTo(0, h * 0.3); shape.closePath();
-    const blade = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: d, bevelEnabled: true, bevelSize: 0.002, bevelThickness: 0.002, bevelSegments: 2 }), mats.steel);
+    const cavity = set.iron === 'cavity';
+    const blade = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: cavity ? d * 1.35 : d, bevelEnabled: true, bevelSize: 0.002, bevelThickness: 0.002, bevelSegments: 2 }), mats.iron);
     blade.position.z = 0.002;
     g.add(blade);
+    if (cavity) {
+      // the hollowed back with a badge, perimeter weighting round it
+      const badge = new THREE.Mesh(new THREE.BoxGeometry(w * 0.55, h * 0.32, 0.003), mats.badge);
+      badge.position.set(w * 0.5, h * 0.36, d * 1.35 + 0.004);
+      g.add(badge);
+    } else {
+      // a muscle-back: thicker low behind the sweet spot
+      const muscle = new THREE.Mesh(new THREE.BoxGeometry(w * 0.7, h * 0.28, 0.008), mats.iron);
+      muscle.position.set(w * 0.48, h * 0.2, d + 0.004);
+      g.add(muscle);
+    }
     // score lines on the face
     for (let i = 0; i < 8; i++) {
       const line = new THREE.Mesh(new THREE.BoxGeometry(w * 0.6, 0.0008, 0.0006), mats.grooves);
       line.position.set(w * 0.52, 0.008 + i * 0.0045, -0.0004);
       g.add(line);
     }
-    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.0085, 0.07, 10).translate(0, 0.035, 0.008), mats.steel));
+    g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.0085, 0.07, 10).translate(0, 0.035, 0.008), mats.iron));
   }
   // tilt the face back by the loft (about the heel-toe axis)
   const lofted = new THREE.Group();
   lofted.add(g);
   g.rotation.x = -THREE.MathUtils.degToRad(spec.loft) * 0.6;
   return lofted;
+}
+
+/** Happy Gilmore's stick: a wooden blade with a hook, wrapped in black tape. */
+function hockeyBlade(mats) {
+  const g = new THREE.Group();
+  const shape = new THREE.Shape();
+  // the blade runs out toward the toe and curls up at the end
+  shape.moveTo(-0.02, 0); shape.lineTo(0.27, 0); shape.quadraticCurveTo(0.32, 0.005, 0.33, 0.04);
+  shape.lineTo(0.31, 0.075); shape.lineTo(0.02, 0.075); shape.lineTo(-0.02, 0.05); shape.closePath();
+  const blade = new THREE.Mesh(new THREE.ExtrudeGeometry(shape, { depth: 0.012, bevelEnabled: true, bevelSize: 0.002, bevelThickness: 0.002, bevelSegments: 1 }), mats.hockeyWood);
+  blade.position.z = -0.004;
+  g.add(blade);
+  const tape = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.058, 0.0175), mats.tape);
+  tape.position.set(0.17, 0.037, 0.002);
+  g.add(tape);
+  return g;
 }
 
 export class Club {
@@ -81,7 +134,15 @@ export class Club {
       graphite: new THREE.MeshStandardMaterial({ color: 0x23262b, metalness: 0.3, roughness: 0.35 }),
       grip: new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.85 }),
       glove: new THREE.MeshStandardMaterial({ color: 0xf2f0ea, roughness: 0.8 }),
+      persimmon: new THREE.MeshStandardMaterial({ color: 0x5a2c17, roughness: 0.32, metalness: 0.05 }),
+      brass: new THREE.MeshStandardMaterial({ color: 0xc9a24a, metalness: 1, roughness: 0.3 }),
+      leather: new THREE.MeshStandardMaterial({ color: 0x2a1a10, roughness: 0.7 }),
+      badge: new THREE.MeshStandardMaterial({ color: 0x1a1d22, metalness: 0.6, roughness: 0.4 }),
+      hockeyWood: new THREE.MeshStandardMaterial({ color: 0xc89b62, roughness: 0.6 }),
+      tape: new THREE.MeshStandardMaterial({ color: 0x141414, roughness: 0.9 }),
+      iron: null,
     };
+    this.setId = 'tour';
     this.id = null;
     this.phase = 'hidden'; // address | back | down | follow | hidden
     this.theta = 0;
@@ -105,10 +166,25 @@ export class Club {
 
   hide() { this.root.visible = false; this.phase = 'hidden'; }
 
+  /** Change the bag (see CLUB_SETS); takes effect on the next address. */
+  setSet(id) {
+    if (id === this.setId) return;
+    this.setId = clubSet(id).id;
+    this.id = null;
+  }
+
   _build(id) {
     this.id = id;
     this.pivot.clear();
-    const spec = SPEC[id] || SPEC['7I'];
+    const set = clubSet(this.setId);
+    const base = SPEC[id] || SPEC['7I'];
+    // a hockey stick is about 60 inches whatever the shot, with a flat lie
+    const spec = set.hockey ? { ...base, len: 58, lie: 52, loft: 4, kind: 'hockey' } : base;
+    const m = this.mats;
+    m.iron = set.finish === 'black'
+      ? (m._black ||= new THREE.MeshStandardMaterial({ color: 0x1c1d20, metalness: 0.85, roughness: 0.38 }))
+      : set.finish === 'satin' ? (m._satin ||= new THREE.MeshStandardMaterial({ color: 0xb7bbc1, metalness: 1, roughness: 0.48 })) : m.steel;
+    if (set.wood === 'carbon') m.crown.color.set(0x0c0d0f); else m.crown.color.set(0x15171a);
     const L = spec.len * IN;
     // swing centre: between the shoulders, further from the ball with longer clubs
     const P = new THREE.Vector3(-(0.3 + L * 0.42), 1.32 + (L - 0.9) * 0.15, 0.02);
@@ -120,8 +196,13 @@ export class Club {
     const butt = hosel.clone().addScaledVector(dir, L);
     const club = new THREE.Group();
     const wood = spec.kind === 'driver' || spec.kind === 'wood';
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.0062, 0.0042, L - 0.27, 10), wood ? this.mats.graphite : this.mats.shaft);
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.0115, 0.0088, 0.27, 14), this.mats.grip);
+    const shaftMat = set.hockey ? m.hockeyWood : set.finish === 'black' ? m.graphite : set.wood === 'persimmon' ? m.shaft : wood ? m.graphite : m.shaft;
+    const shaft = set.hockey
+      ? new THREE.Mesh(new THREE.BoxGeometry(0.028, L - 0.27, 0.018), shaftMat)
+      : new THREE.Mesh(new THREE.CylinderGeometry(0.0062, 0.0042, L - 0.27, 10), shaftMat);
+    const grip = set.hockey
+      ? new THREE.Mesh(new THREE.BoxGeometry(0.031, 0.27, 0.021), m.tape)
+      : new THREE.Mesh(new THREE.CylinderGeometry(0.0115, 0.0088, 0.27, 14), set.wood === 'persimmon' ? m.leather : m.grip);
     const up = new THREE.Vector3(0, 1, 0);
     const q = new THREE.Quaternion().setFromUnitVectors(up, dir);
     shaft.quaternion.copy(q);
@@ -137,7 +218,7 @@ export class Club {
       hand.position.copy(butt).addScaledVector(dir, -k);
       club.add(hand);
     }
-    const head = headMesh(spec, this.mats);
+    const head = headMesh(spec, this.mats, set);
     // orient the head: toe out (+X), face to the target (-Z), hosel at the shaft
     head.position.copy(hosel);
     club.add(head);

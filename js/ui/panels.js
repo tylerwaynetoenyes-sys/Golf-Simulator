@@ -11,6 +11,7 @@ import * as U from '../core/units.js';
 import { MPH } from '../core/physics.js';
 import { audio } from '../audio/audio.js';
 import { panelIn } from './motion.js';
+import { CLUB_SETS } from '../scene/club.js';
 
 const panel = $('#panel');
 const body = $('#panelBody');
@@ -171,12 +172,16 @@ export function openSettings(game) {
     <h3>Display</h3>
     <div class="setting"><div><label>Screen</label><div class="hint">TV makes everything readable from the couch. Same as adding <code>?tv</code> to the address.</div></div>${seg('display', [['standard', 'Standard'], ['tv', 'TV / projector']])}</div>
     <div class="setting"><div><label>Time of day</label></div>${seg('timeOfDay', [['night', 'Night'], ['day', 'Afternoon']])}</div>
-    <div class="setting"><div><label>Weather</label><div class="hint">Wind moves the ball in every mode.</div></div>${seg('weather', [['clear', 'Clear'], ['cloudy', 'Cloudy'], ['breezy', 'Light wind'], ['windy', 'Strong wind']])}</div>
+    <div class="setting"><div><label>Weather</label><div class="hint">Wind moves the ball in every mode.</div></div>${seg('weather', [['clear', 'Clear'], ['cloudy', 'Cloudy'], ['breezy', 'Light wind'], ['windy', 'Strong wind'], ['rain', 'Rain']])}</div>
     <div class="setting"><div><label>Units</label></div>${seg('units', [['imperial', 'Yards · mph'], ['metric', 'Metres · km/h']])}</div>
     <div class="setting"><div><label>Camera</label><div class="hint">Cinematic cuts to a landing camera on longer shots.</div></div>${seg('camera', [['cinematic', 'Cinematic'], ['follow', 'Follow'], ['tee', 'Tee']])}</div>
     <div class="setting"><div><label>Graphics quality</label><div class="hint">Lower it if the frame rate dips.</div></div>${seg('quality', [['high', 'High'], ['medium', 'Medium'], ['low', 'Low']])}</div>
     <div class="setting"><div><label>Ghost tracers</label><div class="hint">Keep faint traces of your last six shots.</div></div>${tog('ghostTracers')}</div>
     <div class="setting"><div><label>Commentary</label><div class="hint">Occasional dry remarks. Never more than one a shot.</div></div>${tog('commentary')}</div>
+    <h3>Clubs</h3>
+    <div class="setting"><div><label>Show the club</label><div class="hint">The club at address and through the strike. Off: just the ball.</div></div>${tog('showClub')}</div>
+    <div class="club-sets">${CLUB_SETS.map((c) => `<button class="club-set" data-set="${c.id}" aria-pressed="${(s.clubSet || 'tour') === c.id}"><b>${esc(c.name)}</b><small>${esc(c.blurb)}</small></button>`).join('')}</div>
+    <div class="hint" style="margin:6px 2px 0">Every set flies the same: the numbers come from your swing.</div>
     <h3>Sound</h3>
     <div class="setting"><label>Master volume</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-range="volume" /></div>
     <div class="setting"><label>Night ambience</label><input type="range" min="0" max="1" step="0.05" value="${s.ambience}" data-range="ambience" /></div>
@@ -194,6 +199,11 @@ export function openSettings(game) {
     b.setAttribute('aria-checked', String(v));
     audio.tick();
     game.applySetting(b.dataset.toggle, v);
+  }));
+  el.querySelectorAll('.club-set').forEach((b) => b.addEventListener('click', () => {
+    el.querySelectorAll('.club-set').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    audio.tick();
+    game.applySetting('clubSet', b.dataset.set);
   }));
   el.querySelectorAll('[data-range]').forEach((r) => r.addEventListener('input', () => game.applySetting(r.dataset.range, Number(r.value))));
   el.querySelectorAll('[data-text]').forEach((i) => i.addEventListener('change', () => game.applySetting(i.dataset.text, i.value.trim())));

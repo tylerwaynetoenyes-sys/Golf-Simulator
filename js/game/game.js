@@ -64,6 +64,7 @@ export class Game {
     this._bindEnv();
     this._bindRadio();
     this.applySetting('camera', store.settings.camera, false);
+    this.world.club.setSet(store.settings.clubSet);
     units.system = store.settings.units;
     const day = store.settings.timeOfDay === 'day';
     world.env.setTime(day ? 'day' : 'night', true);
@@ -321,7 +322,7 @@ export class Game {
   _addressClub() {
     const s = this.setup;
     const w = this.world;
-    if (!s || s.putting || !this.club) { w.club.hide(); return; }
+    if (!s || s.putting || !this.club || store.settings.showClub === false) { w.club.hide(); return; }
     w.club.setAddress(s.origin, s.heading + this.aimDeg, this.club.id, w.groundFn(s.origin.x, s.origin.z));
   }
 
@@ -445,6 +446,13 @@ export class Game {
       case 'display': this.applyDisplay(value); break;
       case 'timeOfDay': this.setTimeOfDay(value); break;
       case 'weather': this.setWeather(value); break;
+      case 'clubSet':
+        this.world.club.setSet(value);
+        if (this.state === 'ready') this._addressClub();
+        break;
+      case 'showClub':
+        if (value && this.state === 'ready') this._addressClub(); else if (!value) this.world.club.hide();
+        break;
       case 'r10Distance': {
         const el = document.getElementById('r10DistVal');
         if (el) el.textContent = `${value} ft`;

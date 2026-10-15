@@ -24,11 +24,13 @@ const DEFAULT_SETTINGS = {
   handedness: 'right',
   display: 'standard', // standard | tv
   timeOfDay: 'night', // night | day
-  weather: 'clear', // clear | cloudy | breezy | windy
+  weather: 'clear', // clear | cloudy | breezy | windy | rain
   rings: 'standard', // putting rings: tight | standard | generous
   mulligans: 'nine', // off | nine | hole | free
   courseLength: 9,
   courseStart: 1,
+  clubSet: 'tour', // see CLUB_SETS in js/scene/club.js
+  showClub: true, // the club at address and through the strike
 };
 
 class Store {
