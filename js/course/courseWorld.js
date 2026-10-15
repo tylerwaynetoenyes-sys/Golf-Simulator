@@ -13,6 +13,7 @@ import { plantTrees, updateTrees, THEME_TREES } from '../scene/trees.js';
 import { tuftGeometry, grassMaterial, GRASS } from './grass.js';
 import { buildCity } from './buildings.js';
 import { dressLots } from './streetlife.js';
+import { dressScenery } from './scenery.js';
 import { buildDecay } from './decay.js';
 import { dressPinFlag, flagpole, fireworks } from './usa.js';
 
@@ -134,6 +135,7 @@ export class CourseWorld {
     this._nearAt = null;
     this._nearPrev = null;
     this.streetLife = null;
+    this.scenery = null;
     this.nearGrass = null;
     const g = (this.holeGroup = new THREE.Group());
     this.root.add(g);
@@ -530,6 +532,11 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
       this.streetLife = dressLots(decay.userData.lots || [], rand, (x, z) => T.meshHeight(x, z));
       g.add(this.streetLife.group);
     }
+
+    // ── scenery beyond play: herds and wagons, boats and sea stacks, crowds ──
+    this.scenery = dressScenery(T, hole, rand, (x, z) => T.meshHeight(x, z), buildLandmark);
+    g.add(this.scenery.group);
+    if (this.scenery.glow.length) this.farLms.push({ group: this.scenery.group, glow: this.scenery.glow });
 
     // ── long grass in the rough: tufts thicken away from the fairway ──
     this._buildRoughGrass(T, g, rand, b);
@@ -1309,6 +1316,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
 
   update(t, dt = 1 / 60, camera = null) {
     this.streetLife?.update(dt);
+    this.scenery?.update(dt, t, { x: GRASS.uWind.value.x * 8, z: GRASS.uWind.value.y * 8 });
     // thick rough wherever the ball settles (checked twice a second)
     if (this.ballPos && this.T) {
       this._nearT = (this._nearT || 0) + dt;

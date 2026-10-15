@@ -140,6 +140,30 @@ add `&manual` to drive frames with `window.__advance(seconds)`.
 - Rolling Hills (`?play=rollinghills`): 18 holes, par 71, greens straight
   from the LiDAR. Details and checks in `docs/alton-courses.md`.
 
+## Visual and gameplay pass (October 15)
+
+- **Hole map** after Trackman (`js/ui/hud.js`): distance arcs, club carry
+  and landing area on the aim line, pin distance, land/sea, trees, OOB, wind.
+- **Camera**: keeps the ball in sight past canopies; tree strikes get a
+  side camera and slow motion (`cameraRig._planTreeCam`).
+- **Club sets** in Settings (`CLUB_SETS` in `js/scene/club.js`), Happy
+  Gilmore's hockey stick included; "Show the club" toggle.
+- **Grass** (`js/course/grass.js`): blade clumps that sway with the wind and
+  part for the ball, a dense patch where the ball rests; denser woods.
+- **Paris** moved to the Champ de Mars and Trocadéro; lattice Eiffel Tower;
+  real city from OSM (`tools/fetch-buildings.mjs`, `js/course/buildings.js`).
+  `carryWater` keeps a river in play.
+- **Liberty**: 7,917 real NYC buildings with a long-lens `cityPull`;
+  re-sculpted statue at 1 km on her bearing.
+- **East St. Louis** street life (`js/course/streetlife.js`); **design pass**
+  for made-up courses (`js/course/design.js`, `enrich: true`); **scenery**
+  per theme (`js/course/scenery.js`: herds, wagons, tumbleweeds, sailboats,
+  sea stacks, crowds).
+- **Pebble Beach and Sawgrass** re-imported with real OSM outlines
+  (`--outlines`); DEMs and imagery re-baked at the new origins.
+- Waiting on Tyler: a Sketchfab API token in the Blender add-on, to import
+  detailed models (Eiffel Tower, Statue of Liberty, cars, people).
+
 ## Next steps
 
 - Long and middle irons land 2–4° flatter than Trackman; closing that needs
