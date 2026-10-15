@@ -5,7 +5,9 @@
 // local X; the levee is on the +Z side, toward the golfer.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, box, cyl, seeded, canvasTex, person } from './kit.js';
+import { mat, lit, box, cyl, seeded, canvasTex, landmarkWater } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
+import { crowdAt } from '../../scene/crowd.js';
 
 export default function build() {
   const g = new THREE.Group();
@@ -13,10 +15,11 @@ export default function build() {
   const rnd = seeded(1817);
   const boat = new THREE.Group();
 
-  const white = lit(0xf3efe6, 0xffd9a0, { night: 0.35, roughness: 0.55 });
-  const trim = mat(0x9a2b22, { roughness: 0.5 });
-  const dark = mat(0x1c1d20, { roughness: 0.6 });
-  const deck = mat(0x8b7356, { roughness: 0.85 });
+  // painted steel and timber
+  const white = pbr('white_plaster_02', { scale: 2.5, tint: 0xfbfaf6, bright: 1.8, glow: 0xffd9a0, night: 0.35 });
+  const trim = pbr('metal_plate', { scale: 2, tint: 0xb03a30, metal: 0.1 });
+  const dark = pbr('metal_plate', { scale: 2, tint: 0x2a2c30, metal: 0.35 });
+  const deck = pbr('brown_planks_08', { scale: 2 });
   const windowMat = lit(0x2a3440, 0xffd59a, { night: 1.4, roughness: 0.15, metalness: 0.3 });
   glow.push(white, windowMat);
 
@@ -24,7 +27,7 @@ export default function build() {
   const hullShape = new THREE.Shape();
   hullShape.moveTo(-36, -7); hullShape.lineTo(30, -7); hullShape.quadraticCurveTo(40, -5, 42, 0);
   hullShape.quadraticCurveTo(40, 5, 30, 7); hullShape.lineTo(-36, 7); hullShape.closePath();
-  const hull = new THREE.Mesh(new THREE.ExtrudeGeometry(hullShape, { depth: 2.6, bevelEnabled: false }).rotateX(-Math.PI / 2).translate(0, -1.2, 0), mat(0xe9e4da, { roughness: 0.6 }));
+  const hull = new THREE.Mesh(new THREE.ExtrudeGeometry(hullShape, { depth: 2.6, bevelEnabled: false }).rotateX(-Math.PI / 2).translate(0, -1.2, 0), pbr('metal_plate', { scale: 2.5, tint: 0xf4f2ec, bright: 1.6, metal: 0.15 }));
   hull.castShadow = true;
   boat.add(hull);
   boat.add(box(78, 0.35, 14.4, trim, 2, 1.25, 0)); // red sheer stripe
@@ -103,7 +106,7 @@ export default function build() {
 
   // stern paddle wheel
   const wheel = new THREE.Group();
-  const red = mat(0xa52a20, { roughness: 0.55 });
+  const red = pbr('brown_planks_08', { scale: 1.5, tint: 0xff7060 });
   const R = 6;
   for (const z of [-5.2, 5.2]) {
     const rim = new THREE.Mesh(new THREE.TorusGeometry(R, 0.18, 6, 32), red);
@@ -148,41 +151,33 @@ export default function build() {
   bulbs.count = bn;
   boat.add(bulbs);
 
-  // passengers on the upper decks
-  const shirts = [0x2d5d8a, 0x9a3b30, 0xdedad0, 0x2f6e4c, 0xd9a43a];
+  // passengers at the rails of the upper decks: the scanned people
+  const pax = [];
   for (let i = 0; i < 14; i++) {
-    const p = person(shirts[i % 5], rnd);
-    const d = decks[1 + (i % 2)];
-    p.position.set(d.x0 + rnd() * (d.x1 - d.x0), d.y + d.h + 0.1, (rnd() < 0.5 ? 1 : -1) * (d.w / 2 - 0.6));
-    p.scale.setScalar(0.95);
-    boat.add(p);
+    const d = decks[1 + (i % 2)], side = rnd() < 0.5 ? 1 : -1;
+    pax.push([d.x0 + rnd() * (d.x1 - d.x0), d.y + d.h + 0.1, side * (d.w / 2 - 0.6), side > 0 ? 0 : Math.PI]);
   }
+  const people = crowdAt(pax, rnd);
+  if (people) boat.add(people);
 
   boat.position.set(0, 0, -6);
   g.add(boat);
 
   // ── the levee: cobblestone slope, bollards, gangway, river ──
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(130, 46), new THREE.MeshStandardMaterial({ color: 0x3d4b44, roughness: 0.18, metalness: 0.25 }));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(130, 46), landmarkWater());
   water.rotation.x = -Math.PI / 2;
   water.position.set(0, 0.06, -14);
   water.receiveShadow = true;
   g.add(water);
-  const cobble = canvasTex(256, 256, (c, w, h) => {
-    c.fillStyle = '#6f675c'; c.fillRect(0, 0, w, h);
-    for (let y = 0; y < h; y += 16) for (let x = (y / 16) % 2 ? 8 : 0; x < w; x += 16) {
-      const v = 90 + Math.floor(rnd() * 50);
-      c.fillStyle = `rgb(${v + 12},${v + 6},${v - 4})`;
-      c.fillRect(x + 1, y + 1, 14, 14);
-    }
-  }, [12, 3]);
-  const levee = new THREE.Mesh(new THREE.PlaneGeometry(130, 16), new THREE.MeshStandardMaterial({ map: cobble, roughness: 0.95 }));
+  // the levee's granite setts, sloping down to the water
+  const levee = new THREE.Mesh(new THREE.PlaneGeometry(130, 16), pbr('cobblestone_floor_08', { scale: 2.5, tint: 0xd8d0c4 }));
   levee.rotation.x = -Math.PI / 2 + 0.2;
   levee.position.set(0, 1.2, 9.5);
   levee.receiveShadow = true;
   g.add(levee);
-  const iron = mat(0x23262a, { metalness: 0.5, roughness: 0.5 });
+  const iron = pbr('metal_plate', { scale: 1, tint: 0x2c2e32, metal: 0.6 });
   for (let x = -50; x <= 50; x += 12.5) g.add(cyl(0.35, 0.45, 0.9, iron, x, 0.2, 3, 10));
-  const gw = box(2.2, 0.2, 9, mat(0x6b5a44), 8, 1.9, 3.2);
+  const gw = box(2.2, 0.2, 9, deck, 8, 1.9, 3.2);
   gw.rotation.x = 0.16;
   g.add(gw);
   // mooring lines

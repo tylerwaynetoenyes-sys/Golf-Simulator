@@ -7,6 +7,13 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { archGeometry, archMaterial } from '../../scene/skyline.js';
 import { mat, lit, seeded, canvasTex, facadeMaterial, tree, SLOT } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
+import { createWaterMaterial } from '../../scene/river.js';
+import { crowdAt } from '../../scene/crowd.js';
+import { courthouse } from './gatewayarch.js';
+
+// the reflecting ponds: the course's water, drawn just over their coping
+let pondWater = null;
 
 const GY = 5; // height of the Arch grounds above the levee
 
@@ -144,23 +151,15 @@ export default function build() {
   }, [1, 1]);
   grassTex.repeat.set(1 / 18, 1 / 18);
   const grass = mat(0xffffff, { map: grassTex, roughness: 0.95 });
-  const walkM = mat(0xd9d2c3, { roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -4 });
-  const granite = lit(0xc9c1b3, 0xffe2b8, { roughness: 0.7, night: 0.06 });
-  const darkGranite = mat(0x6d6a66, { roughness: 0.55 });
-  const coping = mat(0xbdb5a6, { roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
-  const water = mat(0x34505c, { roughness: 0.06, metalness: 0.35, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 });
-  const asphalt = mat(0x45474a, { roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
-  const cobbleTex = canvasTex(128, 128, (g, w, h) => {
-    g.fillStyle = '#5b5148'; g.fillRect(0, 0, w, h);
-    for (let y = 0; y < 16; y++) for (let x = 0; x < 16; x++) {
-      const v = (x * 37 + y * 91) % 23 - 11;
-      g.fillStyle = `rgb(${120 + v},${108 + v},${94 + v})`;
-      g.fillRect(x * 8 + (y % 2) * 4 + 1, y * 8 + 1, 6, 6);
-    }
-  }, [1, 1]);
-  cobbleTex.repeat.set(1 / 3, 1 / 3);
-  const cobble = mat(0xffffff, { map: cobbleTex, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -2 });
-  const steelDark = mat(0x2f3338, { metalness: 0.6, roughness: 0.45 });
+  const walkM = pbr('brushed_concrete', { scale: 3, tint: 0xf0e8da, bright: 1.3, offset: -2 });
+  const granite = pbr('granite_wall', { scale: 1.6, tint: 0xc8d0e0, bright: 1.35, glow: 0xffe2b8, night: 0.06 });
+  const darkGranite = pbr('granite_wall', { scale: 1.2, tint: 0x8890a0, rough: 0.6 });
+  const coping = pbr('granite_wall', { scale: 1.2, tint: 0xc0c8d8, bright: 1.25, offset: -1 });
+  const water = (pondWater ||= Object.assign(createWaterMaterial({ y: GY, tint: 0x24363c, flow: 0.1 }), { polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -6 }));
+  const asphalt = pbr('asphalt_02', { scale: 4, tint: 0xb0b4b8, offset: -1 });
+  // the levee's granite setts
+  const cobble = pbr('cobblestone_floor_08', { scale: 2.5, tint: 0xd8d0c4, offset: -1 });
+  const steelDark = pbr('metal_plate', { scale: 1, tint: 0x3a3e44, metal: 0.6 });
   const lampHead = lit(0xf3efe2, 0xffd59a, { night: 2.2 });
   const upLens = lit(0x8a8f96, 0xfff3dd, { night: 3.0, metalness: 0.4, roughness: 0.3 });
   glow.push(granite, lampHead, upLens);
@@ -305,49 +304,19 @@ export default function build() {
     B.add(walkM, flat([[-16, -40], [16, -40], [12, -52], [-12, -52]], GY + 0.07));
   }
 
-  // ── the Old Courthouse (1839–62, iron dome 1864), facing the Arch ──
+  // ── the Old Courthouse (1839–62, iron dome 1864), its east portico toward the Arch ──
   {
+    const cm = {
+      lime: pbr('white_sandstone_bricks', { scale: 2.4, glow: 0xffe2b8, night: 0.4 }),
+      trim: pbr('white_plaster_02', { scale: 2.5, tint: 0xf2ece0, bright: 1.4 }),
+      metal: pbr('metal_plate', { scale: 2, tint: 0x6f7a74, metal: 0.3 }),
+      dome: pbr('metal_plate', { scale: 2, tint: 0x5a6a62, metal: 0.35 }),
+    };
+    glow.push(cm.lime);
     const cg = new THREE.Group();
-    const stone = lit(0xdcd1bb, 0xffd9a8, { night: 0.45 });
-    const iron = lit(0x4a5753, 0x6d8079, { metalness: 0.55, roughness: 0.45, night: 0.35 });
-    const roof = mat(0x6f6e69, { roughness: 0.6 });
-    glow.push(stone, iron);
-    const C = new Batch();
-    C.add(stone, bx(58, 16, 22, 0, 0, 0), bx(22, 16, 58, 0, 0, 0)); // cross plan
-    C.add(stone, bx(60, 1.2, 24, 0, 16, 0), bx(24, 1.2, 60, 0, 16, 0)); // cornice
-    for (const r of [0, Math.PI / 2]) {
-      const s = new THREE.Shape([new THREE.Vector2(-12, 0), new THREE.Vector2(12, 0), new THREE.Vector2(0, 4.2)]);
-      const pr = new THREE.ExtrudeGeometry(s, { depth: 60, bevelEnabled: false }).translate(0, 0, -30).rotateY(r + Math.PI / 2).translate(0, 17.2, 0);
-      C.add(roof, pr);
-    }
-    // east portico (facing +Z) with six columns and pediment
-    for (let i = 0; i < 6; i++) C.add(stone, cy(0.8, 0.9, 13, -8 + i * 3.2, 2.5, 31.5));
-    C.add(stone, bx(20, 2.5, 6, 0, 0, 31.5), bx(20, 1.8, 6, 0, 15.5, 31.5));
-    C.add(stone, place(new THREE.ExtrudeGeometry(new THREE.Shape([new THREE.Vector2(-10, 0), new THREE.Vector2(10, 0), new THREE.Vector2(0, 3.6)]), { depth: 6, bevelEnabled: false }), 0, 17.3, 28.5));
-    // rotunda: drum, colonnade, iron dome and lantern (top ~59 m)
-    C.add(stone, cy(11, 11.5, 10, 0, 17, 0, 32));
-    for (let k = 0; k < 16; k++) { const an = (k / 16) * Math.PI * 2; C.add(stone, cy(0.45, 0.5, 7.5, Math.cos(an) * 12, 27, Math.sin(an) * 12, 8)); }
-    C.add(stone, cy(12.8, 12.8, 1.2, 0, 34.5, 0, 32), cy(9.6, 10.2, 4, 0, 35.7, 0, 32));
-    C.add(iron, place(new THREE.SphereGeometry(10, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), 0, 39.6, 0, 0, 1, 1.15, 1));
-    for (let k = 0; k < 16; k++) { // dome ribs
-      const an = (k / 16) * Math.PI * 2;
-      const pts = [];
-      for (let i = 0; i <= 8; i++) { const p = (i / 8) * Math.PI / 2; pts.push(new THREE.Vector3(Math.cos(an) * Math.cos(p) * 10.15, 39.6 + Math.sin(p) * 11.5, Math.sin(an) * Math.cos(p) * 10.15)); }
-      C.add(roof, new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 8, 0.18, 4));
-    }
-    C.add(iron, cy(1.9, 2.2, 5, 0, 50.5, 0, 12));
-    for (let k = 0; k < 8; k++) { const an = (k / 8) * Math.PI * 2; C.add(stone, cy(0.15, 0.15, 3, Math.cos(an) * 2.2, 51, Math.sin(an) * 2.2, 5)); }
-    C.add(iron, place(new THREE.SphereGeometry(2.3, 14, 7, 0, Math.PI * 2, 0, Math.PI / 2), 0, 55.5, 0, 0, 1, 1.3, 1), cy(0.1, 0.25, 1.4, 0, 58.4, 0, 6));
-    // windows on the wings
-    const winM = lit(0x2a3036, 0xffcf8a, { night: 0.9, roughness: 0.3 });
-    glow.push(winM);
-    for (let i = 0; i < 5; i++) for (const lvl of [3.2, 9.6]) for (const sx of [-1, 1]) {
-      const x = sx * (13.5 + i * 3.4);
-      C.add(winM, bx(1.4, 3.4, 0.3, x, lvl, 11.05), bx(1.4, 3.4, 0.3, x, lvl, -11.05));
-      C.add(winM, bx(0.3, 3.4, 1.4, 11.05, lvl, x), bx(0.3, 3.4, 1.4, -11.05, lvl, x));
-    }
-    C.build(cg);
+    courthouse(cm).build(cg);
     cg.position.set(150, 0, -238);
+    cg.rotation.y = -Math.PI / 2;
     group.add(cg);
   }
 
@@ -358,8 +327,8 @@ export default function build() {
     const fRed = tiling(facadeMaterial('#8c5a48', { cols: 6, rows: 6, win: '#30343a', seed: 11 }));
     const fLight = tiling(facadeMaterial('#d8d6d0', { cols: 6, rows: 6, win: '#46525e', seed: 13 }));
     glow.push(fTan, fGlass, fRed, fLight);
-    const roofM = mat(0x7d7a74, { roughness: 0.7 });
-    const copper = lit(0x5f8f7c, 0x9fd4bf, { roughness: 0.55, metalness: 0.25, night: 0.5 });
+    const roofM = pbr('brushed_concrete', { scale: 3, tint: 0x9a9690 });
+    const copper = pbr('metal_plate', { scale: 2, tint: 0x6a9a86, metal: 0.3, glow: 0x9fd4bf, night: 0.5 });
     const crownLit = lit(0xd9cfbd, 0xfff0d0, { night: 0.9 });
     glow.push(copper, crownLit);
     const T = new Batch();
@@ -400,7 +369,7 @@ export default function build() {
     T.build(group);
   }
 
-  // people strolling the grounds and the levee (instanced, three parts)
+  // people strolling the grounds and the levee
   {
     const spots = [];
     for (let i = 0; i < 90; i++) {
@@ -412,22 +381,9 @@ export default function build() {
     for (let i = 0; i < 26; i++) spots.push([(rnd() * 2 - 1) * 30, GY - (rnd() * 18 | 0) * rise, 66 + rnd() * 15]);
     // people on the stairs sit on their step
     for (let i = 130; i < spots.length; i++) { const k = Math.max(0, Math.min(steps - 1, Math.floor((spots[i][2] - 66) / tread))); spots[i][1] = GY - k * rise; }
-    const n = spots.length;
-    const legs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.32, 0.85, 0.2).translate(0, 0.425, 0), mat(0xffffff), n);
-    const body = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.62, 0.25).translate(0, 1.16, 0), mat(0xffffff), n);
-    const head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 8, 6).translate(0, 1.6, 0), mat(0xffffff, { roughness: 0.6 }), n);
-    const shirts = [0xc8443a, 0x2f5d8a, 0xe8e2d4, 0x3f6e48, 0xd9a441, 0x6b4b7a, 0x1e2a36, 0xe07a5f];
-    const skins = [0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0x5c3a21];
-    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), e = new THREE.Euler();
-    spots.forEach(([x, y, z], i) => {
-      const s = 0.92 + rnd() * 0.14;
-      m4.compose(new THREE.Vector3(x, y, z), q.setFromEuler(e.set(0, rnd() * 6.28, 0)), new THREE.Vector3(s, s, s));
-      legs.setMatrixAt(i, m4); body.setMatrixAt(i, m4); head.setMatrixAt(i, m4);
-      legs.setColorAt(i, c.set(rnd() < 0.5 ? 0x2c3442 : 0x5a5348));
-      body.setColorAt(i, c.set(shirts[Math.floor(rnd() * shirts.length)]));
-      head.setColorAt(i, c.set(skins[Math.floor(rnd() * skins.length)]));
-    });
-    for (const m of [legs, body, head]) { m.castShadow = false; group.add(m); }
+    // the scanned people (js/scene/crowd.js), each turned its own way
+    const crowd = crowdAt(spots.map(([x, y, z]) => [x, y, z, rnd() * Math.PI * 2]), rnd);
+    if (crowd) { crowd.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.userData.noShadow = true; } }); group.add(crowd); }
   }
 
   // night: soft pools of floodlight round the legs and halos on the lamps

@@ -6,7 +6,11 @@
 // storefronts face +X, toward the golf hole.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat as baseMat, lit, box, cyl, sphere, seeded, canvasTex, facadeMaterial, person, tree, SLOT } from './kit.js';
+import { mat as baseMat, lit, box, cyl, sphere, seeded, canvasTex, tree, SLOT } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
+import { crowdAt } from '../../scene/crowd.js';
+import { Batch, bx, place } from './riverfront.js';
+import { mergeByMaterial } from '../../scene/merge.js';
 
 // share one material per colour/options so the block stays cheap to draw
 const matCache = new Map();
@@ -29,62 +33,63 @@ function signTexture(text, { bg = '#1a0f0c', fg = '#ff5a4a', glow = '#ff9b8a', w
   });
 }
 
-/** A storefront building: brick body, cornice, glass shopfront, awning. */
-function building(g, z0, width, storeys, brick, rnd, glow, { awning = null, lamp = '#ffd9a0' } = {}) {
+// the Loop's brick in its real colours: red brick in a few firings, and the
+// cream terra cotta of the Tivoli
+const BRICK = {
+  '#8a4a36': ['red_bricks_02', 0xffffff], '#9a5a3c': ['red_bricks_02', 0xffe2cc], '#7d4434': ['red_bricks_02', 0xd8c8c0],
+  '#a8705a': ['red_bricks_02', 0xffd8c0], '#6f3d30': ['red_bricks_02', 0xb8a8a0], '#b88a64': ['white_sandstone_bricks', 0xe8c8a0],
+  '#8c5640': ['red_bricks_02', 0xf0d8c8], '#7a5444': ['red_bricks_02', 0xc8b8b0], '#7b2f26': ['red_bricks_02', 0xd8b0a8], '#c9b48e': ['white_sandstone_bricks', 0xfff0d8],
+};
+const brickMat = (c) => { const [id, tint] = BRICK[c] || ['red_bricks_02', 0xffffff]; return pbr(id, { scale: 1.6, tint }); };
+
+/** A storefront building: brick body with real windows, cornice, glass shopfront, awning. */
+function building(B, M, z0, width, storeys, brick, rnd, { awning = null } = {}) {
   const h = 4.6 + storeys * 3.6;
-  const depth = 18;
-  const facade = facadeMaterial(brick, { cols: Math.max(3, Math.round(width / 3)), rows: storeys, win: '#28313b', lamp, frame: '#d8cbb4', seed: Math.floor(rnd() * 1e6) });
-  glow.push(facade);
-  // brick mass, with the window facade as a plane on the street (+X) side
-  const body = new THREE.Mesh(new THREE.BoxGeometry(depth, h - 4.6, width), mat(brick));
-  body.position.set(FRONT_X - depth / 2, 4.6 + (h - 4.6) / 2, z0 + width / 2);
-  body.castShadow = body.receiveShadow = true;
-  g.add(body);
-  const front = new THREE.Mesh(new THREE.PlaneGeometry(width, h - 4.6), facade);
-  front.rotation.y = Math.PI / 2;
-  front.position.set(FRONT_X + 0.02, 4.6 + (h - 4.6) / 2, z0 + width / 2);
-  g.add(front);
-  // ground floor: dark base with a lit shopfront
-  const shop = lit(0x2a3036, 0xffd29a, { night: 1.3, roughness: 0.2, metalness: 0.3 });
-  glow.push(shop);
-  g.add(box(depth, 4.6, width, mat(0x3a2f2a), FRONT_X - depth / 2 - 0.2, 0, z0 + width / 2));
-  g.add(box(0.3, 3.2, width - 1.4, shop, FRONT_X + 0.05, 0.4, z0 + width / 2));
-  // cornice and parapet
-  const stone = mat(0xd9ccb4, { roughness: 0.8 });
-  g.add(box(1.1, 0.7, width + 0.4, stone, FRONT_X + 0.3, h - 0.2, z0 + width / 2));
-  g.add(box(0.8, 0.4, width, stone, FRONT_X + 0.2, 4.4, z0 + width / 2));
-  if (awning) {
-    const a = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.15, width - 1.6), mat(awning, { roughness: 0.9 }));
-    a.position.set(FRONT_X + 1.2, 3.9, z0 + width / 2);
-    a.rotation.z = -0.28;
-    a.castShadow = true;
-    g.add(a);
+  const depth = 18, zc = z0 + width / 2, wall = brickMat(brick);
+  B.add(wall, bx(depth, h - 4.6, width, FRONT_X - depth / 2, 4.6, zc));
+  B.add(M.roof, bx(depth - 0.4, 0.12, width - 0.4, FRONT_X - depth / 2, h, zc)); // tar-and-gravel roof inside the parapet
+  // the upper floors' windows: glass set in the brick, stone sills and lintels, some lit
+  const cols = Math.max(3, Math.round(width / 3)), bay = width / cols;
+  for (let r = 0; r < storeys; r++) for (let c = 0; c < cols; c++) {
+    const y = 4.6 + r * 3.6 + 0.9, zz = z0 + (c + 0.5) * bay;
+    B.add(rnd() < 0.5 ? M.lamp : M.glass, bx(0.1, 2.0, bay * 0.5, FRONT_X + 0.02, y, zz));
+    B.add(M.stone, bx(0.3, 0.14, bay * 0.6, FRONT_X + 0.1, y - 0.14, zz), bx(0.24, 0.3, bay * 0.6, FRONT_X + 0.08, y + 2.0, zz));
   }
+  // ground floor: dark-framed shopfront over a bulkhead, the door recessed
+  B.add(M.frame, bx(depth, 4.6, width, FRONT_X - depth / 2 - 0.2, 0, zc));
+  B.add(M.shop, bx(0.12, 2.9, width - 1.6, FRONT_X + 0.02, 0.7, zc));
+  B.add(M.frame, bx(0.2, 0.7, width - 1.4, FRONT_X + 0.06, 0, zc));
+  for (let k = 0; k <= Math.floor(width / 3); k++) B.add(M.frame, bx(0.16, 2.9, 0.12, FRONT_X + 0.1, 0.7, z0 + 0.8 + k * ((width - 1.6) / Math.floor(width / 3))));
+  // the cornice and the band over the shopfront
+  B.add(M.stone, bx(1.1, 0.7, width + 0.4, FRONT_X + 0.3, h - 0.2, zc));
+  B.add(M.stone, bx(0.8, 0.4, width, FRONT_X + 0.2, 4.4, zc));
+  if (awning) B.add(M.awning(awning), place(new THREE.BoxGeometry(2.4, 0.15, width - 1.6), FRONT_X + 1.2, 3.9, zc, 0, 1, 1, 1, 0, -0.28));
   return h;
 }
 
-/** The Loop Trolley car: a heritage streetcar on 4 ft 8½ in track. */
+/** The Loop Trolley car: a heritage-style streetcar on 4 ft 8½ in track. */
 function trolley() {
   const t = new THREE.Group();
-  const cream = mat(0xece2c6, { roughness: 0.5 });
-  const red = mat(0x8e2a24, { roughness: 0.45 });
-  const roof = mat(0x3c3c3c, { roughness: 0.7 });
-  const glass = lit(0x253039, 0xffe2b0, { night: 1.0, roughness: 0.1, metalness: 0.4 });
-  t.add(box(2.6, 1.0, 14, red, 0, 0.5, 0));
-  t.add(box(2.6, 1.6, 14, cream, 0, 1.5, 0));
-  t.add(box(2.66, 1.0, 12.6, glass, 0, 1.75, 0));
-  t.add(box(2.7, 0.3, 14.2, roof, 0, 3.1, 0));
-  const top = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.35, 13.6, 16, 1, false, 0, Math.PI), roof);
-  top.rotation.set(Math.PI / 2, 0, Math.PI / 2);
-  top.scale.set(1, 1, 0.3);
-  top.position.y = 3.35;
-  t.add(top);
-  for (const z of [-4.6, 4.6]) t.add(box(2.0, 0.5, 2.4, mat(0x222222), 0, 0.15, z));
-  // trolley pole up to the wire
-  const pole = cyl(0.04, 0.04, 2.8, mat(0x222222), 0, 3.4, 3.5, 6);
-  pole.rotation.x = -0.65;
-  t.add(pole);
-  t.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  const cream = pbr('metal_plate', { scale: 1.5, tint: 0xf6ecd0, bright: 1.5, metal: 0.15 });
+  const red = pbr('metal_plate', { scale: 1.5, tint: 0xb83a30, metal: 0.15 });
+  const roof = pbr('metal_plate', { scale: 1.5, tint: 0x4a4a4c, metal: 0.3 });
+  const dark = pbr('metal_plate', { scale: 1, tint: 0x222426, metal: 0.5 });
+  const glass = lit(0x253039, 0xffe2b0, { night: 1.0, roughness: 0.06, metalness: 0.5 });
+  const B = new Batch();
+  // the body: red dash and lower panels, cream window band with its posts, the clerestory roof
+  B.add(red, bx(2.6, 1.0, 14, 0, 0.5, 0));
+  B.add(cream, bx(2.6, 0.3, 14, 0, 1.5, 0), bx(2.6, 0.35, 14, 0, 2.75, 0));
+  B.add(glass, bx(2.5, 0.95, 13.8, 0, 1.8, 0));
+  for (let k = 0; k <= 10; k++) B.add(cream, bx(2.64, 0.95, 0.16, 0, 1.8, -6.9 + k * 1.38));
+  B.add(roof, bx(2.7, 0.2, 14.2, 0, 3.1, 0), bx(1.4, 0.35, 11, 0, 3.3, 0));
+  B.add(roof, place(new THREE.CylinderGeometry(1.35, 1.35, 14.2, 16, 1, false, 0, Math.PI).rotateX(Math.PI / 2).rotateZ(Math.PI / 2).scale(1, 0.25, 1), 0, 3.3, 0));
+  // the trucks: frames and four wheels each, the fenders, the pole up to the wire
+  for (const z of [-4.6, 4.6]) {
+    B.add(dark, bx(2.0, 0.4, 2.4, 0, 0.3, z));
+    for (const dz of [-0.75, 0.75]) B.add(dark, place(new THREE.CylinderGeometry(0.33, 0.33, 1.6, 12).rotateZ(Math.PI / 2), 0, 0.33, z + dz));
+  }
+  B.add(dark, place(new THREE.CylinderGeometry(0.04, 0.04, 2.8, 6).translate(0, 1.4, 0), 0, 3.4, 3.5, 0, 1, 1, 1, -0.65));
+  B.build(t);
   return { group: t, glow: [glass] };
 }
 
@@ -143,12 +148,12 @@ export default function build() {
   const rnd = seeded(6504);
 
   // ── street, sidewalks, rails ──
-  const asphalt = mat(0x2b2d30, { roughness: 0.95 });
-  const walk = mat(0xb9b1a3, { roughness: 0.9 });
+  const asphalt = pbr('asphalt_02', { scale: 4, tint: 0x9a9ea4 });
+  const walk = pbr('brushed_concrete', { scale: 2.5, tint: 0xe8e2d8, bright: 1.2 });
   g.add(box(14, 0.06, 220, asphalt, STREET_X, 0, 0));
   g.add(box(4.2, 0.18, 220, walk, FRONT_X + 2.1, 0, 0));
   g.add(box(4.6, 0.18, 220, walk, STREET_X + 9.3, 0, 0));
-  const rail = mat(0x8a8d92, { metalness: 0.8, roughness: 0.35 });
+  const rail = pbr('metal_plate', { scale: 1, tint: 0x9a9ca0, metal: 0.85, rough: 0.5 });
   for (const x of [STREET_X - 0.72, STREET_X + 0.72]) g.add(box(0.08, 0.1, 220, rail, x, 0.06, 0));
   // lane markings
   const paint = mat(0xe8dc9a, { roughness: 0.8 });
@@ -156,6 +161,17 @@ export default function build() {
 
   // ── buildings, south to north ──
   const bricks = ['#8a4a36', '#9a5a3c', '#7d4434', '#a8705a', '#6f3d30', '#b88a64', '#8c5640', '#7a5444'];
+  const M = {
+    stone: pbr('white_sandstone_bricks', { scale: 1.2, tint: 0xf0e4d0 }),
+    frame: pbr('metal_plate', { scale: 1, tint: 0x2c2826, metal: 0.4 }),
+    roof: pbr('gravel_stones', { scale: 1.5, tint: 0x80807c }),
+    glass: mat(0x28313b, { roughness: 0.08, metalness: 0.6 }),
+    lamp: lit(0x28313b, 0xffd9a0, { night: 1.1, roughness: 0.08, metalness: 0.6 }),
+    shop: lit(0x2a3036, 0xffd29a, { night: 1.3, roughness: 0.1, metalness: 0.5 }),
+    awning: (c) => mat(c, { roughness: 0.9 }),
+  };
+  glow.push(M.lamp, M.shop);
+  const BB = new Batch();
   let z = -104;
   let idx = 0;
   const marks = {};
@@ -164,21 +180,23 @@ export default function build() {
     const name = z > -8 && z < 6 ? 'blueberry' : z > 22 && z < 40 ? 'tivoli' : null;
     if (name === 'blueberry' && !marks.blueberry) {
       marks.blueberry = z;
-      building(g, z, 16, 2, '#7b2f26', rnd, glow, { awning: 0x1d2a3a });
+      building(BB, M, z, 16, 2, '#7b2f26', rnd, { awning: 0x1d2a3a });
       z += 16;
       continue;
     }
     if (name === 'tivoli' && !marks.tivoli) {
       marks.tivoli = z;
-      building(g, z, 18, 3, '#c9b48e', rnd, glow, { lamp: '#ffe6b0' });
+      building(BB, M, z, 18, 3, '#c9b48e', rnd);
       z += 18;
       continue;
     }
     const storeys = rnd() < 0.55 ? 2 : 3;
     const awn = rnd() < 0.6 ? [0x2f4f3a, 0x5a2a28, 0x23364d, 0x6b5a2a][Math.floor(rnd() * 4)] : null;
-    building(g, z, width, storeys, bricks[idx++ % bricks.length], rnd, glow, { awning: awn });
+    building(BB, M, z, width, storeys, bricks[idx++ % bricks.length], rnd, { awning: awn });
     z += width + 0.4;
   }
+
+  BB.build(g);
 
   // Blueberry Hill: neon sign over the door + blade sign
   const bz = marks.blueberry + 8;
@@ -247,8 +265,8 @@ export default function build() {
 
   // ── Chuck Berry plaza (across the street, toward the hole) ──
   const plaza = new THREE.Group();
-  const granite = mat(0x6f6a66, { roughness: 0.55 });
-  plaza.add(box(10, 0.22, 12, mat(0x8d877f, { roughness: 0.7 }), 0, 0, 0));
+  const granite = pbr('granite_wall', { scale: 1.2, tint: 0x8890a0, rough: 0.55 });
+  plaza.add(box(10, 0.22, 12, pbr('granite_wall', { scale: 1.5, tint: 0xb8c0d0, bright: 1.2 }), 0, 0, 0));
   plaza.add(cyl(1.0, 1.1, 1.2, granite, 0, 0.2, 0, 24));
   const bronze = mat(0x6b4a2c, { metalness: 0.75, roughness: 0.38 });
   const cb = chuckBerry(bronze);
@@ -265,7 +283,7 @@ export default function build() {
   g.add(plaza);
 
   // ── street lamps, trees, overhead wire poles ──
-  const iron = mat(0x1e2226, { metalness: 0.5, roughness: 0.5 });
+  const iron = pbr('metal_plate', { scale: 1, tint: 0x2a2e34, metal: 0.6 });
   const lampHead = lit(0xfff1d6, 0xffd9a0, { night: 2.0 });
   glow.push(lampHead);
   const poles = [];
@@ -285,28 +303,21 @@ export default function build() {
   g.add(poleMesh);
   for (let zz = -95; zz <= 95; zz += 16) treeList.push(tree(STREET_X + 10.4, 0.18, zz, 5.8 + rnd() * 1.2, 1.8 + rnd() * 0.5, { slot: SLOT.youngOak }));
 
-  // ── people on the sidewalks ──
-  const shirts = [0x2d5d8a, 0x9a3b30, 0xdedad0, 0x2f6e4c, 0xd9a43a, 0x3a3a46, 0x7a4a8c];
-  const walkers = [];
+  // ── people on the sidewalks and at the statue: the scanned people ──
+  const spots = [];
   for (let i = 0; i < 26; i++) {
-    const p = person(shirts[i % shirts.length], rnd);
     const side = i % 2;
-    const x = side ? STREET_X + 8.2 + rnd() * 1.6 : FRONT_X + 1.2 + rnd() * 1.6;
-    const zz = -100 + rnd() * 200;
-    p.position.set(x, 0.18, zz);
-    const dir = rnd() < 0.5 ? 1 : -1;
-    p.rotation.y = dir > 0 ? 0 : Math.PI;
-    g.add(p);
-    walkers.push({ p, dir, speed: 1.0 + rnd() * 0.5, z0: zz });
+    spots.push([side ? STREET_X + 8.2 + rnd() * 1.6 : FRONT_X + 1.2 + rnd() * 1.6, 0.18, -100 + rnd() * 200, rnd() < 0.5 ? 0 : Math.PI]);
   }
-  // a few people gathered at the statue
   for (let i = 0; i < 5; i++) {
-    const p = person(shirts[(i + 3) % shirts.length], rnd);
-    const a = (i / 5) * Math.PI * 1.4 - 0.7;
-    p.position.set(STREET_X + 15 + Math.cos(a) * 3.2 - 1, 0.22, bz - 1 + Math.sin(a) * 3.2);
-    p.lookAt(STREET_X + 15, 0.22, bz - 1);
-    g.add(p);
+    const a = (i / 5) * Math.PI * 1.4 - 0.7, x = STREET_X + 15 + Math.cos(a) * 3.2 - 1, zz = bz - 1 + Math.sin(a) * 3.2;
+    spots.push([x, 0.22, zz, Math.atan2(STREET_X + 15 - x, bz - 1 - zz)]);
   }
+  const people = crowdAt(spots, rnd);
+  if (people) g.add(people);
+
+  // everything but the trolley stands still: one draw per material
+  mergeByMaterial(g);
 
   // ── the trolley ──
   const tr = trolley();
@@ -329,12 +340,6 @@ export default function build() {
         if (tz0 > 85 || tz0 < -85) { dir = -dir; wait = 6; tz0 = Math.max(-85, Math.min(85, tz0)); }
       }
       tr.group.position.z = tz0;
-      for (const w of walkers) {
-        w.p.position.z += w.dir * w.speed * dt;
-        if (w.p.position.z > 104) w.p.position.z = -104;
-        if (w.p.position.z < -104) w.p.position.z = 104;
-        w.p.position.y = 0.18 + Math.abs(Math.sin(t * 6 * w.speed + w.z0)) * 0.03;
-      }
     },
   };
 }
