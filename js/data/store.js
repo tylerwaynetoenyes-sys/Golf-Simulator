@@ -34,6 +34,7 @@ const DEFAULT_SETTINGS = {
   bag: ['DR', '3W', '5W', '4H', '5I', '6I', '7I', '8I', '9I', 'PW', 'GW', 'SW', 'LW'],
   ball: 'tour', // on the course
   rangeBall: 'range', // on the driving range
+  moments: true, // hole-out, long drive, lip-out and round-end moments (js/ui/moments.js)
   rangeCinema: true, // the range: the ball out of the dispenser with the camera turning in, and venue cutaways
   rings: 'putt', // on the green: putt (putt it out, optional) | tight | standard | generous (rings settle it)
   r10Putts: 'radar', // paired: radar (putt on the mat) | screen (putts on screen, the R10 for full swings only)

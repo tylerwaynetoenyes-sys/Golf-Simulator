@@ -9,6 +9,7 @@ import * as U from '../core/units.js';
 import { CLUBS, clubById, demoLaunch, rebuildClubs, currentBall } from '../data/clubs.js';
 import { partyCalls, partyRule } from './party.js';
 import { store } from '../data/store.js';
+import * as moments from '../ui/moments.js';
 import { audio } from '../audio/audio.js';
 import { radio, STATIONS } from '../audio/radio.js';
 import { createModes } from './modes.js';
@@ -41,6 +42,7 @@ export class Game {
     this.modes = createModes(this, CourseMode);
     this.mode = this.modes.range;
     this.club = clubById('7I');
+    this.timeScale = 1; // slow motion for moments (js/ui/moments.js)
     this.aimDeg = 0;
     this.state = 'idle'; // idle | intro | ready | flight | rest | hole | summary
     this.shot = null;
@@ -902,6 +904,7 @@ export class Game {
     if (o.ace) { title = 'Hole in one'; kicker = this.mode.course ? this.mode.hole.name : 'Closest to Pin'; }
     const sub = this.roster.multi || this.mode.course ? `${s.player.name}${o.sub ? ` · ${o.sub.replace(` · ${s.player.name}`, '')}` : ''}` : o.sub || '';
     this.hud.holeOut({ kicker, title, sub, big });
+    moments.holeOut(this, { level, ace: !!o.ace, eagle: cat === 'eagle' || cat === 'albatross', cup: Number.isFinite(hx) ? { x: hx, y: cy, z: hz } : null, holeName: this.mode.course ? `Hole ${this.mode.hole.n} · ${this.mode.hole.name}` : '' });
     this.piasa?.react(big ? 'big' : 'cheer');
   }
 
@@ -914,6 +917,14 @@ export class Game {
     if (result.putt) this.hud.showPutt({ result, outcome: shown, player, left: this.mode.T ? this.mode.T.toPin(result.rest.x, result.rest.z) : null });
     else this.hud.showShot({ launch, result, club, source, outcome: shown, player: this.roster.multi ? player : null });
     if (!result.putt) this.hud.addDot(result, player.color);
+    // notable shots: a long drive, an approach stiff to the pin
+    if (!result.putt && !result.holed && !s.tapping) {
+      const total = result.total / YD;
+      if ((club.kind === 'driver' || club.kind === 'wood') && total >= 300) moments.notable(this, 'longDrive', { text: `${U.dist(result.total)} ${U.distUnit()}`, sub: `${club.name} · carry ${U.dist(result.carry)}`, best: outcome.isBest });
+      else if (this.mode.course && this.mode.T && !this.mode.T.onGreenAt?.(result.origin) && this.mode.T.toPin(result.rest.x, result.rest.z) < 1.83 && result.carry > 30) {
+        moments.notable(this, 'stiff', { text: U.proximity(this.mode.T.toPin(result.rest.x, result.rest.z)), sub: 'to the pin', at: result.rest });
+      }
+    }
     this.refreshMode();
     if (store.settings.commentary && !(result.holed && !s.tapping) && !outcome.finish) {
       const c = commentFor({ result, launch, club, mode: this.mode.id, outcome, hole: this.mode.course ? this.mode.hole : null });
@@ -1029,11 +1040,11 @@ export class Game {
     this.state = 'summary';
     if (summary.isBest) audio.personalBest();
     this.piasa?.react('cheer');
-    openSummary(summary, {
+    moments.roundEnd(this, summary, () => openSummary(summary, {
       onAgain: () => this.restartMode(),
       onRange: () => this.setMode('range'),
       onScorecard: summary.scorecard ? () => openScorecard(this) : null,
-    });
+    }));
   }
 
   // ── per frame ──
@@ -1099,6 +1110,7 @@ export class Game {
           if (e.speed > 6) w.effects.burst(e.x, e.y, e.z, { n: 8, color: e.surface === 'sand' ? 0xe8dcb8 : 0x6f8a3a, speed: 1, up: 1, life: 0.5 });
         } else if (e.type === 'lip') {
           audio.lip();
+          if (!r.holed) moments.notable(this, 'lip');
           if (!s.tapping && e.speed > 0.6) s.lipped = true;
         } else if (e.type === 'drop') {
           audio.cupDrop(e.speed);

@@ -871,3 +871,18 @@ body.tv .callout .co-text { font-size: 17px; } body.tv .callout .co-text b { fon
 .club-rail .club { padding: 7px 12px; }
 
 .club-set .set-spec { display: block; margin-top: 6px; font-variant-numeric: tabular-nums; color: var(--text-2); letter-spacing: 0.02em; }
+
+/* moments (js/ui/moments.js): a centred banner, display type, one thin gold rule */
+.moment-banner { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; pointer-events: none; opacity: 0; z-index: 30; padding: 28px 64px; }
+.moment-banner::before { content: ''; position: absolute; inset: -30% -20%; background: radial-gradient(closest-side, rgba(8, 12, 10, 0.42), rgba(8, 12, 10, 0)); z-index: -1; }
+.moment-banner .mb-kicker, .moment-banner .mb-sub { text-shadow: 0 1px 10px rgba(0, 0, 0, 0.5); }
+.moment-banner .mb-kicker { font-family: var(--display); font-size: 12px; letter-spacing: 0.32em; text-transform: uppercase; color: rgba(255, 255, 255, 0.82); margin-bottom: 6px; }
+.moment-banner .mb-title { font-family: var(--display); font-weight: 400; color: #fff; line-height: 1; font-variant-numeric: tabular-nums; }
+.moment-banner .mb-title .mask { display: inline-block; overflow: hidden; vertical-align: bottom; }
+.moment-banner .mb-title .mask > span { display: inline-block; }
+.moment-banner .mb-rule { width: 120px; height: 1px; margin: 12px auto 8px; background: #e9c97a; transform-origin: 50% 50%; }
+.moment-banner .mb-sub { font-size: 14px; color: rgba(255, 255, 255, 0.78); letter-spacing: 0.04em; }
+.moment-banner[data-size="s"] .mb-title { font-size: clamp(30px, 3.6vw, 44px); }
+.moment-banner[data-size="m"] .mb-title { font-size: clamp(40px, 5vw, 64px); }
+.moment-banner[data-size="l"] .mb-title { font-size: clamp(52px, 7vw, 92px); }
+.moment-banner[data-size="xl"] .mb-title { font-size: clamp(60px, 9vw, 124px); letter-spacing: 0.01em; }

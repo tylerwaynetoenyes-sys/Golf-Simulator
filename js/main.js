@@ -74,7 +74,8 @@ async function boot() {
   let last = performance.now();
   let firstFrame = true;
   const frame = (now) => {
-    const dt = Math.min(MAX_DT, (now - last) / 1000);
+    // game.timeScale: slow motion for a moment (js/ui/moments.js)
+    const dt = Math.min(MAX_DT, (now - last) / 1000) * (game.timeScale ?? 1);
     last = now;
     const ballPos = game.update(dt);
     const playT = game.shot ? game.shot.t : 0;
