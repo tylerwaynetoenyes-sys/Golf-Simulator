@@ -162,7 +162,7 @@ export class World {
     this.effects.update(dt);
     this.characters.update(dt);
     this.club.update(dt, t);
-    if (this.sceneMode === 'course') this.course.update(t, dt, this.camera);
+    if (this.sceneMode === 'course') { this.course.ballPos = ballPos; this.course.update(t, dt, this.camera); }
     this.markers.update(t);
     this.ambient.update(dt, t);
     this.rain.update(dt, this.camera, this.env.wind(0, { gust: false }), this.env.day);

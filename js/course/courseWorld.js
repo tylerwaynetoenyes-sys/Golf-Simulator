@@ -10,6 +10,7 @@ import { makeFlag, lightConeMaterial } from '../scene/rangeProps.js';
 import { CUP } from '../core/physics.js';
 import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
 import { plantTrees, updateTrees, THEME_TREES } from '../scene/trees.js';
+import { tuftGeometry, grassMaterial, GRASS } from './grass.js';
 import { buildDecay } from './decay.js';
 import { dressPinFlag, flagpole, fireworks } from './usa.js';
 
@@ -128,6 +129,9 @@ export class CourseWorld {
     this._ringKey = null;
     this.ringTarget = 0;
     const T = (this.T = new HoleTerrain(hole));
+    this._nearAt = null;
+    this._nearPrev = null;
+    this.nearGrass = null;
     const g = (this.holeGroup = new THREE.Group());
     this.root.add(g);
     const rand = seeded(hole.n * 977);
@@ -409,12 +413,13 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     };
     // stands along both sides: species-grouped clusters at varying depth
     for (const side of [-1, 1]) {
-      for (let s = -30; s < T.length + 70; s += 26 + rand() * 26) {
-        if (rand() < 0.18 + (1 - TT.density) * 0.4) continue; // glades (open country in the West)
+      for (let s = -30; s < T.length + 70; s += 15 + rand() * 16) {
+        if (rand() < 0.1 + (1 - TT.density) * 0.35) continue; // glades (open country in the West)
         const pt = T.pointAt(s);
-        const depth = corridor + 18 + rand() * 70;
+        // a front row at the edge of the rough, deeper woods behind it
+        const depth = corridor + (rand() < 0.55 ? 12 + rand() * 22 : 34 + rand() * 60);
         const cx = pt.x + pt.rx * depth * side, cz = pt.z + pt.rz * depth * side;
-        const n = Math.round((3 + rand() * 8) * quality);
+        const n = Math.round((5 + rand() * 10) * quality);
         const rad = 8 + rand() * 16;
         const species = bySite(cx, cz);
         for (let i = 0; i < n; i++) {
@@ -461,7 +466,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
       const far = [];
       const R = 900;
       const cx = (b2.minx + b2.maxx) / 2, cz = (b2.minz + b2.maxz) / 2;
-      const N = Math.round(1400 * (this.treeDensity ?? 1) * TT.density * (TT.scatter ?? 0.5));
+      const N = Math.round(2800 * (this.treeDensity ?? 1) * TT.density * (TT.scatter ?? 0.5));
       for (let i = 0; i < N * 3 && far.length < N; i++) {
         const x = cx + (rand() * 2 - 1) * R, z = cz + (rand() * 2 - 1) * R;
         if (x > b2.minx && x < b2.maxx && z > b2.minz && z < b2.maxz) continue;
@@ -1064,29 +1069,15 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
 
   _buildRoughGrass(T, g, rand, b) {
     if (!this.tuftGeo) {
-      // a tuft: five blades fanned around the centre, darker at the root
-      const pos = [], col = [];
-      for (let i = 0; i < 5; i++) {
-        const a = (i / 5) * Math.PI * 2 + 0.3;
-        const lean = 0.35;
-        const ca = Math.cos(a), sa = Math.sin(a);
-        const w = 0.045;
-        pos.push(-sa * w, 0, ca * w, sa * w, 0, -ca * w, ca * lean * 0.5, 1, sa * lean * 0.5);
-        col.push(0.45, 0.5, 0.42, 0.45, 0.5, 0.42, 1.05, 1.1, 0.85);
-      }
-      this.tuftGeo = new THREE.BufferGeometry();
-      this.tuftGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-      this.tuftGeo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
-      this.tuftGeo.computeVertexNormals();
+      this.tuftGeo = tuftGeometry(14);
       this.tuftGeo.userData.shared = true;
-      this.tuftMat = new THREE.MeshStandardMaterial({ color: 0x5f7f34, vertexColors: true, side: THREE.DoubleSide, roughness: 0.95 });
+      this.tuftMat = grassMaterial(0x6a8a3a);
     }
-    const N = Math.round(9000 * (this.treeDensity ?? 1));
+    const N = Math.round(15000 * (this.treeDensity ?? 1));
     const tint = { western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.theme];
     if (tint && !this.tuftMats?.[tint]) {
       this.tuftMats ||= {};
-      this.tuftMats[tint] = this.tuftMat.clone();
-      this.tuftMats[tint].color.set(tint);
+      this.tuftMats[tint] = grassMaterial(tint);
     }
     const tufts = new THREE.InstancedMesh(this.tuftGeo, tint ? this.tuftMats[tint] : this.tuftMat, N);
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
@@ -1100,9 +1091,10 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       if (T.terrain(x, z).surface !== 'rough') continue;
       if (T.greenEdge(x, z) < 3) continue;
       const deep = T.roughDepth(x, z) === 'deep';
-      const h = (deep ? 0.22 : 0.12) + rand() * (deep ? 0.18 : 0.06);
+      const h = (deep ? 0.2 : 0.1) + rand() * (deep ? 0.2 : 0.07);
       q.setFromAxisAngle(up, rand() * 6.28);
-      sc.set(1 + rand() * 0.6, h, 1 + rand() * 0.6);
+      const spread = 0.8 + rand() * 0.7;
+      sc.set(spread, h, spread);
       tufts.setMatrixAt(n++, m4.compose(p.set(x, this._coarseH(x, z) - 0.02, z), q, sc));
     }
     tufts.count = n;
@@ -1252,7 +1244,64 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
     return new THREE.CanvasTexture(c);
   }
 
+  /**
+   * Dense rough round the ball's resting spot: the field-wide tufts are
+   * spread thin, so where the camera actually looks (the ball) gets a thick
+   * patch, rebuilt whenever the ball settles somewhere new.
+   */
+  _nearGrassAt(x, z) {
+    const T = this.T;
+    if (!T || !this.tuftGeo) return;
+    const N = Math.round(9000 * Math.max(0.5, this.treeDensity ?? 1));
+    if (!this.nearGrass) {
+      const mat = this.tuftMats?.[{ western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.theme]] || this.tuftMat;
+      this.nearGrass = new THREE.InstancedMesh(this.tuftGeo, mat, N);
+      this.nearGrass.receiveShadow = true;
+      this.nearGrass.frustumCulled = false;
+      this.holeGroup.add(this.nearGrass);
+    }
+    const im = this.nearGrass;
+    const rand = seeded(Math.round(x * 13 + z * 7));
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+    let n = 0;
+    const R = 22;
+    for (let i = 0; i < N * 2 && n < N; i++) {
+      // denser toward the centre, where the ball sits
+      const r = R * Math.pow(rand(), 0.75), a = rand() * Math.PI * 2;
+      const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+      if (T.terrain(px, pz).surface !== 'rough') continue;
+      if (T.greenEdge(px, pz) < 2.5) continue;
+      const deep = T.roughDepth(px, pz) === 'deep';
+      // the first-cut edge of the rough stays short
+      const h = (deep ? 0.18 : 0.08) + rand() * (deep ? 0.18 : 0.06);
+      q.setFromAxisAngle(up, rand() * 6.28);
+      const spread = 0.7 + rand() * 0.6;
+      sc.set(spread, h, spread);
+      im.setMatrixAt(n++, m4.compose(p.set(px, this._coarseH(px, pz) - 0.02, pz), q, sc));
+    }
+    im.count = n;
+    im.instanceMatrix.needsUpdate = true;
+    this._nearAt = { x, z };
+  }
+
   update(t, dt = 1 / 60, camera = null) {
+    // thick rough wherever the ball settles (checked twice a second)
+    if (this.ballPos && this.T) {
+      this._nearT = (this._nearT || 0) + dt;
+      if (this._nearT > 0.5) {
+        this._nearT = 0;
+        const b = this.ballPos, pv = this._nearPrev;
+        const still = pv && Math.hypot(b.x - pv.x, b.z - pv.z) < 0.3;
+        this._nearPrev = { x: b.x, z: b.z };
+        const at = this._nearAt;
+        if (still && (!at || Math.hypot(b.x - at.x, b.z - at.z) > 9)) this._nearGrassAt(b.x, b.z);
+      }
+    }
+    // rough grass: wind (the way the air moves) and the ball it parts around
+    GRASS.uTime.value = t;
+    const wr = ((this.windFrom ?? 0) * Math.PI) / 180;
+    GRASS.uWind.value.set(-Math.sin(wr), Math.cos(wr)).multiplyScalar(this.wind ?? 0);
+    if (this.ballPos) GRASS.uBall.value.copy(this.ballPos);
     const sh = this.flag?.userData.flagMat.userData.shader;
     if (sh) { sh.uniforms.uTime.value = t; sh.uniforms.uWind.value = this.wind; }
     // flagstick lifting out / dropping back in
