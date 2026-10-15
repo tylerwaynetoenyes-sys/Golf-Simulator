@@ -23,7 +23,7 @@ const ready = fetch(`${BASE}ground.json`).then((r) => (r.ok ? r.json() : null)).
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const FT = 0.3048;
 
-function materials() {
+export function materials() {
   return {
     conc: pbr('concrete_wall_008', { scale: 3.5, tint: 0xeeeae2 }),
     steel: pbr('metal_plate', { scale: 1.5, tint: 0xdfe3e6, metal: 0.35 }),
@@ -38,7 +38,7 @@ function materials() {
 }
 
 // ── the Confluence Tower: two shafts, three lookouts, the canopy on top ──
-function confluenceTower(m, glow) {
+export function confluenceTower(m, glow) {
   const B = new Batch();
   const H = 180 * FT, gap = 9, w = 5.2;
   B.add(m.paving, place(new THREE.CylinderGeometry(26, 26, 0.3, 48).translate(0, 0.15, 0), 0, 0, 0));

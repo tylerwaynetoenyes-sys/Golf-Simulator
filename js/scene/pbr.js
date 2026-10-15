@@ -10,6 +10,7 @@
 //     metal  metalness (steel, copper) · rough  roughness multiplier
 //     glow   night emissive colour (lit stone, windows) via userData.night
 //     offset polygon offset (draped paving over the ground)
+//     bright albedo multiplier over the normalised mid (1.8 for white paint)
 import * as THREE from 'three';
 
 const BASE = new URL('../../assets/textures/pbr/', import.meta.url).href;
@@ -47,14 +48,14 @@ function set(id) {
 }
 
 const cache = new Map();
-export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow = null, night = 0.5, side = THREE.FrontSide, offset = 0 } = {}) {
-  const key = `${id}|${scale}|${tint}|${metal}|${rough}|${glow}|${side}|${offset}`;
+export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow = null, night = 0.5, side = THREE.FrontSide, offset = 0, bright = 1 } = {}) {
+  const key = `${id}|${scale}|${tint}|${metal}|${rough}|${glow}|${side}|${offset}|${bright}`;
   if (cache.has(key)) return cache.get(key);
   const tx = set(id);
   const m = new THREE.MeshStandardMaterial({ color: tint, metalness: metal, roughness: 1, side });
   if (offset) Object.assign(m, { polygonOffset: true, polygonOffsetFactor: offset, polygonOffsetUnits: offset });
   if (glow != null) { m.emissive = new THREE.Color(glow); m.emissiveIntensity = 0; m.userData.night = night; }
-  const uni = { uTriG: tx.gain, uTriD: { value: tx.diff }, uTriR: { value: tx.rough }, uTriN: { value: tx.nor }, uTriS: { value: 1 / scale }, uTriRough: { value: rough } };
+  const uni = { uTriG: tx.gain, uTriD: { value: tx.diff }, uTriR: { value: tx.rough }, uTriN: { value: tx.nor }, uTriS: { value: 1 / scale }, uTriRough: { value: rough }, uTriK: { value: bright } };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uni);
     sh.vertexShader = sh.vertexShader
@@ -71,13 +72,13 @@ export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
 varying vec3 vTriW; varying vec3 vTriN;
-uniform sampler2D uTriD; uniform sampler2D uTriR; uniform sampler2D uTriN; uniform float uTriS; uniform float uTriRough; uniform float uTriG;
+uniform sampler2D uTriD; uniform sampler2D uTriR; uniform sampler2D uTriN; uniform float uTriS; uniform float uTriRough; uniform float uTriG; uniform float uTriK;
 vec3 triW() { vec3 w = pow(abs(normalize(vTriN)), vec3(4.0)); return w / (w.x + w.y + w.z); }`)
       .replace('#include <map_fragment>', `
         vec3 tw = triW();
         vec3 tp = vTriW * uTriS;
         vec3 tc = texture2D(uTriD, tp.zy).rgb * tw.x + texture2D(uTriD, tp.xz).rgb * tw.y + texture2D(uTriD, tp.xy).rgb * tw.z;
-        diffuseColor.rgb *= min(tc * uTriG, vec3(1.0));`)
+        diffuseColor.rgb *= min(tc * uTriG * uTriK, vec3(1.0));`)
       .replace('#include <roughnessmap_fragment>', `
         float roughnessFactor = roughness * uTriRough * (texture2D(uTriR, tp.zy).g * tw.x + texture2D(uTriR, tp.xz).g * tw.y + texture2D(uTriR, tp.xy).g * tw.z);`)
       .replace('#include <normal_fragment_maps>', `
