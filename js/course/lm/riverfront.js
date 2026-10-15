@@ -1122,11 +1122,22 @@ export function pavingMeshes(D, gy, skipAt, { paths = true, sidewalks = false } 
     if (p.length < 3) continue;
     const cx = p.reduce((s, q) => s + q[0], 0) / p.length, cz = p.reduce((s, q) => s + q[1], 0) / p.length;
     const tris = THREE.ShapeUtils.triangulateShape(p.map(([x, z]) => new THREE.Vector2(x, z)), []);
-    for (const t of tris) {
-      // a lot reaching into the field of play stops at its edge (triangle by triangle)
-      if (skipAt((p[t[0]][0] + p[t[1]][0] + p[t[2]][0]) / 3, (p[t[0]][1] + p[t[1]][1] + p[t[2]][1]) / 3)) continue;
-      for (const k of t) lots.push(p[k][0], gy(p[k][0], p[k][1]) + 0.22, p[k][1]);
-    }
+    // split into ~6 m pieces: the lot drapes over the ground, and one reaching into the
+    // field of play stops cleanly at its edge instead of a big triangle running onto the fairway
+    const piece = (A, B, C) => {
+      const ab = Math.hypot(B[0] - A[0], B[1] - A[1]), bc = Math.hypot(C[0] - B[0], C[1] - B[1]), ca = Math.hypot(A[0] - C[0], A[1] - C[1]);
+      const m = Math.max(ab, bc, ca);
+      if (m > 6) {
+        const mid = (P, Q) => [(P[0] + Q[0]) / 2, (P[1] + Q[1]) / 2];
+        if (m === ab) { const M2 = mid(A, B); piece(A, M2, C); piece(M2, B, C); }
+        else if (m === bc) { const M2 = mid(B, C); piece(A, B, M2); piece(A, M2, C); }
+        else { const M2 = mid(C, A); piece(A, B, M2); piece(M2, B, C); }
+        return;
+      }
+      if (skipAt((A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3)) return;
+      for (const q of [A, B, C]) lots.push(q[0], gy(q[0], q[1]) + 0.22, q[1]);
+    };
+    for (const t of tris) piece(p[t[0]], p[t[1]], p[t[2]]);
   }
   if (lots.length) {
     const g = new THREE.BufferGeometry();
