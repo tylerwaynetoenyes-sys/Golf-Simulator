@@ -128,5 +128,33 @@ export class Renderer {
   render() {
     if (this.quality.bloom) this.composer.render();
     else this.renderer.render(this.scene, this.camera);
+    // a cut was asked for: hold this frame over the next ones and let it dissolve
+    if (this._snapCbs?.length) {
+      const cbs = this._snapCbs; this._snapCbs = [];
+      try { this._hold(); } catch (e) { /* no snapshot: the cut just happens */ }
+      for (const cb of cbs) cb();
+    }
+  }
+
+  /** Cross-dissolve the next camera change: cb runs once this frame is held. */
+  snapshot(cb) { (this._snapCbs ||= []).push(cb); }
+
+  _hold() {
+    const src = this.renderer.domElement;
+    let o = this._dissolve;
+    if (!o) {
+      o = this._dissolve = document.createElement('canvas');
+      o.className = 'cut-dissolve';
+      Object.assign(o.style, { position: 'fixed', inset: '0', width: '100%', height: '100%', pointerEvents: 'none', opacity: '0' });
+      src.parentNode.insertBefore(o, src.nextSibling);
+    }
+    // draw at half resolution: it's a moment of motion, and cheaper on iPad
+    o.width = Math.max(2, src.width >> 1); o.height = Math.max(2, src.height >> 1);
+    o.getContext('2d').drawImage(src, 0, 0, o.width, o.height);
+    o.style.transition = 'none';
+    o.style.opacity = '1';
+    void o.offsetWidth;
+    o.style.transition = 'opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1)';
+    o.style.opacity = '0';
   }
 }

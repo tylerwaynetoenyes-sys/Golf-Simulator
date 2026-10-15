@@ -9,9 +9,30 @@ function damp(current, target, rate, dt) {
   return current.lerp(target, 1 - Math.exp(-rate * dt));
 }
 
+/**
+ * A critically damped spring (Unity's SmoothDamp): unlike exponential damping
+ * it eases in as well as out, so a camera starting a move never jerks. `vel`
+ * is the spring's state; `rate` keeps the old meaning (higher = tighter).
+ */
+function spring(current, target, vel, rate, dt) {
+  const st = Math.max(0.05, 1.35 / Math.max(0.1, rate));
+  const omega = 2 / st, x = omega * dt;
+  const exp = 1 / (1 + x + 0.48 * x * x + 0.235 * x * x * x);
+  for (const k of ['x', 'y', 'z']) {
+    const change = current[k] - target[k];
+    const temp = (vel[k] + omega * change) * dt;
+    vel[k] = (vel[k] - omega * temp) * exp;
+    current[k] = target[k] + (change + temp) * exp;
+  }
+  return current;
+}
+
 export class CameraRig {
   constructor(camera) {
     this.camera = camera;
+    this._pv = new THREE.Vector3(); this._lv = new THREE.Vector3(); // spring velocities (position, look)
+    this.snapshot = null; // set by the world: snapshot(cb) cross-dissolves the next cut (js/scene/renderer.js)
+    this._pendingCut = null;
     this.origin = new THREE.Vector3(0, 0.1, 0);
     this.heading = 0; // target-line direction, degrees (0 = -Z)
     this.aimDeg = 0;
@@ -82,6 +103,11 @@ export class CameraRig {
     if (immediate) {
       this.pos.copy(this.desiredPos);
       this.look.copy(this.desiredLook);
+      this._pv.set(0, 0, 0); this._lv.set(0, 0, 0);
+    } else if (this.pos.distanceTo(this.desiredPos) > 30) {
+      // a long way back to the ball: dissolve there rather than swoop
+      const p = this.desiredPos.clone(), l = this.desiredLook.clone();
+      this._cutTo(() => { this.pos.copy(p); this.look.copy(l); });
     }
   }
 
@@ -331,6 +357,18 @@ export class CameraRig {
     this.lookRate = 4;
   }
 
+  /**
+   * Change to a new camera without a hard cut: the last frame is held over the
+   * new view and dissolves away (half a second). Until the snapshot is taken the
+   * camera holds still, so nothing moves under the held frame.
+   */
+  _cutTo(apply) {
+    const done = () => { this._pendingCut = null; apply(); this._pv.set(0, 0, 0); this._lv.set(0, 0, 0); };
+    if (!this.snapshot) { done(); return; }
+    this._pendingCut = apply;
+    this.snapshot(done);
+  }
+
   update(dt, ball, playT) {
     this.t += dt;
     const b = ball;
@@ -376,14 +414,12 @@ export class CameraRig {
       this.desiredLook.set(c.cup.x - c.dx * back, c.cup.y + THREE.MathUtils.lerp(0.015, -0.07, e), c.cup.z - c.dz * back);
       if (!c.cut) {
         c.cut = true;
-        this.pos.copy(this.desiredPos);
-        this.look.copy(this.desiredLook);
-        this.fov = 40;
-        this.shake = 0;
+        const p = this.desiredPos.clone(), l = this.desiredLook.clone();
+        this._cutTo(() => { this.pos.copy(p); this.look.copy(l); this.fov = 40; this.shake = 0; });
       }
       this.baseFov = THREE.MathUtils.lerp(40, 27, e);
-      this.rate = 10;
-      this.lookRate = 14;
+      this.rate = 7;
+      this.lookRate = 9;
     } else if (this.mode === 'shot' && this.result) {
       const r = this.result;
       if (r.putt) {
@@ -422,10 +458,7 @@ export class CameraRig {
         const tc = this.treeCam;
         if (!tc.cut) {
           tc.cut = true;
-          this.pos.copy(tc.pos);
-          this.look.copy(tc.point);
-          this.fov = this.baseFov = 36;
-          this.shake = 0;
+          this._cutTo(() => { this.pos.copy(tc.pos); this.look.copy(tc.point); this.fov = this.baseFov = 36; this.shake = 0; });
         }
         // hold on the strike, then follow the ball out of the branches
         const after = playT - tc.t;
@@ -454,10 +487,8 @@ export class CameraRig {
         }
         if (!this.cut) {
           this.cut = true;
-          this.pos.copy(this.landCam);
-          this.look.copy(target);
-          this.fov = this.baseFov = this.landFov || 34;
-          this.shake = 0;
+          const l = target.clone();
+          this._cutTo(() => { this.pos.copy(this.landCam); this.look.copy(l); this.fov = this.baseFov = this.landFov || 34; this.shake = 0; });
         }
         this.desiredPos.copy(this.landCam);
         this.desiredLook.copy(target);
@@ -469,7 +500,7 @@ export class CameraRig {
         const d = Math.hypot(b.x - o.x, b.z - o.z);
         this.desiredPos.copy(this.pos);
         this.desiredLook.lerpVectors(this.look, b, playT < 0.35 ? 0.25 : 1);
-        this.lookRate = playT < 0.35 ? 10 : 7;
+        this.lookRate = playT < 0.35 ? 6 : 5;
         this.baseFov = THREE.MathUtils.clamp(44 - d * 0.07, 22, 44);
       } else {
         // chase: behind and above the ball, looking a little ahead of it
@@ -488,7 +519,7 @@ export class CameraRig {
         this.desiredPos.copy(tgt);
         this.desiredLook.set(b.x + fx * 6, b.y + 0.4, b.z + fz * 6);
         this.rate = playT < 0.5 ? 2 : 5;
-        this.lookRate = 12;
+        this.lookRate = 7;
         this.baseFov = 44 - Math.min(8, playT * 2);
       }
     } else if (this.mode === 'rest') {
@@ -544,8 +575,10 @@ export class CameraRig {
     if (this.mode !== 'flyover') {
       // the camera never climbs over trees any more: anything between it
       // and the ball fades out instead (js/scene/occlusion.js)
-      damp(this.pos, this.desiredPos, this.rate, dt);
-      damp(this.look, this.desiredLook, this.lookRate, dt);
+      if (!this._pendingCut) {
+        spring(this.pos, this.desiredPos, this._pv, this.rate, dt);
+        spring(this.look, this.desiredLook, this._lv, this.lookRate, dt);
+      }
     }
     const want = this.baseFov * this.fovScale;
     this.fov += (want - this.fov) * (1 - Math.exp(-3 * dt));
