@@ -89,6 +89,11 @@ and in the in-game course card.
   - `road_damaged` texture (diffuse, 1k, MD5 checked against the API),
     converted to greyscale for `assets/textures/asphalt_damaged.jpg` (the
     East St. Louis lots)
+  - `container_side` texture by Dimitrios Savva (diffuse and OpenGL normal,
+    1k, MD5 checked against the API), processed in Blender
+    (`tools/blender/container.py`) to `assets/textures/container_side.jpg`
+    (luminance plus a rust mask) and `container_side_nor.jpg` (the East
+    St. Louis shipping containers)
 - **Sketchfab models**, Creative Commons Attribution 4.0 (CC BY 4.0,
   https://creativecommons.org/licenses/by/4.0/). Each was decimated, its
   textures resized to 2K or less and exported Draco-compressed in Blender;
@@ -186,3 +191,13 @@ commercial licence or rebuild with `python tools/fetch-sat.py --source
 sentinel`, which mosaics open Copernicus Sentinel-2 L2A scenes from AWS Open
 Data (any use; credit "Contains modified Copernicus Sentinel data").
 
+
+## Rock
+
+| Asset | Source | Licence |
+|---|---|---|
+| `assets/textures/rock/` (rock_08, rock_face_03, rock_boulder_cracked, rock_wall_02: colour and roughness, 1K) | Poly Haven | CC0 |
+
+Used by `js/course/rock.js` on steep ground, per course: limestone
+(Alton, Godfrey, St. Louis, Paris), badlands (Scotts Bluff), ochre (Cap
+Canaille, Cassis), granite (Pebble Beach).

@@ -19,6 +19,7 @@ import { Environment } from './environment.js';
 import { Ambient } from './ambient.js';
 import { Rain } from './rain.js';
 import { patchOccluders, setOcclusion } from './occlusion.js';
+import { patchRock } from '../course/rock.js';
 import { Club } from './club.js';
 
 export class World {
@@ -125,6 +126,8 @@ export class World {
     const T = this.course.load(hole);
     // trees, shrubs and long grass fade where they'd hide the ball
     patchOccluders(this.course.root);
+    // real rock on the steep faces: bluffs, cliffs, badlands
+    patchRock(this.course.root, hole.course || 'confluence');
     this.terrainFn = T.terrain;
     this.groundFn = T.groundHeight;
     this.ball.setGround(this.course.visualHeight);
