@@ -408,7 +408,9 @@ export class CourseWorld {
 
     // keep trees and masts out of the landmark's footprint
     const lmBox = new THREE.Box3().setFromObject(holder).expandByScalar(5);
-    const inLandmark = (x, z) => x > lmBox.min.x && x < lmBox.max.x && z > lmBox.min.z && z < lmBox.max.z;
+    // (and out of what a map-wide landmark covers: a vineyard's parcels, say)
+    const occupiers = (this.farLms || []).filter((l) => l.occupies);
+    const inLandmark = (x, z) => (x > lmBox.min.x && x < lmBox.max.x && z > lmBox.min.z && z < lmBox.max.z) || occupiers.some((l) => l.occupies(x, z));
 
     // ── trees: natural stands of oak, maple, sycamore and cedar ──
     this.treeGrid = new Map();
@@ -1418,6 +1420,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       if (T.greenEdge(x, z) < 3) continue;
       if (this._mownCarry(x, z)) continue;
       if (this.landmark?.clear?.(x, z)) continue; // the landmark's paving (a street, a plaza)
+      if ((this.farLms || []).some((l) => l.occupies?.(x, z))) continue; // a vineyard's rows
       const deep = T.roughDepth(x, z) === 'deep';
       const h = (deep ? 0.2 : 0.1) + rand() * (deep ? 0.2 : 0.07);
       q.setFromAxisAngle(up, rand() * 6.28);

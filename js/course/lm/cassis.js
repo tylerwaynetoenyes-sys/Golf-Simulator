@@ -12,7 +12,7 @@ import * as THREE from 'three';
 import { mat, lit, seeded, tree, boulderGeometry } from './kit.js';
 import { pbr } from '../../scene/pbr.js';
 import { boatFleet } from '../../scene/boats.js';
-import { Batch, bx, cy, place } from './riverfront.js';
+import { Batch, bx, cy, place, span } from './riverfront.js';
 
 const CYPRESS = 11, OLIVE = 10; // the course's Italian cypress and olive models (scene/trees.js)
 const built = (B) => { const g = new THREE.Group(); B.build(g); return g; };
@@ -167,4 +167,163 @@ function chateau() {
   return { group: built(B), glow: [stone, glass], haze: [stone] };
 }
 
-export default { vineyard, phare, cassisport, chateau };
+
+// ── the vignoble: the appellation's vines over the whole plateau, beyond the field of play ──
+// Parcels on a grid in map axes, each with its own row direction, laid on the course's
+// real ground: tilled ochre soil, rows of goblet vines as leafy hedges (cheap at any
+// count), dry-stone restanques holding the steeper ones, cypress windbreaks on some
+// tracks, and the odd parcel left to garrigue and olives.
+let _vineMat = null;
+function vineMaterial() {
+  if (_vineMat) return _vineMat;
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const g = c.getContext('2d');
+  g.clearRect(0, 0, 256, 128);
+  let q = 7; const r = () => ((q = (q * 16807) % 2147483647) / 2147483647);
+  // stocks: a gnarled trunk every 1.3 m (the texture tile is 3.9 m)
+  g.strokeStyle = '#4a3a2c';
+  for (let k = 0; k < 3; k++) { const x = 40 + k * 85; g.lineWidth = 5; g.beginPath(); g.moveTo(x, 128); g.quadraticCurveTo(x + 6, 100, x - 2, 70); g.stroke(); }
+  // the leaf mass: a goblet of leaves on each stock, gaps between, densest at the top
+  for (let i = 0; i < 2400; i++) {
+    const k = Math.floor(r() * 3), ang = r() * 6.28, rad = Math.pow(r(), 0.7) * 40;
+    const x = 40 + k * 85 + Math.cos(ang) * rad, y = 48 + Math.sin(ang) * rad * 0.9 - 12;
+    if (y > 96) continue;
+    const l = 22 + r() * 22, h = 70 + r() * 40, sat = 35 + r() * 25;
+    g.fillStyle = `hsl(${h},${sat}%,${l}%)`;
+    g.beginPath(); g.ellipse(x, y + 4, 3 + r() * 4, 2 + r() * 3, r() * 3, 0, 6.29); g.fill();
+  }
+  // hand-made mip levels with the alpha boosted at each step, so a row keeps its
+  // coverage into the distance instead of dissolving under the alpha test
+  const mips = [c];
+  for (let w = 128, h = 64; w >= 1 && h >= 1; w >>= 1, h = Math.max(1, h >> 1)) {
+    const m = document.createElement('canvas'); m.width = w; m.height = h;
+    const mg = m.getContext('2d'); mg.drawImage(mips[mips.length - 1], 0, 0, w, h);
+    const d = mg.getImageData(0, 0, w, h);
+    for (let i = 3; i < d.data.length; i += 4) d.data[i] = Math.min(255, d.data[i] * 1.45);
+    mg.putImageData(d, 0, 0);
+    mips.push(m);
+    if (w === 1) break;
+  }
+  const t = new THREE.Texture(c);
+  t.mipmaps = mips;
+  t.generateMipmaps = false;
+  t.needsUpdate = true;
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping; t.anisotropy = 8;
+  _vineMat = new THREE.MeshStandardMaterial({ map: t, alphaTest: 0.28, alphaToCoverage: true, side: THREE.DoubleSide, vertexColors: true, roughness: 0.85 });
+  return _vineMat;
+}
+
+function vignoble() {
+  const group = new THREE.Group();
+  const trees = [];
+  let occ = null;
+  const res = {
+    group, glow: [], trees,
+    occupies: (x, z) => (occ ? occ(x, z) : false),
+    fit(holder, T, opts = {}) {
+      if (!opts.course) return;
+      holder.updateMatrix();
+      const L = holder.matrix.clone(), Li = L.clone().invert(), w = new THREE.Vector3();
+      const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
+      const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
+      const prj = (x, z) => { toW(x, z); return T.project(w.x, w.z); };
+      const wl = T.seaLevel != null ? (T.seaLevel - holder.position.y) / holder.scale.y : -1e9;
+      const corridor = Math.max(T.fwHalf || 0, 14) + 22;
+      const clearOf = (x, z) => { const pr = prj(x, z); if (pr.s > -40 && pr.s < T.length + 45 && Math.abs(pr.d) < corridor) return false; toW(x, z); return T.greenEdge(w.x, w.z) > 30 && Math.hypot(w.x, w.z) > 40; };
+      const rnd = seeded(1936 + (T.hole?.n || 0));
+      const hash = (i, j) => { const v = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return v - Math.floor(v); };
+      const CELL = 46, TRACK = 4, P = CELL - TRACK;
+      const parcels = new Map();
+      // the cells round this hole, out to 420 m either side
+      const ends = [prj(0, 0)];
+      const b = new THREE.Box3();
+      for (let sv = -60; sv <= T.length + 60; sv += 30) { const p = T.pointAt(Math.max(0, Math.min(T.length, sv))); for (const d of [-430, 430]) { w.set(p.x + p.rx * d, 0, p.z + p.rz * d).applyMatrix4(Li); b.expandByPoint(w.clone()); } }
+      const soilP = [], soilC = [], rowP = [], rowN = [], rowU = [], rowC = [], wallG = new Batch();
+      const stone = pbr('sandstone_blocks_08', { scale: 0.9, tint: 0xf0e4d0, bright: 1.2 });
+      const col = new THREE.Color();
+      for (let i = Math.floor(b.min.x / CELL); i <= Math.floor(b.max.x / CELL); i++) for (let j = Math.floor(b.min.z / CELL); j <= Math.floor(b.max.z / CELL); j++) {
+        const hx = hash(i + 0.5, j), hz = hash(i, j + 0.5);
+        const x0 = i * CELL + TRACK / 2 + hx * 6, z0 = j * CELL + TRACK / 2 + hz * 6, cx = x0 + P / 2, cz = z0 + P / 2;
+        if (cz > 380) continue; // the town and the port
+        const pr = prj(cx, cz);
+        if (Math.abs(pr.d) > 440 || pr.s < -200 || pr.s > T.length + 200) continue;
+        if (![[x0, z0], [x0 + P, z0], [x0, z0 + P], [x0 + P, z0 + P], [cx, cz]].every(([x, z]) => clearOf(x, z))) continue;
+        const ys = [gy(x0, z0), gy(x0 + P, z0), gy(x0, z0 + P), gy(x0 + P, z0 + P)];
+        if (Math.min(...ys) < wl + 4) continue;
+        const slope = (Math.max(...ys) - Math.min(...ys)) / P;
+        if (slope > 0.32) continue;
+        const h = hash(i, j);
+        if (h < 0.22) { // garrigue and a few olives
+          for (let k = 0; k < 3; k++) { const x = x0 + rnd() * P, z = z0 + rnd() * P; trees.push(tree(x, gy(x, z), z, 4 + rnd() * 2, 2.4, { slot: OLIVE })); }
+          continue;
+        }
+        parcels.set(`${i},${j}`, 1);
+        // the soil, draped
+        const N = 7, st = P / N;
+        // pale, stony limestone soil, a little redder toward Cap Canaille
+        // (with a little of the rows' green in it: from afar, where the rows thin out, a parcel still reads as vines)
+        const soil = col.setHSL(0.08 + h * 0.02, 0.12 + h * 0.1, 0.66 + h * 0.08).clone().lerp(new THREE.Color(0x5f7434), 0.5);
+        const Y = (x, z) => gy(x, z) + 0.06;
+        for (let a = 0; a < N; a++) for (let c = 0; c < N; c++) {
+          const xa = x0 + a * st, za = z0 + c * st, xb = xa + st, zb = za + st;
+          soilP.push(xa, Y(xa, za), za, xa, Y(xa, zb), zb, xb, Y(xb, zb), zb, xa, Y(xa, za), za, xb, Y(xb, zb), zb, xb, Y(xb, za), za);
+          for (let v = 0; v < 6; v++) soilC.push(soil.r, soil.g, soil.b);
+        }
+        // the rows: along x or along z, 2.3 m apart, a leafy tent over each
+        const alongX = h > 0.58;
+        const leaf = col.setHSL(0.24 + (h - 0.5) * 0.06, 0.45, 0.82 + h * 0.12).clone();
+        const span2 = P - 6 * Math.max(hx, hz);
+        for (let rr = 1.2; rr < span2 - 0.8; rr += 2.3) {
+          const seg = 3.9;
+          for (let t = 0.8; t < span2 - 0.8; t += seg) {
+            const t1 = Math.min(span2 - 0.8, t + seg);
+            const A = alongX ? [x0 + t, z0 + rr] : [x0 + rr, z0 + t], B2 = alongX ? [x0 + t1, z0 + rr] : [x0 + rr, z0 + t1];
+            const ya = gy(...A), yb = gy(...B2);
+            const ox = alongX ? 0 : 0.5, oz = alongX ? 0.5 : 0;
+            const u0 = t / 3.9, u1 = t1 / 3.9;
+            for (const sd of [-1, 1]) {
+              // a slanted face from the foot of the canopy out at the side, up to the ridge
+              const p = [A[0] + ox * sd * 0.8, ya + 0.1, A[1] + oz * sd * 0.8, B2[0] + ox * sd * 0.8, yb + 0.1, B2[1] + oz * sd * 0.8, B2[0], yb + 1.15, B2[1], A[0], ya + 1.15, A[1]];
+              rowP.push(...p.slice(0, 3), ...p.slice(3, 6), ...p.slice(6, 9), ...p.slice(0, 3), ...p.slice(6, 9), ...p.slice(9, 12));
+              rowU.push(u0, 0, u1, 0, u1, 1, u0, 0, u1, 1, u0, 1);
+              const n = [ox * sd * 0.8, 1, oz * sd * 0.8];
+              for (let v = 0; v < 6; v++) { rowN.push(...n); rowC.push(leaf.r, leaf.g, leaf.b); }
+            }
+          }
+        }
+        // a dry-stone restanque along the downhill edge of a steep parcel
+        if (slope > 0.1) {
+          const lowZ = ys[0] + ys[1] < ys[2] + ys[3];
+          const zz = lowZ ? z0 - 0.5 : z0 + P + 0.5;
+          for (let t = 0; t < P; t += 6) wallG.add(stone, span(new THREE.Vector3(x0 + t, gy(x0 + t, zz) + 0.9, zz), new THREE.Vector3(x0 + t + 6, gy(x0 + t + 6, zz) + 0.9, zz), 0.7, 1.6));
+        }
+        // a windbreak of cypresses along the north track of some parcels (the mistral comes from the north)
+        if (h > 0.9) for (let x = x0; x < x0 + P; x += 3.6) trees.push(tree(x, gy(x, z0 - 2), z0 - 2, 10 + rnd() * 5, 1.3, { slot: CYPRESS }));
+      }
+      const mk = (P2, C, extra, material) => {
+        if (!P2.length) return;
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(P2, 3));
+        geo.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+        for (const [k, v, n] of extra) geo.setAttribute(k, new THREE.Float32BufferAttribute(v, n));
+        if (!extra.some(([k]) => k === 'normal')) geo.computeVertexNormals();
+        const m = new THREE.Mesh(geo, material);
+        m.receiveShadow = true;
+        group.add(m);
+        return m;
+      };
+      mk(soilP, soilC, [], pbr('brown_mud_dry', { scale: 3, tint: 0xffffff, vertex: true, offset: -2 }));
+      const rows = mk(rowP, rowC, [['normal', rowN, 3], ['uv', rowU, 2]], vineMaterial());
+      if (rows) rows.castShadow = true;
+      wallG.build(group);
+      occ = (wx, wz) => {
+        w.set(wx, 0, wz).applyMatrix4(Li);
+        const i = Math.floor(w.x / CELL), j = Math.floor(w.z / CELL);
+        return parcels.has(`${i},${j}`);
+      };
+    },
+  };
+  return res;
+}
+
+export default { vineyard, vignoble, phare, cassisport, chateau };

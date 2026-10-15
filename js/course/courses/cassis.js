@@ -18,7 +18,9 @@ export default {
   // the Calanques to the west are white Urgonian limestone
   rockZones: [{ ll: [43.2005, 5.5600], r: 1700, color: 0xa65a3c }],
   far: [
-    // vineyards on open ground beside the holes (DEM metres)
+    // the appellation's vines over the plateau, parcel by parcel round each hole (map axes)
+    { type: 'vignoble', ll: [43.219, 5.540], maxD: Infinity },
+    // and three domaines with their bastides (DEM metres)
     { type: 'vineyard', dem: [330, -1120], maxD: Infinity, rot: 0.3 },
     { type: 'vineyard', dem: [-330, -300], maxD: Infinity, rot: -0.4 },
     { type: 'vineyard', dem: [230, 10], maxD: Infinity, rot: 0.9 },
