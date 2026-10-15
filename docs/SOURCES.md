@@ -3,7 +3,24 @@
 Everything Fairway ships that came from somewhere else, with its licence and
 the credit it needs. Keep this file current when adding data or assets.
 
-## Elevation (every real-terrain course)
+## Elevation: 1-metre LiDAR (Rolling Hills)
+
+Baked by `tools/fetch-lidar.py` from the **USGS 3D Elevation Program (3DEP)
+1-metre bare-earth DEM**, found through the TNM Access API
+(https://tnmaccess.nationalmap.gov/api/v1/products) and read as
+Cloud-Optimized GeoTIFFs from `prd-tnm.s3.amazonaws.com`. Public domain (U.S.
+Government work); credit given anyway: "Elevation: U.S. Geological Survey,
+3D Elevation Program".
+
+| Course | Files | Projects |
+|---|---|---|
+| Rolling Hills (Godfrey, IL) | `assets/courses/rollinghills/dem.*` (1 m over 1.8 km), `far.*` (32 m over 16 km) | Playing area: tile `x74y432` of **IL_10CountyNRCS_D23** (published April 2026). Surround: the same project, then IL_SouthCentral_2021_D21, IL_19County_D24, MO_WestCentral_2018_D19 and others, with Terrarium tiles only where no LiDAR covers. Each file's JSON lists the tiles used. |
+
+The script ignores any LiDAR sample more than 15 m from the coarse Terrarium
+surface. Tile `x74y431` of IL_10CountyNRCS_D23 has a strip that reads a
+constant 92.3 m along its north edge, on ground near 170 m.
+
+## Elevation: Terrarium tiles (the other real-terrain courses)
 
 Baked by `tools/fetch-dem.mjs` from the AWS Terrain Tiles (Terrarium format),
 the open elevation dataset built by Mapzen / Tilezen and hosted on the
@@ -34,13 +51,22 @@ Required credit:
   nine; Pebble Beach Golf Links' front nine, inside the OSM boundary of
   "Pebble Beach Golf Course"; the TPC Sawgrass Stadium Course back nine,
   inside "TPC Sawgrass", with the 17th's lake redrawn as one island pond;
-  imported with `tools/import-course.mjs` through the Overpass API), and
+  imported with `tools/import-course.mjs` through the Overpass API); all
+  18 holes of Rolling Hills Golf Course, Godfrey, with the real outlines of
+  its greens, fairways, bunkers and ponds (`--outlines`), and
   the positions of landmarks on the East St. Louis, Paris and Cassis courses
   (Eads Bridge, grain elevators, Gateway Arch, harbour and château).
 - **OpenGolfAPI** (https://opengolfapi.org, ODbL 1.0; course data
   © OpenStreetMap contributors): course search and the Liberty National, Pebble Beach and TPC Sawgrass
   Stadium scorecards (pars, yardages, stroke indexes). Credit: "© OpenStreetMap
   contributors (ODbL 1.0) via OpenGolfAPI".
+- **The Rolling Hills scorecard** (pars, handicaps and four tee sets): typed
+  in from the club's own card, https://www.rollinghillsgc.com/scorecard/
+  and the printed PDF
+  (https://www.rollinghillsgc.com/wp-content/uploads/sites/8763/2023/03/rhscorecard.pdf),
+  retrieved 14 October 2026, in `assets/courses/rollinghills/scorecard.json`.
+  OpenGolfAPI has no card for this course. These are facts from the card,
+  used to set par and yardage, with credit to the club.
 
 Data under the ODbL can be used and adapted, including commercially, as long
 as it is credited and any adapted *database* shared under the same licence.

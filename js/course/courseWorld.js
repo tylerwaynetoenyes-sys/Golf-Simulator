@@ -229,6 +229,15 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
 
     // ── water ──
     for (const p of T.ponds) {
+      if (p.poly) {
+        // the mapped outline, grown a few metres so the sheet runs under the banks
+        const k = (p.poly.R + 3) / p.poly.R;
+        const shape = new THREE.Shape(p.poly.pts.map(([x, z]) => new THREE.Vector2(p.x + (x - p.x) * k, -(p.z + (z - p.z) * k))));
+        const m = new THREE.Mesh(new THREE.ShapeGeometry(shape).rotateX(-Math.PI / 2), this._water({ y: p.level, tint: 0x1d3036 }));
+        m.position.y = p.level;
+        g.add(m);
+        continue;
+      }
       const m = new THREE.Mesh(new THREE.CircleGeometry(1, 64).rotateX(-Math.PI / 2), this._water({ y: p.level, tint: 0x1d3036 }));
       m.scale.set(p.rx * 1.02, 1, p.rz * 1.02);
       m.rotation.y = Math.atan2(p.dirx, p.dirz);
@@ -368,7 +377,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
     const ok = (x, z, clear) => {
       const pr = T.project(x, z);
       if (Math.abs(pr.d) < clear) return false;
-      if (Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 24) return false;
+      if (T.greenEdge(x, z) < 24) return false;
       if (Math.hypot(x, z) < 22) return false;
       if (inLandmark(x, z)) return false;
       if (T.seaLevel != null && T.meshHeight(x, z) < T.seaLevel + 1.2) return false; // not in the sea
@@ -497,7 +506,7 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
         if (inLandmark(x, z)) return true;
         const pr = T.project(x, z);
         if (Math.abs(pr.d) < cor + 30 && pr.s > -40 && pr.s < T.length + 50) return true;
-        if (Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 40 || Math.hypot(x, z) < 40) return true;
+        if (T.greenEdge(x, z) < 40 || Math.hypot(x, z) < 40) return true;
         return T.terrain(x, z).surface === 'water';
       };
       g.add(buildDecay(T, rand, (x, z) => T.meshHeight(x, z), clear));
@@ -704,7 +713,7 @@ diffuseColor.rgb *= 0.5 + 0.62 * mix(bd, bd2, 0.45);
         if (T.F) {
           // real-ground courses: the maintained rough gives way to the land
           // itself (an irregular edge, not a ruler line)
-          const gd = Math.hypot(x - T.green.x, z - T.green.z) - T.greenR;
+          const gd = T.greenEdge(x, z);
           const wob = 14 * Math.sin(x * 0.021 + z * 0.013) + 8 * Math.sin(z * 0.047 - x * 0.031);
           const w = THREE.MathUtils.smoothstep(Math.min(Math.abs(pr.d) - Math.max(T.fwHalf, 12), gd) + wob, 10, 46);
           if (w > 0) c.lerp(this._backColor(T, x, z, T.baseGround(x, z), 4, this._c3 || (this._c3 = new THREE.Color())), w);
@@ -724,7 +733,10 @@ diffuseColor.rgb *= 0.5 + 0.62 * mix(bd, bd2, 0.45);
    */
   _buildGreen(T, g, coarseH, groundMat) {
     const pin = T.pin;
-    const Rc = Math.hypot(pin.x - T.green.x, pin.z - T.green.z) + T.greenR + 7;
+    // reach every part of the green from the cup (mapped outlines can be long)
+    const Rc = (T.greenPoly
+      ? Math.max(...T.greenPoly.pts.map(([x, z]) => Math.hypot(x - pin.x, z - pin.z)))
+      : Math.hypot(pin.x - T.green.x, pin.z - T.green.z) + T.greenR) + 7;
     this._Rc = Rc;
     const Rp = Rc + 3;
     const radii = [];
@@ -1086,7 +1098,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       const d = (edge + 2 + Math.pow(rand(), 1.6) * 42) * (rand() < 0.5 ? -1 : 1);
       const x = pt.x + pt.rx * d, z = pt.z + pt.rz * d;
       if (T.terrain(x, z).surface !== 'rough') continue;
-      if (Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 3) continue;
+      if (T.greenEdge(x, z) < 3) continue;
       const deep = T.roughDepth(x, z) === 'deep';
       const h = (deep ? 0.22 : 0.12) + rand() * (deep ? 0.18 : 0.06);
       q.setFromAxisAngle(up, rand() * 6.28);
@@ -1151,7 +1163,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       const k = THREE.MathUtils.smoothstep(ad, corridor + 6, corridor + 60);
       const f = 0.55 + 0.45 * Math.sin(x * 0.05 + Math.sin(z * 0.04) * 2) * Math.cos(z * 0.06 - x * 0.02);
       if (rand() > k * f) continue;
-      if (Math.hypot(x - T.green.x, z - T.green.z) < T.greenR + 14 || Math.hypot(x, z) < 12) continue;
+      if (T.greenEdge(x, z) < 14 || Math.hypot(x, z) < 12) continue;
       if (T.seaLevel != null && T.meshHeight(x, z) < T.seaLevel + 1) continue;
       const sf = T.terrain(x, z).surface;
       if (sf !== 'rough' && sf !== 'oob') continue;

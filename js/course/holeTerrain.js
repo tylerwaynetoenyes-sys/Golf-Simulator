@@ -21,6 +21,80 @@ function vnoise(x, z) {
   return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
 }
 
+/**
+ * A real outline (green, bunker, pond, fairway) in hole-local metres, as
+ * mapped on OpenStreetMap. `q` mimics the ellipse test: 0 at the middle, 1 on
+ * the edge, growing outside, so outlines and ellipses share every consumer.
+ */
+export class Outline {
+  constructor(pts) {
+    this.pts = pts;
+    let a = 0, cx = 0, cz = 0;
+    let minx = Infinity, maxx = -Infinity, minz = Infinity, maxz = -Infinity;
+    for (let i = 0; i < pts.length; i++) {
+      const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % pts.length];
+      const c = x1 * z2 - x2 * z1;
+      a += c; cx += (x1 + x2) * c; cz += (z1 + z2) * c;
+      minx = Math.min(minx, x1); maxx = Math.max(maxx, x1); minz = Math.min(minz, z1); maxz = Math.max(maxz, z1);
+    }
+    this.area = Math.abs(a / 2);
+    this.x = cx / (3 * a); this.z = cz / (3 * a);
+    this.R = Math.max(1, Math.sqrt(this.area / Math.PI));
+    this.box = { minx, maxx, minz, maxz };
+  }
+
+  inside(x, z) {
+    const b = this.box;
+    if (x < b.minx || x > b.maxx || z < b.minz || z > b.maxz) return false;
+    let c = false;
+    const p = this.pts;
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      if ((p[i][1] > z) !== (p[j][1] > z) && x < ((p[j][0] - p[i][0]) * (z - p[i][1])) / (p[j][1] - p[i][1]) + p[i][0]) c = !c;
+    }
+    return c;
+  }
+
+  /** Signed distance to the edge (m): negative inside. */
+  sd(x, z) {
+    const b = this.box;
+    const out = Math.max(b.minx - x, x - b.maxx, b.minz - z, z - b.maxz);
+    if (out > 40) return out; // far away: a lower bound is enough
+    let d2 = Infinity;
+    const p = this.pts;
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const ax = p[j][0], az = p[j][1], ex = p[i][0] - ax, ez = p[i][1] - az;
+      const L = ex * ex + ez * ez || 1;
+      const u = Math.max(0, Math.min(1, ((x - ax) * ex + (z - az) * ez) / L));
+      d2 = Math.min(d2, (x - ax - ex * u) ** 2 + (z - az - ez * u) ** 2);
+    }
+    const d = Math.sqrt(d2);
+    return this.inside(x, z) ? -d : d;
+  }
+
+  /** Ellipse-like quadratic: 0 at the middle, 1 on the edge. */
+  q(x, z) {
+    const k = Math.max(0, 1 + this.sd(x, z) / this.R);
+    return k * k;
+  }
+
+  /** Deepest point inside nearest to (x, z) with at least `depth` metres of margin. */
+  settle(x, z, depth) {
+    if (this.sd(x, z) <= -depth) return { x, z };
+    let best = null, bd = Infinity, deep = null, dd = 0;
+    const b = this.box;
+    for (let gx = b.minx; gx <= b.maxx; gx += 0.5) {
+      for (let gz = b.minz; gz <= b.maxz; gz += 0.5) {
+        const s = -this.sd(gx, gz);
+        if (s > dd) { dd = s; deep = { x: gx, z: gz }; }
+        if (s < depth) continue;
+        const d = Math.hypot(gx - x, gz - z);
+        if (d < bd) { bd = d; best = { x: gx, z: gz }; }
+      }
+    }
+    return best || deep || { x, z };
+  }
+}
+
 export class HoleTerrain {
   constructor(hole) {
     this.hole = hole;
@@ -49,8 +123,21 @@ export class HoleTerrain {
     // real ground is graded through the playing corridor (embankments, ditches
     // and drains smoothed, nothing left below the water line), easing back to
     // the untouched land ~70 m out so the backdrop meets it exactly
-    if (this.F) this._buildGrade();
-    this.greenBase = this.elevAt(1) + (this.F ? 0.25 : 0.4);
+    // 1 m LiDAR (tools/fetch-lidar.py): the ground is already true to ~10 cm,
+    // so no corridor grading, no added lumps, and greens, bunkers and tees
+    // keep the surveyed shape
+    this.lidar = !!this.F?.d?.dem?.meta?.lidar;
+    if (this.F && !this.lidar) this._buildGrade();
+    this.greenBase = this.elevAt(1) + (this.lidar ? 0 : this.F ? 0.25 : 0.4);
+    // real outlines (OSM polygons, hole-local metres) where the course has them
+    this.greenPoly = hole.green.poly ? new Outline(hole.green.poly) : null;
+    this.fairwayPolys = (hole.fairways || []).map((p) => new Outline(p));
+    if (this.greenPoly) {
+      this.greenR = this.greenPoly.R;
+      // the green's centre: the end of the hole line if it sits well inside
+      const c = this.greenPoly.settle(this.green.x, this.green.z, Math.min(3, this.greenPoly.R * 0.4));
+      this.green = { x: c.x, z: c.z };
+    }
     // Green contours: two soft swells/swales per green (deterministic per hole)
     // on top of the overall tilt, flattened around the pin like a real hole
     // location. Peak slopes stay around 2–3%.
@@ -66,8 +153,9 @@ export class HoleTerrain {
       x: this.green.x + this.finalRight.x * hole.pin[0] - this.finalDir.x * hole.pin[1],
       z: this.green.z + this.finalRight.z * hole.pin[0] - this.finalDir.z * hole.pin[1],
     };
+    if (this.greenPoly) this.pin = this.greenPoly.settle(this.pin.x, this.pin.z, Math.min(3.5, this.greenPoly.R * 0.45));
     this.tee = { x: 0, z: 0 };
-    this.teeHeight = this.elevAt(0) + 0.3;
+    this.teeHeight = this.elevAt(0) + (this.lidar ? 0.05 : 0.3);
     this.oobLateral = Math.max(this.fwHalf, 14) + 78;
 
     // Hazards in world coordinates
@@ -75,13 +163,28 @@ export class HoleTerrain {
       const p = this.pointAt(t * this.length);
       return { x: p.x + p.rx * off, z: p.z + p.rz * off, dirx: p.dx, dirz: p.dz };
     };
-    this.bunkers = (hole.bunkers || []).map((b) => ({ ...place(b.t, b.off), rx: b.rx, rz: b.rz }));
+    const outline = (o) => {
+      const poly = new Outline(o.poly);
+      return { x: poly.x, z: poly.z, dirx: this.finalDir.x, dirz: this.finalDir.z, rx: poly.R, rz: poly.R, poly };
+    };
+    this.bunkers = (hole.bunkers || []).map((b) => (b.poly ? outline(b) : { ...place(b.t, b.off), rx: b.rx, rz: b.rz }));
     // shaping: mounds (+) and hollows (−) as soft Gaussian landforms
     this.mounds = (hole.mounds || []).map((m) => ({ ...place(m.t, m.off), r: m.r, h: m.h }));
     this.ponds = [];
     this.creeks = [];
     for (const w of hole.water || []) {
-      if (w.creek != null) {
+      if (w.poly) {
+        // a mapped pond: on LiDAR the water surface is the (hydro-flattened)
+        // ground inside it; sit the water just under that
+        const o = outline(w);
+        const hs = [];
+        const bb = o.poly.box;
+        const st = Math.max(1, Math.sqrt(o.poly.area) / 12);
+        for (let x = bb.minx; x <= bb.maxx; x += st) for (let z = bb.minz; z <= bb.maxz; z += st) if (o.poly.inside(x, z)) hs.push(this.F ? this.F.height(x, z) : 0);
+        hs.sort((a, b) => a - b);
+        const level = (hs.length ? hs[Math.floor(hs.length / 2)] : 0) + (w.level ?? -0.15);
+        this.ponds.push({ ...o, level, off: w.level ?? -0.15, island: !!w.island, mapped: true });
+      } else if (w.creek != null) {
         this.creeks.push({ s: w.creek * this.length, half: w.width / 2, level: this.elevAt(w.creek) - 1.2 });
       } else {
         const p = place(w.t, w.off);
@@ -91,6 +194,7 @@ export class HoleTerrain {
     // shaped ground (side slopes, mounds) can dip below a pond's nominal
     // level: sit the water a little under the lowest point of its banks
     for (const p of this.ponds) {
+      if (p.mapped) continue;
       let lo = Infinity;
       for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
         const ex = Math.cos(a) * p.rx * 1.05, ez = Math.sin(a) * p.rz * 1.05;
@@ -162,6 +266,7 @@ export class HoleTerrain {
   }
 
   _ellipse(o, x, z) {
+    if (o.poly) return o.poly.q(x, z);
     const dx = x - o.x, dz = z - o.z;
     const along = dx * o.dirx + dz * o.dirz;
     const across = dx * -o.dirz + dz * o.dirx;
@@ -239,8 +344,10 @@ export class HoleTerrain {
       // the real ground, plus a little mown-in roll on the corridor and
       // natural lumps in the rough (the DEM is ~8 m resolution)
       h = this._grade ? this._graded(x, z) : this.F.height(x, z);
-      h += (vnoise(x * 0.03, z * 0.03) - 0.5) * 0.9 * smooth(corridor - 4, corridor + 20, ad);
-      h += (vnoise(x * 0.09, z * 0.09) - 0.5) * 0.3;
+      if (!this.lidar) {
+        h += (vnoise(x * 0.03, z * 0.03) - 0.5) * 0.9 * smooth(corridor - 4, corridor + 20, ad);
+        h += (vnoise(x * 0.09, z * 0.09) - 0.5) * 0.3;
+      }
     } else {
       h = this.elevAt(Math.min(1, Math.max(0, t)));
       // mounding and tree-line rise outside the corridor
@@ -268,7 +375,7 @@ export class HoleTerrain {
     // green: tilted plane, blended into surroundings
     const gdx = x - this.green.x, gdz = z - this.green.z;
     const gd = Math.hypot(gdx, gdz);
-    const gw = smooth(this.greenR + 9, this.greenR, gd);
+    const gw = this.lidar ? 0 : smooth(this.greenR + 9, this.greenR, gd);
     if (gw > 0) {
       let gh = this.greenBase + this.slope[0] * gdx + this.slope[1] * gdz;
       if (this.contours && gd < this.greenR + 9) {
@@ -288,7 +395,8 @@ export class HoleTerrain {
     // bunkers: shallow bowls with a lip
     // (greenside bunkers never deform the putting surface itself)
     const keepGreen = smooth(this.greenR + 0.2, this.greenR + 2.2, gd);
-    for (const b of this.bunkers) {
+    // (LiDAR already holds the real bunker floors and faces)
+    if (!this.lidar) for (const b of this.bunkers) {
       const q = this._ellipse(b, x, z);
       if (q < 1.6) h += (-0.75 * smooth(1.15, 0, q) + 0.25 * smooth(1.6, 1.05, q) * smooth(0.9, 1.05, q)) * keepGreen;
     }
@@ -305,6 +413,12 @@ export class HoleTerrain {
       if (u < c.half + 6) return { level: c.level, q: u / c.half, bank: c.half };
     }
     for (const p of this.ponds) {
+      if (p.mapped) {
+        // a mapped outline: banks in real metres from its edge, never on a green
+        const sd = p.poly.sd(x, z);
+        if (sd < 3 && !(sd > 0 && this.greenEdge(x, z) < 1)) return { level: p.level, q: sd < 0 ? 0.5 : 1.2, sd };
+        continue;
+      }
       const q = this._ellipse(p, x, z);
       if (q < 1.5) {
         if (p.island && Math.hypot(x - this.green.x, z - this.green.z) < this.greenR + 4) continue;
@@ -319,7 +433,11 @@ export class HoleTerrain {
     const pr = this.project(x, z);
     let h = this._land(x, z, pr);
     const w = this._water(x, z, pr);
-    if (w && !w.sea) {
+    if (w && w.sd != null) {
+      // mapped pond: the bed falls away from the edge to 1.4 m under the water
+      const bowl = w.level - 1.4 * smooth(0, -6, w.sd);
+      h = h + (Math.min(h, bowl) - h) * smooth(3, 0, w.sd);
+    } else if (w && !w.sea) {
       const bowl = w.level - 1.4 * smooth(1.05, 0.4, w.q);
       const bank = smooth(1.45, 0.95, w.q);
       h = h + (Math.min(h, bowl) - h) * bank;
@@ -335,18 +453,30 @@ export class HoleTerrain {
     const pr = this.project(x, z);
     const w = this._water(x, z, pr);
     const land = this._land(x, z, pr);
-    if (w && w.q < 1) return { height: w.level, surface: "water" };
+    if (w && (w.sd != null ? w.sd < 0 : w.q < 1)) return { height: w.level, surface: "water" };
     let surface;
     const ad = Math.abs(pr.d);
     if (ad > this.oobLateral || pr.s < -25 || pr.s > this.length + 75) surface = 'oob';
-    else if (Math.hypot(x - this.green.x, z - this.green.z) < this.greenR) surface = 'green';
-    else if (Math.hypot(x - this.green.x, z - this.green.z) < this.greenR + 1.8) surface = 'fringe';
+    else if (this.greenPoly ? this._onGreen(x, z) < 0 : Math.hypot(x - this.green.x, z - this.green.z) < this.greenR) surface = 'green';
+    else if (this.greenPoly ? this._onGreen(x, z) < 1.8 : Math.hypot(x - this.green.x, z - this.green.z) < this.greenR + 1.8) surface = 'fringe';
     else if (Math.hypot(x - this.tee.x, z - this.tee.z) < 4.5) surface = 'tee';
     else if (this.bunkers.some((b) => this._ellipse(b, x, z) < 1)) surface = 'sand';
-    else if (this.fwHalf > 0 && pr.s > this.fwStart && pr.s < this.length && ad < this.fairwayHalf(pr.s)) surface = 'fairway';
+    else if (this.fairwayPolys.length ? this.fairwayPolys.some((f) => f.inside(x, z)) : this.fwHalf > 0 && pr.s > this.fwStart && pr.s < this.length && ad < this.fairwayHalf(pr.s)) surface = 'fairway';
     else surface = 'rough';
+    // (mapped ponds: the bank exactly as drawn, down to the water's edge)
+    if (w && w.sd != null) return { height: land + (Math.min(land, w.level) - land) * smooth(3, 0, w.sd), surface };
     return { height: w && w.q < 1.3 ? Math.max(land, w.level) : land, surface };
   };
+
+  /** Signed distance to the green's mapped edge (negative on the green). */
+  _onGreen(x, z) {
+    return this.greenPoly.sd(x, z);
+  }
+
+  /** Distance off the green's edge (m; negative on it), for outlines and circles alike. */
+  greenEdge(x, z) {
+    return this.greenPoly ? this.greenPoly.sd(x, z) : Math.hypot(x - this.green.x, z - this.green.z) - this.greenR;
+  }
 
   /**
    * Rough depth at (x, z): 'first' (the first cut, a few metres off the
@@ -355,6 +485,10 @@ export class HoleTerrain {
   roughDepth(x, z) {
     const pr = this.project(x, z);
     const ad = Math.abs(pr.d);
+    if (this.fairwayPolys.length) {
+      const near = this.fairwayPolys.some((f) => f.sd(x, z) < 4.5);
+      return near || this.greenEdge(x, z) < 5 ? 'first' : 'deep';
+    }
     const edge = this.fwHalf > 0 && pr.s > this.fwStart && pr.s < this.length ? this.fairwayHalf(pr.s) : 0;
     const gd = Math.hypot(x - this.green.x, z - this.green.z) - this.greenR;
     return (edge > 0 && ad - edge < 4.5) || gd < 5 ? 'first' : 'deep';

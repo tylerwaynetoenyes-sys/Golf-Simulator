@@ -37,7 +37,7 @@ fronts and swales on a green.
 
 | Course | Where | Hole lines | Greens | Bunkers | Ready? |
 |---|---|---|---|---|---|
-| Rolling Hills Golf Course | Godfrey | 18 | 18 | 33 | **Yes**: best-mapped Alton course |
+| Rolling Hills Golf Course | Godfrey | 18 | 18 | 2* | **Yes**: best-mapped Alton course; **built** (see below) |
 | Rock Spring Golf Course | Alton | 27* | 28 | 58 | Yes, check (*boundary overlap suspected) |
 | Belk Park Golf Course | Wood River | 9 | 9 | 5 | Half mapped (9 of 18) |
 | Cloverleaf Golf Course | Alton | 9 | 9 | 0 | Partial |
@@ -46,7 +46,10 @@ fronts and swales on a green.
 | Spencer T. Olin Community Golf Course | Alton | 3 | 4 | 2 | Needs mapping |
 | Florissant Golf Club / Eagle Springs | Missouri side | 18 | 19 | 23 / 16 | Yes |
 
-(Counts are OSM features inside each course boundary.)
+(Counts are OSM features inside each course boundary. *Rolling Hills: an
+earlier count of 33 bunkers was wrong; OSM has 2 inside the boundary, plus
+29 greens (practice greens included), 60 tees, 20 fairways and 4 water
+hazards.)
 
 ### Scorecards: OpenGolfAPI (ODbL)
 
@@ -95,3 +98,31 @@ uses OSM.
 Sources: USGS TNM Access API (`tnmaccess.nationalmap.gov`), Overpass API
 (OpenStreetMap), OpenGolfAPI course search and hole endpoints, Home Tee Hero
 App Store listing.
+
+## Pilot built: Rolling Hills (October 2026)
+
+`?play=rollinghills`. Steps 1–3 and 5 above are done for this course:
+
+- **Terrain**: `tools/fetch-lidar.py` (rasterio) asks TNM Access for the 1 m
+  tiles, ranks them (IL_10CountyNRCS_D23, then IL_SouthCentral_2021_D21, then
+  newest), reads only the needed window of each COG over HTTP, and warps it
+  straight into the game's frame. The playing area is 1 m over 1.8 km (all of
+  it from tile x74y432 of the 2023 flight); the 16 km surround is 32 m from
+  the tiles' overviews, with Terrarium only where no LiDAR covers. Samples
+  more than 15 m from Terrarium are rejected (one 2023 tile has a corrupt
+  edge strip).
+- **No smoothing**: on LiDAR ground `HoleTerrain` skips the corridor grade,
+  the added lumps, the analytic green plane and contours and the bunker
+  bowls. Rendered green heights sit within 1.3 cm of the raw grid; in the
+  browser the fall line matches the LiDAR to 1.5° on average (hole 7).
+  Interior green slopes: median 1.2–4.6%.
+- **Real outlines**: `--outlines` keeps the OSM polygons of greens,
+  fairways, bunkers and ponds (`Outline` in `holeTerrain.js`), with ponds at
+  their hydro-flattened LiDAR level and every bunker or pond near a hole
+  included, whichever hole it was mapped nearest.
+- **Scorecard** from the club's own card (`assets/courses/rollinghills/scorecard.json`, `--card`).
+  The OSM hole lines measure within 1–15 yards of the blue tees on most
+  holes; 17 (156 vs 173) and 18 (272 vs 301) start from forward tees.
+
+Still to do: trees from the point cloud (step 4), more bunkers in OSM, and
+the same import for Spencer T. Olin and The Woodlands.

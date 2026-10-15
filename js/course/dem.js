@@ -135,10 +135,16 @@ export function prepareDemHoles(course, d) {
   return course.holes.map((h) => {
     const f = demFrame(d, h.pts[0], h.pts[1]);
     const line = h.pts.map(([X, Z]) => { const [x, z] = f.toLocal(X, Z); return [x / YD, z / YD]; });
+    // mapped outlines (greens, bunkers, ponds, fairways) come in DEM metres too
+    const loc = (p) => p.map(([X, Z]) => f.toLocal(X, Z));
+    const withPoly = (o) => (o.poly ? { ...o, poly: loc(o.poly) } : o);
     return {
       ...h, line, demFrame: f, course: course.id, theme: course.theme, far,
+      green: withPoly(h.green),
+      bunkers: (h.bunkers || []).map(withPoly),
+      ...(h.fairways ? { fairways: h.fairways.map(loc) } : {}),
       // sea or river surface (m above sea level): water wherever the ground is below it
-      water: h.water || [], waterLevel: course.waterLevel ?? null, waterTint: course.waterTint ?? null,
+      water: (h.water || []).map(withPoly), waterLevel: course.waterLevel ?? null, waterTint: course.waterTint ?? null,
       // regions where the rock is a different colour (DEM metres, radius, hex)
       rockZones: (course.rockZones || []).map((z) => (z.ll ? { ...z, dem: [(z.ll[1] - lon) * mLon, -(z.ll[0] - lat) * mLat] } : z)),
       elev: [[0, 0], [1, 0]],

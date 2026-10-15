@@ -1,0 +1,19 @@
+{
+  "course": "Rolling Hills Golf Club, 5801 Pierce Lane, Godfrey, Illinois 62035",
+  "source": "The club's own scorecard: https://www.rollinghillsgc.com/scorecard/ and the printed card https://www.rollinghillsgc.com/wp-content/uploads/sites/8763/2023/03/rhscorecard.pdf",
+  "retrieved": "2026-10-14",
+  "notes": "Typed in from the printed card. The card's printed totals (Blue 3087 out, 5765 gross; White 2554 in, 5473 gross) differ from the sum of its hole yardages (Blue 3097 / 5775, White 2534 / 5453); the hole figures are used. Men's handicap 7 is printed on both holes 6 and 8.",
+  "back": "blue",
+  "par": [5, 3, 4, 4, 5, 3, 4, 4, 4, 4, 5, 4, 4, 4, 3, 4, 3, 4],
+  "handicap": [3, 15, 11, 13, 5, 7, 9, 7, 1, 4, 6, 2, 8, 10, 18, 12, 16, 14],
+  "tees": {
+    "blue": [534, 140, 351, 360, 484, 131, 364, 345, 388, 350, 440, 302, 343, 332, 117, 320, 173, 301],
+    "white": [509, 133, 340, 340, 450, 123, 318, 330, 376, 313, 437, 286, 330, 321, 111, 306, 149, 281],
+    "gold": [498, 133, 335, 293, 421, 123, 310, 302, 358, 301, 419, 286, 330, 303, 111, 292, 138, 270],
+    "red": [477, 97, 320, 278, 388, 110, 282, 280, 329, 288, 367, 256, 318, 290, 104, 279, 130, 260]
+  },
+  "ratings": {
+    "men": { "blue": "67.9/110", "white": "66.2/105", "gold": "65.2/104", "red": "63.5/101" },
+    "women": { "gold": "69.6/111", "red": "67.6/108" }
+  }
+}

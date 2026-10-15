@@ -152,7 +152,7 @@ if __name__ == '__main__':
         i = argv.index('--source')
         source = argv[i + 1]
         del argv[i:i + 2]
-    ids = argv or ['oregon', 'eaststl', 'paris', 'cassis', 'liberty', 'pebble', 'sawgrass']
+    ids = argv or ['oregon', 'eaststl', 'paris', 'cassis', 'liberty', 'pebble', 'sawgrass', 'rollinghills']
     for cid in ids:
         cov = build_eox(cid) if source == 'eox' else build(cid)
         print(cid, f'{cov * 100:.1f}% covered')

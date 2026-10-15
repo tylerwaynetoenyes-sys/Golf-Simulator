@@ -523,10 +523,13 @@ export class HUD {
     c.lineWidth = 1;
     // ponds, bunkers (drawn as circles of their mean radius: the map is small)
     const blob = (o, r, style) => { const [x, y] = toMap(o.x, o.z); c.fillStyle = style; c.beginPath(); c.arc(x, y, Math.max(2, r * scale), 0, Math.PI * 2); c.fill(); };
-    for (const w of T.ponds) blob(w, (w.rx + w.rz) / 2, 'rgba(90,150,230,0.55)');
-    for (const b of T.bunkers) blob(b, (b.rx + b.rz) / 2, 'rgba(240,226,190,0.6)');
+    // mapped outlines (real-course imports) are drawn as their true shapes
+    const shape = (pts, style) => { c.fillStyle = style; c.beginPath(); pts.forEach(([x, z], i) => { const [mx, my] = toMap(x, z); i ? c.lineTo(mx, my) : c.moveTo(mx, my); }); c.closePath(); c.fill(); };
+    for (const w of T.ponds) w.poly ? shape(w.poly.pts, 'rgba(90,150,230,0.55)') : blob(w, (w.rx + w.rz) / 2, 'rgba(90,150,230,0.55)');
+    for (const b of T.bunkers) b.poly ? shape(b.poly.pts, 'rgba(240,226,190,0.6)') : blob(b, (b.rx + b.rz) / 2, 'rgba(240,226,190,0.6)');
     // green
-    blob(T.green, T.greenR, 'rgba(140,210,110,0.55)');
+    if (T.greenPoly) shape(T.greenPoly.pts, 'rgba(140,210,110,0.55)');
+    else blob(T.green, T.greenR, 'rgba(140,210,110,0.55)');
     // tee
     const [tx, ty] = toMap(T.tee.x, T.tee.z);
     c.fillStyle = 'rgba(255,255,255,0.35)';

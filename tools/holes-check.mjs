@@ -20,11 +20,20 @@ for (const h of HOLES) {
     green: T.terrain(T.green.x, T.green.z).surface,
     pin: T.terrain(T.pin.x, T.pin.z).surface,
   };
-  // sample a ring just inside the green edge
+  // sample just inside the green edge: a ring for round greens; for mapped
+  // outlines, every point of a 1 m grid at least 0.5 m inside the edge
   let wetGreen = 0;
-  for (let a = 0; a < Math.PI * 2; a += 0.2) {
-    const s = T.terrain(T.green.x + Math.cos(a) * (T.greenR - 0.5), T.green.z + Math.sin(a) * (T.greenR - 0.5)).surface;
-    if (s !== 'green') wetGreen++;
+  if (T.greenPoly) {
+    const b = T.greenPoly.box;
+    for (let x = b.minx; x <= b.maxx; x += 1) for (let z = b.minz; z <= b.maxz; z += 1) {
+      if (T.greenPoly.sd(x, z) < -0.5 && T.terrain(x, z).surface !== 'green') wetGreen++;
+    }
+    if (T.greenPoly.sd(T.pin.x, T.pin.z) > -2) wetGreen++; // the cup needs room around it
+  } else {
+    for (let a = 0; a < Math.PI * 2; a += 0.2) {
+      const s = T.terrain(T.green.x + Math.cos(a) * (T.greenR - 0.5), T.green.z + Math.sin(a) * (T.greenR - 0.5)).surface;
+      if (s !== 'green') wetGreen++;
+    }
   }
   const ok = checks.tee === 'tee' && checks.green === 'green' && checks.pin === 'green' && wetGreen === 0;
   if (!ok) bad++;

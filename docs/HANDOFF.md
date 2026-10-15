@@ -130,6 +130,16 @@ add `&manual` to drive frames with `window.__advance(seconds)`.
 - Multiplayer checked in the browser: 4 players, two teams, honour then
   farthest-away order, best-ball team scores, tie verdicts fixed.
 
+## LiDAR pilot: Rolling Hills, Godfrey (October 15)
+
+- `tools/fetch-lidar.py`: 1 m USGS 3DEP bare earth into the course DEM
+  format (Python with rasterio; the eo-mcp sandbox Python has it).
+- `tools/import-course.mjs --lidar --outlines --card <json>`: LiDAR terrain,
+  real OSM outlines, hand-entered scorecard. The `--course` filter now also
+  keeps to the search box (a Wyoming "Rolling Hills Golf Course" leaked in).
+- Rolling Hills (`?play=rollinghills`): 18 holes, par 71, greens straight
+  from the LiDAR. Details and checks in `docs/alton-courses.md`.
+
 ## Next steps
 
 - Long and middle irons land 2–4° flatter than Trackman; closing that needs

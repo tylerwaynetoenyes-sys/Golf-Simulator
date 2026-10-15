@@ -16,6 +16,13 @@
 //   --name, --place      display name and place (default from OpenGolfAPI / OSM)
 //   --theme <t>          parkland | western | coastal | urban (default parkland)
 //   --no-dem             skip the elevation bake (tools/fetch-dem.mjs)
+//   --lidar              bake 1 m USGS 3DEP LiDAR instead (tools/fetch-lidar.py;
+//                        US only; python with rasterio, or set LIDAR_PY)
+//   --outlines           keep the real OSM outlines of greens, fairways,
+//                        bunkers and ponds instead of reducing them to ellipses
+//   --card <file.json>   scorecard typed in from the course's own card, for
+//                        courses OpenGolfAPI lacks (par, handicap, tees; see
+//                        assets/courses/rollinghills/scorecard.json)
 //   --dry                print what would be written
 //
 // Data: © OpenStreetMap contributors (ODbL 1.0); scorecards via OpenGolfAPI
@@ -50,7 +57,14 @@ async function getJSON(url, opts = {}) {
 }
 
 // ── 1. where, and the scorecard ──
-let lat = Number(args.lat), lon = Number(args.lon), card = null, ogName = null, ogCity = null;
+let lat = Number(args.lat), lon = Number(args.lon), card = null, ogName = null, ogCity = null, cardFile = null;
+if (args.card) {
+  cardFile = JSON.parse(await readFile(args.card, 'utf8'));
+  const back = cardFile.back || Object.keys(cardFile.tees)[0];
+  card = new Map(cardFile.par.map((par, i) => [i + 1, {
+    par, handicap_index: cardFile.handicap?.[i], back, yardages: Object.fromEntries(Object.entries(cardFile.tees).map(([t, y]) => [t, y[i]])),
+  }]));
+}
 if (args.q) {
   const q = new URLSearchParams({ q: args.q, ...(args.state ? { state: args.state } : {}) });
   const s = await getJSON(`https://api.opengolfapi.org/v1/courses/search?${q}`);
@@ -63,7 +77,7 @@ if (args.q) {
   console.log(`OpenGolfAPI: ${c.name}, ${c.city} ${c.state} (par ${c.par})`);
   if (!args.lat) { lat = c.latitude; lon = c.longitude; }
   ogName = c.course_name || c.name; ogCity = `${c.city}, ${c.state}`;
-  try {
+  if (!card) try {
     const h = await getJSON(`https://api.opengolfapi.org/v1/courses/${c.id}/holes`);
     card = new Map((h?.holes || []).map((x) => [x.number, x]));
   } catch { /* scorecard is optional */ }
@@ -76,9 +90,10 @@ const bbox = `${lat - dLat},${lon - dLon},${lat + dLat},${lon + dLon}`;
 const query = `[out:json][timeout:90];
 (
   ${args.course ? `area["leisure"="golf_course"]["name"="${String(args.course).replace(/"/g, '')}"]->.c;
-  way["golf"="hole"](area.c);` : `way["golf"="hole"](${bbox});`}
+  way["golf"="hole"](area.c)(${bbox});` : `way["golf"="hole"](${bbox});`}
   way["golf"~"^(green|fairway|bunker|tee|water_hazard|lateral_water_hazard)$"](${bbox});
   way["natural"="water"](${bbox});
+  ${args.outlines ? `relation["golf"="fairway"](${bbox});` : ''}
   way["leisure"="golf_course"](${bbox});
   relation["leisure"="golf_course"](${bbox});
 );
@@ -102,7 +117,41 @@ for (const h of holesOsm) for (const g of h.geometry) { minLa = Math.min(minLa, 
 const LAT0 = +((minLa + maxLa) / 2).toFixed(5), LON0 = +((minLo + maxLo) / 2).toFixed(5);
 const mLat = (Math.PI / 180) * 6378137, mLon = mLat * Math.cos((LAT0 * Math.PI) / 180);
 const xy = (g) => [(g.lon - LON0) * mLon, -(g.lat - LAT0) * mLat];
-const poly = (e) => (e.geometry || []).map(xy);
+const ring = (g) => { const p = g.map(xy); if (p.length > 2 && Math.hypot(p[0][0] - p.at(-1)[0], p[0][1] - p.at(-1)[1]) < 0.01) p.pop(); return p; };
+/** A way's ring, or a multipolygon's outer ring (its outer members joined end to end). */
+function poly(e) {
+  if (e.type !== 'relation') return ring(e.geometry || []);
+  const segs = (e.members || []).filter((m) => m.role === 'outer' && m.geometry?.length).map((m) => m.geometry.map((g) => [g.lat, g.lon]));
+  if (!segs.length) return [];
+  const out = segs.shift();
+  const same = (a, b) => a[0] === b[0] && a[1] === b[1];
+  while (segs.length) {
+    const end = out.at(-1);
+    const i = segs.findIndex((sg) => same(sg[0], end) || same(sg.at(-1), end));
+    if (i < 0) break;
+    const sg = segs.splice(i, 1)[0];
+    out.push(...(same(sg[0], end) ? sg : sg.reverse()).slice(1));
+  }
+  return ring(out.map(([la, lo]) => ({ lat: la, lon: lo })));
+}
+/** Douglas–Peucker on a closed outline, to `tol` metres, coordinates to 0.1 m. */
+function simplifyRing(p, tol = 0.35) {
+  if (p.length < 5) return p.map(([x, z]) => [+x.toFixed(1), +z.toFixed(1)]);
+  let far = 0, fd = 0;
+  for (let i = 1; i < p.length; i++) { const d = Math.hypot(p[i][0] - p[0][0], p[i][1] - p[0][1]); if (d > fd) { fd = d; far = i; } }
+  const dp = (pts) => {
+    const [ax, az] = pts[0], [bx, bz] = pts.at(-1);
+    const L = Math.hypot(bx - ax, bz - az) || 1;
+    let best = -1, bd = 0;
+    for (let i = 1; i < pts.length - 1; i++) {
+      const d = Math.abs((bx - ax) * (az - pts[i][1]) - (ax - pts[i][0]) * (bz - az)) / L;
+      if (d > bd) { bd = d; best = i; }
+    }
+    return bd > tol ? [...dp(pts.slice(0, best + 1)), ...dp(pts.slice(best)).slice(1)] : [pts[0], pts.at(-1)];
+  };
+  const a = dp(p.slice(0, far + 1)), b = dp([...p.slice(far), p[0]]);
+  return [...a, ...b.slice(1, -1)].map(([x, z]) => [+x.toFixed(1), +z.toFixed(1)]);
+}
 const area = (p) => { let a = 0; for (let i = 0; i < p.length; i++) { const [x1, z1] = p[i], [x2, z2] = p[(i + 1) % p.length]; a += x1 * z2 - x2 * z1; } return Math.abs(a) / 2; };
 const centroid = (p) => p.reduce((a, [x, z]) => [a[0] + x / p.length, a[1] + z / p.length], [0, 0]);
 
@@ -150,7 +199,7 @@ function project(line, [x, z]) {
 }
 
 const greens = els.filter((e) => e.tags?.golf === 'green').map(poly);
-const fairways = els.filter((e) => e.tags?.golf === 'fairway').map(poly);
+const fairways = els.filter((e) => e.tags?.golf === 'fairway').map(poly).filter((p) => p.length > 2);
 const bunkers = els.filter((e) => e.tags?.golf === 'bunker').map(poly);
 const waters = els.filter((e) => /water_hazard/.test(e.tags?.golf || '') || e.tags?.natural === 'water').map(poly);
 
@@ -181,12 +230,14 @@ const holes = holesOsm
     let g = null, gd = Infinity;
     for (const p of greens) { const c = centroid(p); const d = Math.hypot(c[0] - end[0], c[1] - end[1]); if (d < gd) { gd = d; g = p; } }
     const greenR = g && gd < 45 ? Math.max(11, Math.min(19, Math.sqrt(area(g) / Math.PI))) : 14;
+    const fwPolys = [];
     const pr = project(pts, end);
     // fairway width from the fairway polygons along this hole (area / length)
     let fwA = 0, fwL = 0, fwS = Infinity;
     for (const p of fairways) {
       const c = centroid(p); const q = project(pts, c);
       if (q.dist > 45 || q.s < 0 || q.s > q.len) continue;
+      fwPolys.push(p);
       fwA += area(p);
       let lo = Infinity, hi = -Infinity;
       for (const v of p) { const pv = project(pts, v); lo = Math.min(lo, pv.s); hi = Math.max(hi, pv.s); }
@@ -203,13 +254,23 @@ const holes = holesOsm
     };
     const bk = near(bunkers, bunkerOwner).slice(0, 6).map((o) => ({ t: +(o.q.s / o.q.len).toFixed(2), off: Math.round(o.q.off), ...ext(o.p, o.q) }));
     const wt = near(waters, waterOwner).filter((o) => area(o.p) > 150).slice(0, 2).map((o) => ({ t: +(o.q.s / o.q.len).toFixed(2), off: Math.round(o.q.off), ...ext(o.p, o.q), level: -0.8 }));
-    const yards = sc?.yardages ? Math.max(...Object.values(sc.yardages).filter(Number.isFinite)) : Math.round(pr.len / YD);
+    const yards = sc?.yardages ? (sc.back ? sc.yardages[sc.back] : Math.max(...Object.values(sc.yardages).filter(Number.isFinite))) : Math.round(pr.len / YD);
+    const from = sc?.back ? `the ${sc.back} tees` : 'the back tees';
+    // real outlines: every bunker and pond along the hole, whichever hole it was mapped nearest
+    const along = (list) => list.map((p) => ({ p, q: project(pts, centroid(p)) }))
+      .filter((o) => o.q.dist < 90 && o.q.s > -30 && o.q.s < o.q.len + 60);
+    const outlines = args.outlines ? {
+      bunkers: along(bunkers).map((o) => ({ poly: simplifyRing(o.p) })),
+      water: along(waters).filter((o) => area(o.p) > 150).map((o) => ({ poly: simplifyRing(o.p, 0.6) })),
+      ...(fwPolys.length ? { fairways: fwPolys.map((p) => simplifyRing(p, 0.6)) } : {}),
+    } : null;
     return {
       n: ref, name: e.tags.name || `Hole ${ref}`, par,
-      note: `${par === 3 ? 'Par 3' : `Par ${par}`}, ${yards} yards from the back tees.${sc?.handicap_index ? ` Stroke index ${sc.handicap_index}.` : ''}`,
+      note: `${par === 3 ? 'Par 3' : `Par ${par}`}, ${yards} yards from ${from}.${sc?.handicap_index ? ` ${cardFile ? 'Handicap' : 'Stroke index'} ${sc.handicap_index}.` : ''}`,
       pts, fw, ...(fw && Number.isFinite(fwS) ? { fwStart: Math.round(Math.max(60, fwS) / YD) } : {}),
-      green: { r: Math.round(greenR), slope: [0.006, -0.008] }, pin: [0, -2],
-      bunkers: bk, water: wt,
+      green: { r: Math.round(greenR), slope: [0.006, -0.008], ...(outlines && g && gd < 45 ? { poly: simplifyRing(g, 0.25) } : {}) }, pin: [0, -2],
+      bunkers: outlines ? outlines.bunkers : bk, water: outlines ? outlines.water : wt,
+      ...(outlines?.fairways ? { fairways: outlines.fairways } : {}),
       lm: { type: 'none', at: [0, 0] },
     };
   });
@@ -230,9 +291,12 @@ const holeSrc = (h) => {
 
 const name = args.name || courseTag?.tags?.name || ogName || args.id;
 const place = args.place || ogCity || '';
+const cardSrc = cardFile ? `the club's own card (${cardFile.source.replace(/^.*?(https?:\/\/\S+).*$/, '$1')})` : 'OpenGolfAPI';
+const elevSrc = args.lidar ? 'USGS 3DEP 1 m LiDAR (public domain)' : 'AWS Terrain Tiles';
 const src = `// ${name}${place ? ` · ${place}` : ''}. Imported by tools/import-course.mjs on
 // ${new Date().toISOString().slice(0, 10)}: hole lines, greens, fairways, bunkers and water from
-// OpenStreetMap; scorecard from OpenGolfAPI. Points are DEM-frame metres
+// OpenStreetMap${args.outlines ? ' (real outlines)' : ''}; scorecard from ${cardSrc};
+// elevation from ${elevSrc}. Points are DEM-frame metres
 // (+x east, +z south, origin ${LAT0}°, ${LON0}°).
 // Data © OpenStreetMap contributors (ODbL 1.0), https://www.openstreetmap.org/copyright
 export default {
@@ -243,7 +307,7 @@ export default {
   dem: true,
   origin: [${LAT0}, ${LON0}],
   blurb: ${JSON.stringify(`${holes.length} holes routed exactly as mapped on OpenStreetMap, on real elevation.`)},
-  credit: 'Holes © OpenStreetMap contributors (ODbL); scorecard via OpenGolfAPI (ODbL); elevation: AWS Terrain Tiles',
+  credit: ${JSON.stringify(`Holes © OpenStreetMap contributors (ODbL); scorecard ${cardFile ? 'from the club\'s own card' : 'via OpenGolfAPI (ODbL)'}; elevation: ${args.lidar ? 'USGS 3DEP 1 m LiDAR (public domain)' : 'AWS Terrain Tiles'}`)},
   holes: [
 ${holes.map(holeSrc).join(',\n')},
   ],
@@ -264,7 +328,16 @@ if (!reg.includes(`./courses/${args.id}.js`)) {
 }
 
 // ── 5. elevation ──
-if (!args['no-dem']) {
+if (!args['no-dem'] && args.lidar) {
+  // 1 m over the playing area (every hole plus 320 m), LiDAR overviews beyond
+  let ext = 0;
+  for (const h of holes) for (const [x, z] of h.pts) ext = Math.max(ext, Math.abs(x), Math.abs(z));
+  const size = Math.ceil((2 * (ext + 320)) / 100) * 100;
+  console.log(`baking 1 m LiDAR over ${size} m…`);
+  const py = process.env.LIDAR_PY || 'python3';
+  const r = spawnSync(py, ['-I', 'tools/fetch-lidar.py', args.id, String(LAT0), String(LON0), '--size', String(size)], { stdio: 'inherit' });
+  if (r.status) process.exit(r.status);
+} else if (!args['no-dem']) {
   console.log('baking elevation…');
   const r = spawnSync(process.execPath, ['tools/fetch-dem.mjs', args.id, String(LAT0), String(LON0), '4000', '8', '16000', '64'], { stdio: 'inherit' });
   if (r.status) process.exit(r.status);

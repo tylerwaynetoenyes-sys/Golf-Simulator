@@ -1,0 +1,109 @@
+{
+  "lat": 38.95036,
+  "lon": -90.21312,
+  "size": 16000,
+  "step": 32,
+  "n": 501,
+  "min": 107.63,
+  "max": 207.3,
+  "lidar": false,
+  "source": "USGS 3DEP 1 m bare-earth DEM (IL_10CountyNRCS_D23, IL_19County_D24, IL_MadisonCo_2014, IL_SouthCentral_2021_D21, MO_WestCentral_2018_D19), public domain; 0.1% from Terrarium tiles (AWS Open Data)",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 15 x73y432 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 34263
+    },
+    {
+      "tile": "USGS 1 Meter 15 x73y433 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 1394
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y431 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 20189
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y432 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 93026
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y433 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 5209
+    },
+    {
+      "tile": "USGS 1 Meter 15 x73y432 IL_SouthCentral_2021_D21",
+      "project": "IL_SouthCentral_2021_D21",
+      "published": "2022-12-08",
+      "samples": 22122
+    },
+    {
+      "tile": "USGS 1 Meter 15 x73y433 IL_SouthCentral_2021_D21",
+      "project": "IL_SouthCentral_2021_D21",
+      "published": "2022-12-08",
+      "samples": 16992
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y433 IL_SouthCentral_2021_D21",
+      "project": "IL_SouthCentral_2021_D21",
+      "published": "2022-12-08",
+      "samples": 18459
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y433 IL_19County_D24",
+      "project": "IL_19County_D24",
+      "published": "2026-09-02",
+      "samples": 4192
+    },
+    {
+      "tile": "USGS 1 Meter 15 x73y431 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 19701
+    },
+    {
+      "tile": "USGS 1 Meter 15 x73y432 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 7419
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y431 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 7700
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y432 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 162
+    },
+    {
+      "tile": "USGS one meter x73y432 IL MadisonCo 2014",
+      "project": "IL_MadisonCo_2014",
+      "published": "2020-03-30",
+      "samples": 1
+    },
+    {
+      "tile": "USGS one meter x73y433 IL MadisonCo 2014",
+      "project": "IL_MadisonCo_2014",
+      "published": "2020-03-30",
+      "samples": 26
+    },
+    {
+      "tile": "USGS one meter x74y431 IL MadisonCo 2014",
+      "project": "IL_MadisonCo_2014",
+      "published": "2020-03-30",
+      "samples": 1
+    }
+  ]
+}
