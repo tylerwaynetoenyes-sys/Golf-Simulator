@@ -249,7 +249,12 @@ corrugated_iron, asphalt_02, granite_wall, red_bricks_02, white_plaster_02,
 roof_slates_02, and for the landmark pass cobblestone_floor_08,
 gravel_stones, rock_face_03, rusty_metal_02, box_profile_metal_sheet,
 thatch_roof_angled, white_stucco, wood_planks_grey (1K colour, 512 px
-roughness and normal). Laid on in world space by `js/scene/pbr.js`.
+roughness and normal), gray_rocks and rock_boulder_dry (the riprap). Laid on
+in world space by `js/scene/pbr.js`. From ambientCG (https://ambientcg.com,
+CC0): painted_steel (Metal032) and red_brick (Bricks059), which pbr.js draws
+for the `metal_plate` and `red_bricks_02` ids (a tread plate and a weathered
+mixed brick, wrong for the painted steel and red brick their callers mean);
+`assets/textures/fence/chainlink_*` (Fence003), the riverfront's chain-link.
 
 ## Alton parks
 

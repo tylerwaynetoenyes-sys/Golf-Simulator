@@ -32,7 +32,7 @@
 // own ground wins, and the real ground eases to its level round the edge.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { mat, lit, seeded, canvasTex, tree, SLOT } from './kit.js';
+import { mat, lit, seeded, canvasTex, tree, SLOT, boulderGeometry } from './kit.js';
 import { pbr } from '../../scene/pbr.js';
 import { carsAt } from '../../scene/cars.js';
 import { crowdAt } from '../../scene/crowd.js';
@@ -940,6 +940,7 @@ export function townMeshes(D, gy, skip, glow, rnd) {
 }
 
 const STREETS = new Set(['residential', 'tertiary', 'secondary', 'primary', 'unclassified', 'living_street']);
+const LINED = new Set(['tertiary', 'secondary', 'primary', 'trunk']);
 /** Wind every triangle of a flat list counter-clockwise seen from above. */
 function faceUp(a) {
   for (let i = 0; i < a.length; i += 9) {
@@ -951,11 +952,11 @@ function faceUp(a) {
 export function pavingMeshes(D, gy, skipAt, { paths = true, sidewalks = false } = {}) {
   const { x0, z0, step, nx, nz } = D.grid;
   const onMap = (x, z) => x > x0 + 6 && x < x0 + (nx - 1) * step - 6 && z > z0 + 6 && z < z0 + (nz - 1) * step - 6;
-  const asphalt = pbr('asphalt_02', { scale: 6, tint: 0xd8d8d8, offset: -2 });
+  const asphalt = pbr('asphalt_02', { scale: 5, tint: sidewalks ? 0x8c9094 : 0xd8d8d8, offset: -2 });
   const pathM = pbr('brushed_concrete', { scale: 4, tint: 0xe8e2d6, offset: -2 });
   const lotM = pbr('asphalt_02', { scale: 6, tint: 0xc8c8c8, offset: -1 });
   const roads = { [asphalt.uuid]: [], [pathM.uuid]: [] };
-  const walks = [];
+  const walks = [], curbs = [], lines = [];
   for (const r of D.roads) {
     if (r.b) continue; // bridges and ramps: the Clark Bridge is modelled, the rest are lost in the trees
     const path = ['footway', 'path', 'cycleway'].includes(r.k);
@@ -978,14 +979,22 @@ export function pavingMeshes(D, gy, skipAt, { paths = true, sidewalks = false } 
       const L = Math.hypot(bxx - ax, bz - az) || 1, ux = -(bz - az) / L, uz = (bxx - ax) / L, nx = ux * w, nz = uz * w;
       const ya = gy(ax, az) + 0.15, yb = gy(bxx, bz) + 0.15;
       list.push(ax - nx, ya, az - nz, bxx - nx, yb, bz - nz, bxx + nx, yb, bz + nz, ax - nx, ya, az - nz, bxx + nx, yb, bz + nz, ax + nx, ya, az + nz);
+      const strip = (out, o0, o1, dy, cut = 0) => {
+        const yA = ya + dy, yB = yb + dy, a0x = ax + (bxx - ax) * cut, a0z = az + (bz - az) * cut;
+        out.push(a0x + ux * o0, yA, a0z + uz * o0, bxx + ux * o0, yB, bz + uz * o0, bxx + ux * o1, yB, bz + uz * o1, a0x + ux * o0, yA, a0z + uz * o0, bxx + ux * o1, yB, bz + uz * o1, a0x + ux * o1, yA, a0z + uz * o1);
+      };
       if (walkSides) for (const s of [-1, 1]) {
-        const o0 = s * (w + 1.0), o1 = s * (w + 2.5), yA = ya + 0.08, yB = yb + 0.08;
-        walks.push(ax + ux * o0, yA, az + uz * o0, bxx + ux * o0, yB, bz + uz * o0, bxx + ux * o1, yB, bz + uz * o1, ax + ux * o0, yA, az + uz * o0, bxx + ux * o1, yB, bz + uz * o1, ax + ux * o1, yA, az + uz * o1);
+        strip(curbs, s * w, s * (w + 0.25), 0.15); // the curb, a step up from the gutter
+        strip(walks, s * (w + 1.0), s * (w + 2.5), 0.12); // the sidewalk past a grass verge
       }
+      // a dashed yellow centre line on the through streets
+      if (sidewalks && LINED.has(r.k) && i % 2 === 0) strip(lines, -0.07, 0.07, 0.02, 0.4);
     }
   }
   const meshes = [];
-  for (const [m, list] of [[asphalt, roads[asphalt.uuid]], [pathM, roads[pathM.uuid]], [pathM, walks]]) {
+  const curbM = pbr('concrete_wall_008', { scale: 1.5, tint: 0xd0d8e8, bright: 1.3 });
+  const lineM = mat(0xd8b03a, { roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 });
+  for (const [m, list] of [[asphalt, roads[asphalt.uuid]], [pathM, roads[pathM.uuid]], [pathM, walks], [curbM, curbs], [lineM, lines]]) {
     if (!list.length) continue;
     faceUp(list);
     const g = new THREE.BufferGeometry();
@@ -1053,6 +1062,58 @@ function inPoly(x, z, p) {
   return c;
 }
 
+/** Galvanised chain-link (ambientCG Fence003, CC0): the wire's colour, its holes as alpha, 0.35 m a tile. */
+let _chain = null;
+function chainLink() {
+  if (_chain) return _chain;
+  const base = new URL('../../../assets/textures/fence/', import.meta.url).href, L = new THREE.TextureLoader();
+  const t = (f, srgb) => { const x = L.load(base + f); x.wrapS = x.wrapT = THREE.RepeatWrapping; x.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; x.anisotropy = 8; return x; };
+  _chain = new THREE.MeshStandardMaterial({ map: t('chainlink_diff.jpg', true), alphaMap: t('chainlink_opacity.jpg'), normalMap: t('chainlink_nor_gl.jpg'), roughnessMap: t('chainlink_rough.jpg'), transparent: true, depthWrite: false, side: THREE.DoubleSide, metalness: 0.35, roughness: 0.8, color: 0xffffff });
+  // blended, not alpha-tested: far off the mipmapped wire becomes the grey haze a chain-link fence is
+  // the wire covers ~15% of a tile; mipmapped that fades to nothing, where a
+  // real fence reads as a grey screen: lift the coverage
+  _chain.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <alphamap_fragment>', '#include <alphamap_fragment>\n diffuseColor.a = min(1.0, diffuseColor.a * 2.6);'); };
+  _chain.customProgramCacheKey = () => 'chainlink';
+  return _chain;
+}
+
+/**
+ * A rock-pile dike along a polyline at the water: a mound of quarried riprap
+ * (its surface photographed rock), boulders heaped along the crest and
+ * tumbled down the flanks. `crest` is the height above the water.
+ */
+function riprap(B, line, wy, rnd, { base = 12, crest = 1.6, boulders = true } = {}) {
+  const pile = pbr('gray_rocks', { scale: 2.5, tint: 0xd8d8d4 });
+  const rock = pbr('rock_boulder_dry', { scale: 1.6, tint: 0xd0d2d4 });
+  for (let i = 0; i < line.length - 1; i++) {
+    const A = new THREE.Vector2(line[i][0], line[i][1]), Bv = new THREE.Vector2(line[i + 1][0], line[i + 1][1]);
+    const L = A.distanceTo(Bv);
+    if (L < 1) continue;
+    const d = Bv.clone().sub(A).divideScalar(L), nrm = new THREE.Vector2(-d.y, d.x);
+    // the mound: a rounded cross-section swept along the segment, lumpy along its length
+    const segs = Math.max(2, Math.ceil(L / 3)), prof = [[-1, -2.5], [-0.7, 0.2], [-0.35, 0.85], [0, 1], [0.35, 0.85], [0.7, 0.2], [1, -2.5]];
+    const pos = [];
+    const at = (u, k) => {
+      const t = u / segs, c = A.clone().lerp(Bv, t), w = base / 2, [px, py] = prof[k];
+      const lump = 1 + Math.sin(t * L * 0.9 + k) * 0.08 + Math.sin(t * L * 2.3 + k * 2) * 0.05;
+      return [c.x + nrm.x * px * w * lump, wy + (py > 0 ? py * crest * lump : py), c.y + nrm.y * px * w * lump];
+    };
+    for (let u = 0; u < segs; u++) for (let k = 0; k < prof.length - 1; k++) {
+      const a = at(u, k), b = at(u + 1, k), c = at(u + 1, k + 1), e = at(u, k + 1);
+      pos.push(...a, ...c, ...b, ...a, ...e, ...c);
+    }
+    const g = new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.computeVertexNormals();
+    B.add(pile, g);
+    if (!boulders) continue;
+    for (let t = 0; t < L; t += 1.6) for (let k = 0; k < 3; k++) {
+      const o = (rnd() - 0.5) * base * 0.8, c = A.clone().addScaledVector(d, t + rnd() * 1.6).addScaledVector(nrm, o);
+      const r = 0.45 + rnd() * 0.6, y = wy + crest * Math.max(0, 1 - Math.abs(o) / (base * 0.5)) * 0.9;
+      B.add(rock, place(boulderGeometry(r, rnd, { detail: 1, flat: 0.65 }), c.x, y, c.y, rnd() * 6.28));
+    }
+  }
+}
+
 /**
  * Riverfront Park as it is (OpenStreetMap, park.json): the black ornamental
  * fence along the river walk, lamp standards along it, the two picnic
@@ -1075,37 +1136,60 @@ function parkDressing(PK, B, gy, skipAt, glow) {
   const ok = (x, z) => !skipAt(x, z);
   const park = PK.parks.find((p) => p.n === 'Riverfront Park');
   if (!park) return;
-  // ── the fence along the river walk: the park's river edge, posts every 2.4 m, pickets, rails ──
-  const edge = park.p;
+  // ── the flood wall: the park runs level to its edge, where a concrete wall
+  // drops straight into the river; a tall galvanised chain-link fence along its top ──
+  const wallM = pbr('concrete_wall_008', { scale: 3, tint: 0xc4cee4, bright: 1.15 });
+  const capM = pbr('brushed_concrete', { scale: 2, tint: 0xd8e0ee, bright: 1.25 });
+  const walkM = pbr('brushed_concrete', { scale: 3, tint: 0xe4e6ea, bright: 1.15 });
+  const galv = pbr('metal_plate', { scale: 0.5, tint: 0xd8dee4, bright: 1.6, metal: 0.35, rough: 0.8 }); // galvanised, dull grey
+  const mesh = chainLink();
+  const edge = park.p, fence = [];
   for (let i = 0; i < edge.length - 1; i++) {
     const [x1, z1] = edge[i], [x2, z2] = edge[i + 1];
     if (x1 > -140 || x2 > -140 || Math.abs(z2 - z1) < Math.abs(x2 - x1)) continue; // the shore side only
-    const L = Math.hypot(x2 - x1, z2 - z1), ry = -Math.atan2(z2 - z1, x2 - x1);
-    for (let t = 0; t <= L; t += 0.13) {
-      const x = x1 + ((x2 - x1) * t) / L, z = z1 + ((z2 - z1) * t) / L;
-      if (!ok(x, z)) continue;
-      const y = gy(x, z), post = Math.abs((t / 2.4) - Math.round(t / 2.4)) < 0.03;
-      B.add(iron, bx(post ? 0.08 : 0.022, post ? 1.32 : 1.15, post ? 0.08 : 0.022, x, y, z, ry));
-      if (post) B.add(iron, place(new THREE.SphereGeometry(0.06, 6, 4), x, y + 1.36, z));
+    const L = Math.hypot(x2 - x1, z2 - z1), n = Math.max(1, Math.ceil(L / 6));
+    for (let k = 0; k < n; k++) {
+      const a0 = k / n, a1 = (k + 1) / n;
+      const P = new THREE.Vector3(x1 + (x2 - x1) * a0, 0, z1 + (z2 - z1) * a0), Q = new THREE.Vector3(x1 + (x2 - x1) * a1, 0, z1 + (z2 - z1) * a1);
+      if (!ok(P.x, P.z) || !ok(Q.x, Q.z)) continue;
+      // the wall's top sits at the park's level just inside it
+      P.y = Math.max(gy(P.x + 12, P.z), gy(P.x + 16, P.z)) + 0.05; Q.y = Math.max(gy(Q.x + 12, Q.z), gy(Q.x + 16, Q.z)) + 0.05;
+      B.add(wallM, span(P, Q, 0.7, P.y - (WY - 2), -0.35));
+      B.add(capM, span(P.clone().setY(P.y + 0.12), Q.clone().setY(Q.y + 0.12), 0.9, 0.12, -0.35));
+      // the river walk on top: level concrete from the wall back to the lawn
+      B.add(walkM, span(P.clone().setY(P.y + 0.06), Q.clone().setY(Q.y + 0.06), 12, P.y + 0.06 - (WY - 1), -6.3)); // (+lat is riverward along these edges)
+      fence.push([P.clone().setY(P.y + 0.12), Q.clone().setY(Q.y + 0.12)]);
     }
-    for (const h of [0.12, 1.0, 1.12]) {
-      const n = Math.ceil(L / 8);
-      for (let k = 0; k < n; k++) {
-        const a = k / n, b = (k + 1) / n;
-        const P = new THREE.Vector3(x1 + (x2 - x1) * a, 0, z1 + (z2 - z1) * a), Q = new THREE.Vector3(x1 + (x2 - x1) * b, 0, z1 + (z2 - z1) * b);
-        if (!ok(P.x, P.z)) continue;
-        P.y = gy(P.x, P.z) + h; Q.y = gy(Q.x, Q.z) + h;
-        B.add(iron, span(P, Q, 0.04, 0.04));
-      }
+  }
+  // posts every 3 m, a top rail and a bottom tension wire, the mesh between
+  const FH = 2.4, quads = [], uvs = [];
+  let run = 0;
+  for (const [P, Q] of fence) {
+    const L = P.distanceTo(Q);
+    for (let t = 0; t < L; t += 3) {
+      const X = P.clone().lerp(Q, t / L);
+      B.add(galv, cy(0.045, 0.045, FH + 0.1, X.x, X.y, X.z, 8));
     }
-    // acorn lamp standards along the walk, a few metres in from the fence
-    for (let t = 6; t < L; t += 26) {
-      const x = x1 + ((x2 - x1) * t) / L + 4, z = z1 + ((z2 - z1) * t) / L;
-      if (!ok(x, z)) continue;
-      const y = gy(x, z);
-      B.add(iron, cy(0.07, 0.11, 3.8, x, y, z, 8), cy(0.16, 0.12, 0.25, x, y + 3.8, z, 8));
-      B.add(lampM, place(new THREE.SphereGeometry(0.22, 10, 8).scale(1, 1.35, 1), x, y + 4.3, z));
-    }
+    B.add(galv, rod(P.clone().setY(P.y + FH), Q.clone().setY(Q.y + FH), 0.03, 6), rod(P.clone().setY(P.y + 0.05), Q.clone().setY(Q.y + 0.05), 0.008, 3));
+    const u0 = run / 0.35, u1 = (run + L) / 0.35, v1 = FH / 0.35; // ~5 cm diamonds
+    quads.push(P.x, P.y, P.z, Q.x, Q.y, Q.z, Q.x, Q.y + FH, Q.z, P.x, P.y, P.z, Q.x, Q.y + FH, Q.z, P.x, P.y + FH, P.z);
+    uvs.push(u0, 0, u1, 0, u1, v1, u0, 0, u1, v1, u0, v1);
+    run += L;
+  }
+  if (quads.length) {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(quads, 3));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    g.computeVertexNormals();
+    B.add(mesh, g);
+  }
+  // acorn lamp standards along the walk, a few metres in from the wall
+  for (let i = 0; i < fence.length; i += 4) {
+    const [P] = fence[i], x = P.x + 5, z = P.z;
+    if (!ok(x, z)) continue;
+    const y = gy(x, z);
+    B.add(iron, cy(0.07, 0.11, 3.8, x, y, z, 8), cy(0.16, 0.12, 0.25, x, y + 3.8, z, 8));
+    B.add(lampM, place(new THREE.SphereGeometry(0.22, 10, 8).scale(1, 1.35, 1), x, y + 4.3, z));
   }
   // ── the park buildings: two open picnic pavilions, the brick restroom ──
   for (const b of PK.buildings) {
@@ -1493,16 +1577,16 @@ export default function build() {
           }
         }
       }
-      const rip = pbr('granite_wall', { scale: 1.2, tint: 0x9a9286 });
+      // the rock-pile dikes: the marina's breakwater from the end of the park
+      // nearly to the bridge, and the wing dikes out in the channel, just awash
+      const RB = new Batch();
       for (const p of D.breakwaters) {
         const cx = p[0][0], cz = p[0][1];
-        if (Math.hypot(cx, cz) > 1300) continue;
-        for (let i = 0; i < p.length - 1; i++) {
-          // rock wing dikes, just breaking the surface
-          const a = new THREE.Vector3(p[i][0], WY + 0.35, p[i][1]), b = new THREE.Vector3(p[i + 1][0], WY + 0.35, p[i + 1][1]);
-          if (a.distanceTo(b) > 1) EB.add(rip, span(a, b, 6, 3));
-        }
+        if (Math.hypot(cx, cz) > 1300 || p.length < 2) continue;
+        const marina = Math.abs(cx + 167) < 5 && Math.abs(cz - 219) < 5;
+        riprap(RB, p, WY, rnd, marina ? { base: 13, crest: 1.8 } : { base: 8, crest: 0.4, boulders: Math.hypot(cx, cz) < 700 });
       }
+      for (const mesh of RB.build(ext, false)) mesh.userData.noShadow = true;
     }
     // real cruisers and runabouts in the slips (js/scene/boats.js), bobbing
     // about a third of the slips taken (the roofs hide the rest from the course)

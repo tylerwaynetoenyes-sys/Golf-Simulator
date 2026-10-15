@@ -47,8 +47,15 @@ function set(id) {
   return sets.get(id);
 }
 
+// Sets that turned out wrong for what callers ask of them: `metal_plate` is a
+// rusty diamond tread plate (callers mean painted steel: bridges, hulls,
+// posts, domes) and `red_bricks_02` an old weathered mixed brick (callers mean
+// red brick). Both now draw clean sets (ambientCG Metal032 and Bricks059, CC0).
+const ALIAS = { metal_plate: 'painted_steel', red_bricks_02: 'red_brick' };
+
 const cache = new Map();
 export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow = null, night = 0.5, side = THREE.FrontSide, offset = 0, bright = 1 } = {}) {
+  id = ALIAS[id] || id;
   const key = `${id}|${scale}|${tint}|${metal}|${rough}|${glow}|${side}|${offset}|${bright}`;
   if (cache.has(key)) return cache.get(key);
   const tx = set(id);
