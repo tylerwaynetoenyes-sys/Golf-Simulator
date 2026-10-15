@@ -207,8 +207,8 @@ button { font: inherit; color: inherit; }
 .pin-stem { width: 1px; height: 22px; background: linear-gradient(rgba(255, 211, 106, 0.7), rgba(255, 211, 106, 0)); }
 
 /* minimap */
-.minimap { position: absolute; right: var(--gutter); bottom: var(--gutter); border-radius: 20px; padding: 8px; }
-.minimap canvas { display: block; width: 150px; height: 205px; }
+.minimap { position: absolute; right: var(--gutter); bottom: var(--gutter); border-radius: 20px; padding: 6px; }
+.minimap canvas { display: block; width: 180px; height: 260px; border-radius: 14px; }
 
 /* ───────── Launch ───────── */
 .launch { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(80% 70% at 50% 60%, rgba(6, 9, 15, 0.1), rgba(6, 9, 15, 0.75) 80%), linear-gradient(180deg, rgba(6, 9, 15, 0.55), rgba(6, 9, 15, 0.2) 40%, rgba(6, 9, 15, 0.85)); transition: opacity 0.9s var(--ease), visibility 0.9s; z-index: 20; }

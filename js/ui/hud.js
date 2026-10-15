@@ -25,6 +25,10 @@ export class HUD {
     this.commentEl = $('#commentary');
     this.map = $('#minimap');
     this.mapCtx = this.map.getContext('2d');
+    // the course map draws in CSS pixels on a 2× canvas
+    this.mapDpr = 2;
+    this.mapW = this.map.width / this.mapDpr;
+    this.mapH = this.map.height / this.mapDpr;
     this.dots = [];
     this.live = null;
     this._commentTimer = null;
@@ -383,7 +387,8 @@ export class HUD {
   drawMap(ball, aimDeg, mode, course = null, setup = null) {
     if (course && course.T) { this._drawCourseMap(ball, aimDeg, course, setup); return; }
     this._courseKey = null;
-    const c = this.mapCtx, W = this.map.width, H = this.map.height;
+    const c = this.mapCtx, W = this.mapW, H = this.mapH;
+    c.setTransform(this.mapDpr, 0, 0, this.mapDpr, 0, 0);
     const zMax = 360 * YD;
     const xr = 75;
     const px = (x) => W / 2 + (x / xr) * (W / 2 - 8);
@@ -400,7 +405,7 @@ export class HUD {
     // yardage lines
     c.strokeStyle = 'rgba(255,255,255,0.07)';
     c.fillStyle = 'rgba(255,255,255,0.32)';
-    c.font = '600 15px -apple-system, system-ui, sans-serif';
+    c.font = '600 10px Jost, -apple-system, system-ui, sans-serif';
     for (const yd of [100, 200, 300]) {
       const y = py(-yd * YD);
       c.beginPath(); c.moveTo(0, y); c.lineTo(W, y); c.stroke();
@@ -455,10 +460,12 @@ export class HUD {
     c.beginPath(); c.arc(px(0), py(0), 3, 0, Math.PI * 2); c.fill();
   }
 
-  // ── course map: the hole rotated so the tee is at the bottom ──
+  // ── course map, after Trackman's hole view: the hole rotated so the tee
+  // is at the bottom; distance arcs from the ball, the club's carry and
+  // landing area on the aim line, the pin distance, trees, OOB and wind ──
 
   _courseFrame(T) {
-    const W = this.map.width, H = this.map.height;
+    const W = this.mapW, H = this.mapH;
     const gx = T.pin.x - T.tee.x, gz = T.pin.z - T.tee.z;
     const L = Math.hypot(gx, gz) || 1;
     const fx = gx / L, fz = gz / L; // forward
@@ -469,31 +476,46 @@ export class HUD {
       const p = T.pointAt(s);
       const f = (p.x - T.tee.x) * fx + (p.z - T.tee.z) * fz;
       const r = (p.x - T.tee.x) * rx + (p.z - T.tee.z) * rz;
-      const hw = T.fairwayHalf(s) + 14;
+      const hw = T.fairwayHalf(s) + 22;
       minF = Math.min(minF, f); maxF = Math.max(maxF, f);
       minR = Math.min(minR, r - hw); maxR = Math.max(maxR, r + hw);
     }
-    maxF += T.greenR + 12; minF -= 8;
-    const scale = Math.min((H - 24) / (maxF - minF), (W - 16) / (maxR - minR));
+    maxF += T.greenR + 16; minF -= 10;
+    const top = 26, bottom = 10;
+    const scale = Math.min((H - top - bottom) / (maxF - minF), (W - 14) / (maxR - minR));
     const cR = (minR + maxR) / 2;
     const toMap = (x, z) => {
       const f = (x - T.tee.x) * fx + (z - T.tee.z) * fz;
       const r = (x - T.tee.x) * rx + (z - T.tee.z) * rz;
-      return [W / 2 + (r - cR) * scale, H - 12 - (f - minF) * scale];
+      return [W / 2 + (r - cR) * scale, H - bottom - (f - minF) * scale];
     };
-    return { toMap, scale, fx, fz, rx, rz };
+    const fromMap = (mx, my) => {
+      const r = (mx - W / 2) / scale + cR, f = (H - bottom - my) / scale + minF;
+      return [T.tee.x + f * fx + r * rx, T.tee.z + f * fz + r * rz];
+    };
+    return { toMap, fromMap, scale, fx, fz, rx, rz };
   }
 
-  _renderHoleBase(T, frame) {
-    const W = this.map.width, H = this.map.height;
+  _renderHoleBase(T, frame, trees) {
+    const W = this.mapW, H = this.mapH, k = this.mapDpr;
     const cv = this._holeCanvas || (this._holeCanvas = document.createElement('canvas'));
-    cv.width = W; cv.height = H;
+    cv.width = W * k; cv.height = H * k;
     const c = cv.getContext('2d');
-    const { toMap, scale } = frame;
-    // rough corridor + fairway ribbons
-    const ribbon = (half, style) => {
+    c.setTransform(k, 0, 0, k, 0, 0);
+    const { toMap, fromMap, scale } = frame;
+    // the land, and the sea or lake beyond it, from the terrain itself
+    const cell = 3;
+    for (let y = 0; y < H; y += cell) {
+      for (let x = 0; x < W; x += cell) {
+        const [wx, wz] = fromMap(x + cell / 2, y + cell / 2);
+        const sea = T.seaLevel != null && T.meshHeight(wx, wz) < T.seaLevel;
+        c.fillStyle = sea ? 'rgba(38,92,150,0.9)' : 'rgba(34,52,32,0.55)';
+        c.fillRect(x, y, cell, cell);
+      }
+    }
+    const ribbon = (half, style, from = T.fwStart) => {
       const L = [], R = [];
-      for (let s = T.fwStart; s <= T.length + 0.1; s += 6) {
+      for (let s = from; s <= T.length + 0.1; s += 5) {
         const p = T.pointAt(Math.min(s, T.length));
         const h = half(s);
         L.push(toMap(p.x - p.rx * h, p.z - p.rz * h));
@@ -505,70 +527,133 @@ export class HUD {
       R.reverse().forEach(([x, y]) => c.lineTo(x, y));
       c.closePath(); c.fill();
     };
-    const fwStart = T.fwStart;
-    T.fwStart = 0;
-    ribbon((s) => T.fairwayHalf(s) + 26, 'rgba(70,100,50,0.22)');
-    T.fwStart = fwStart;
-    ribbon((s) => T.fairwayHalf(s), 'rgba(120,170,90,0.32)');
+    // rough corridor, then the fairway: mown stripes like the course
+    ribbon((s) => T.fairwayHalf(s) + 30, 'rgba(62,92,46,0.42)', -10);
+    ribbon((s) => T.fairwayHalf(s), 'rgba(118,176,86,0.62)');
+    // out of bounds: white dashes where the stakes are
+    c.strokeStyle = 'rgba(255,255,255,0.32)'; c.setLineDash([2, 3]); c.lineWidth = 1;
+    for (const side of [-1, 1]) {
+      c.beginPath();
+      for (let s = -10, i = 0; s <= T.length + 30; s += 8, i++) {
+        const p = T.pointAt(Math.max(0, Math.min(s, T.length)));
+        const [x, y] = toMap(p.x + p.rx * T.oobLateral * side, p.z + p.rz * T.oobLateral * side);
+        i ? c.lineTo(x, y) : c.moveTo(x, y);
+      }
+      c.stroke();
+    }
+    c.setLineDash([]);
     // creeks
-    c.strokeStyle = 'rgba(90,150,230,0.55)';
-    for (const k of T.creeks) {
-      const p = T.pointAt(k.s);
-      const w = T.fairwayHalf(k.s) + 40;
+    c.strokeStyle = 'rgba(80,150,230,0.75)';
+    for (const kk of T.creeks) {
+      const p = T.pointAt(kk.s);
+      const w = T.fairwayHalf(kk.s) + 40;
       const [x0, y0] = toMap(p.x - p.rx * w, p.z - p.rz * w);
       const [x1, y1] = toMap(p.x + p.rx * w, p.z + p.rz * w);
-      c.lineWidth = Math.max(2, k.half * 2 * scale);
+      c.lineWidth = Math.max(2, kk.half * 2 * scale);
       c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
     }
     c.lineWidth = 1;
-    // ponds, bunkers (drawn as circles of their mean radius: the map is small)
-    const blob = (o, r, style) => { const [x, y] = toMap(o.x, o.z); c.fillStyle = style; c.beginPath(); c.arc(x, y, Math.max(2, r * scale), 0, Math.PI * 2); c.fill(); };
-    // mapped outlines (real-course imports) are drawn as their true shapes
+    const blob = (o, rx, rz, style) => { const [x, y] = toMap(o.x, o.z); c.fillStyle = style; c.beginPath(); c.ellipse(x, y, Math.max(1.6, rx * scale), Math.max(1.6, rz * scale), 0, 0, Math.PI * 2); c.fill(); };
     const shape = (pts, style) => { c.fillStyle = style; c.beginPath(); pts.forEach(([x, z], i) => { const [mx, my] = toMap(x, z); i ? c.lineTo(mx, my) : c.moveTo(mx, my); }); c.closePath(); c.fill(); };
-    for (const w of T.ponds) w.poly ? shape(w.poly.pts, 'rgba(90,150,230,0.55)') : blob(w, (w.rx + w.rz) / 2, 'rgba(90,150,230,0.55)');
-    for (const b of T.bunkers) b.poly ? shape(b.poly.pts, 'rgba(240,226,190,0.6)') : blob(b, (b.rx + b.rz) / 2, 'rgba(240,226,190,0.6)');
-    // green
-    if (T.greenPoly) shape(T.greenPoly.pts, 'rgba(140,210,110,0.55)');
-    else blob(T.green, T.greenR, 'rgba(140,210,110,0.55)');
-    // tee
+    const WATER = 'rgba(70,140,225,0.85)', SAND = 'rgba(236,222,184,0.9)';
+    for (const w of T.ponds) w.poly ? shape(w.poly.pts, WATER) : blob(w, w.rx, w.rz, WATER);
+    if (T.ponds.some((w) => w.island)) blob(T.green, T.greenR + 3, T.greenR + 3, 'rgba(62,92,46,1)');
+    // trees: a dot per canopy, so the map shows what blocks a line
+    c.fillStyle = 'rgba(28,52,30,0.85)';
+    for (const t of trees || []) {
+      const [x, y] = toMap(t.x, t.z);
+      if (x < -4 || x > W + 4 || y < -4 || y > H + 4) continue;
+      c.beginPath(); c.arc(x, y, Math.max(1.3, (t.r || 3) * scale * 0.8), 0, Math.PI * 2); c.fill();
+    }
+    for (const b of T.bunkers) b.poly ? shape(b.poly.pts, SAND) : blob(b, b.rx, b.rz, SAND);
+    // green, fringe ring
+    if (T.greenPoly) shape(T.greenPoly.pts, 'rgba(150,222,120,0.95)');
+    else { blob(T.green, T.greenR + 1.8, T.greenR + 1.8, 'rgba(120,190,95,0.9)'); blob(T.green, T.greenR, T.greenR, 'rgba(160,228,128,0.95)'); }
+    // tee box
     const [tx, ty] = toMap(T.tee.x, T.tee.z);
-    c.fillStyle = 'rgba(255,255,255,0.35)';
-    c.fillRect(tx - 4, ty - 3, 8, 6);
+    c.fillStyle = 'rgba(255,255,255,0.7)';
+    c.fillRect(tx - 3.5, ty - 2.5, 7, 5);
   }
 
   _drawCourseMap(ball, aimDeg, course, setup) {
     const T = course.T;
-    const c = this.mapCtx, W = this.map.width, H = this.map.height;
+    const c = this.mapCtx, W = this.mapW, H = this.mapH, k = this.mapDpr;
+    const world = course.game.world;
     const key = `${course.hole.n}:${T.length.toFixed(1)}`;
     if (this._courseKey !== key) {
       this._courseKey = key;
       this._frame = this._courseFrame(T);
-      this._renderHoleBase(T, this._frame);
+      this._renderHoleBase(T, this._frame, world.course?.treeList);
     }
-    const { toMap } = this._frame;
-    c.clearRect(0, 0, W, H);
+    const { toMap, scale, fx, fz, rx, rz } = this._frame;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, W * k, H * k);
     c.drawImage(this._holeCanvas, 0, 0);
-    // flag
+    c.setTransform(k, 0, 0, k, 0, 0);
+    const font = (w, px) => `${w} ${px}px Jost, -apple-system, system-ui, sans-serif`;
+    const label = (txt, x, y, { align = 'left', color = '#fff', size = 10, weight = 600 } = {}) => {
+      c.font = font(weight, size); c.textAlign = align; c.textBaseline = 'middle';
+      c.lineWidth = 3; c.strokeStyle = 'rgba(8,10,12,0.75)'; c.strokeText(txt, x, y);
+      c.fillStyle = color; c.fillText(txt, x, y);
+    };
+    const yd = (m) => Math.round(U.isMetric() ? m : m / YD);
+    const unit = U.distUnit();
     const [px, py] = toMap(T.pin.x, T.pin.z);
-    c.strokeStyle = '#fff'; c.lineWidth = 1.5;
-    c.beginPath(); c.moveTo(px, py); c.lineTo(px, py - 12); c.stroke();
+    const o = setup?.origin;
+    const aiming = setup && !ball;
+
+    // distance arcs from the ball, every 50 yd (or m), toward the hole
+    if (aiming && !setup.putting) {
+      const [bx, by] = toMap(o.x, o.z);
+      const toPin = Math.hypot(T.pin.x - o.x, T.pin.z - o.z);
+      // 50s on a short shot, 100s on a long one, as on a yardage book
+      const step = (toPin > 330 ? 100 : 50) * (U.isMetric() ? 1 : YD);
+      const headPin = Math.atan2(px - bx, -(py - by));
+      c.lineWidth = 1;
+      for (let d = step; d < toPin + step * 0.6; d += step) {
+        const r = d * scale;
+        c.strokeStyle = 'rgba(255,255,255,0.16)';
+        c.beginPath(); c.arc(bx, by, r, headPin - Math.PI / 2 - 0.55, headPin - Math.PI / 2 + 0.55); c.stroke();
+        const la = headPin - Math.PI / 2 + 0.58;
+        label(String(Math.round(d / (U.isMetric() ? 1 : YD))), bx + Math.cos(la) * r, by + Math.sin(la) * r, { size: 8, color: 'rgba(255,255,255,0.6)', weight: 500 });
+      }
+      // ball to pin
+      c.strokeStyle = 'rgba(255,213,74,0.35)'; c.setLineDash([1, 3]);
+      c.beginPath(); c.moveTo(bx, by); c.lineTo(px, py); c.stroke(); c.setLineDash([]);
+      // the club's carry on the aim line, with its landing area
+      const id = course.game.club?.id;
+      const carry = (STOCK_CARRY[id] || 0) * YD;
+      if (carry) {
+        const a = ((setup.heading + aimDeg) * Math.PI) / 180;
+        const lx = o.x + Math.sin(a) * carry, lz = o.z - Math.cos(a) * carry;
+        const [ax, ay] = toMap(lx, lz);
+        c.strokeStyle = 'rgba(255,255,255,0.85)'; c.lineWidth = 1.2;
+        c.beginPath(); c.moveTo(bx, by); c.lineTo(ax, ay); c.stroke();
+        // dispersion: about ±6% of carry long and short, ±4.5° wide
+        const ang = Math.atan2(ax - bx, -(ay - by));
+        c.save(); c.translate(ax, ay); c.rotate(ang);
+        c.fillStyle = 'rgba(236,208,143,0.22)'; c.strokeStyle = 'rgba(236,208,143,0.9)'; c.lineWidth = 1;
+        c.beginPath(); c.ellipse(0, 0, Math.max(3, carry * Math.tan(0.078) * scale), Math.max(4, carry * 0.06 * scale), 0, 0, Math.PI * 2); c.fill(); c.stroke();
+        c.restore();
+        label(`${yd(carry)}`, ax + 9, ay, { size: 10, color: '#ecd08f', weight: 600 });
+      }
+    }
+    // flag + distance to the pin
+    c.strokeStyle = '#fff'; c.lineWidth = 1.2;
+    c.beginPath(); c.moveTo(px, py); c.lineTo(px, py - 11); c.stroke();
     c.fillStyle = '#ffd54a';
-    c.beginPath(); c.moveTo(px, py - 12); c.lineTo(px + 8, py - 9); c.lineTo(px, py - 6); c.fill();
-    c.lineWidth = 1;
-    // aim line from the current ball
-    if (setup && !setup.putting && !ball) {
-      const a = ((setup.heading + aimDeg) * Math.PI) / 180;
-      const o = setup.origin;
-      const [ax, ay] = toMap(o.x, o.z);
-      const [bx, by] = toMap(o.x + Math.sin(a) * 250, o.z - Math.cos(a) * 250);
-      c.strokeStyle = 'rgba(255,255,255,0.25)';
-      c.setLineDash([3, 5]); c.beginPath(); c.moveTo(ax, ay); c.lineTo(bx, by); c.stroke(); c.setLineDash([]);
+    c.beginPath(); c.moveTo(px, py - 11); c.lineTo(px + 7, py - 8.5); c.lineTo(px, py - 6); c.fill();
+    if (o) {
+      const toPin = Math.hypot(T.pin.x - o.x, T.pin.z - o.z);
+      const right = px < W - 50;
+      label(`${yd(toPin)} ${unit}`, px + (right ? 10 : -10), py - 9, { align: right ? 'left' : 'right', size: 11, weight: 650 });
     }
     // this hole's shots
+    c.lineWidth = 1;
     for (const d of this.dots) {
       const [ox, oy] = toMap(d.ox, d.oz);
       const [x, y] = toMap(d.x, d.z);
-      c.strokeStyle = 'rgba(255,255,255,0.18)';
+      c.strokeStyle = 'rgba(255,255,255,0.3)';
       c.beginPath(); c.moveTo(ox, oy);
       if (d.cx != null) { const [cx, cy] = toMap(d.cx, d.cz); c.lineTo(cx, cy); }
       c.lineTo(x, y); c.stroke();
@@ -578,18 +663,34 @@ export class HUD {
       const b = course.ball?.get(p.id);
       if (!b || b.holed || b.pickedUp) continue;
       const [x, y] = toMap(b.x, b.z);
+      const me = course.game.player?.id === p.id;
       c.fillStyle = p.color;
-      c.beginPath(); c.arc(x, y, setup && course.game.player?.id === p.id ? 4.5 : 3.2, 0, Math.PI * 2); c.fill();
-      if (course.game.player?.id === p.id) { c.strokeStyle = '#fff'; c.beginPath(); c.arc(x, y, 6.5, 0, Math.PI * 2); c.stroke(); }
+      c.beginPath(); c.arc(x, y, me ? 3.6 : 2.6, 0, Math.PI * 2); c.fill();
+      if (me) { c.strokeStyle = '#fff'; c.lineWidth = 1.2; c.beginPath(); c.arc(x, y, 5.5, 0, Math.PI * 2); c.stroke(); }
     }
     if (ball) {
       const [x, y] = toMap(ball.x, ball.z);
-      c.fillStyle = '#fff'; c.shadowColor = '#ffb46b'; c.shadowBlur = 10;
-      c.beginPath(); c.arc(x, y, 4, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
+      c.fillStyle = '#fff'; c.shadowColor = '#ecd08f'; c.shadowBlur = 8;
+      c.beginPath(); c.arc(x, y, 3.4, 0, Math.PI * 2); c.fill(); c.shadowBlur = 0;
     }
-    // hole number + par
-    c.fillStyle = 'rgba(255,255,255,0.55)';
-    c.font = '700 14px -apple-system, system-ui, sans-serif';
-    c.fillText(`${course.hole.n} · Par ${course.hole.par}`, 8, 18);
+    // header: hole, par, length
+    c.fillStyle = 'rgba(11,13,15,0.55)';
+    c.fillRect(0, 0, W, 20);
+    label(`HOLE ${course.hole.n}`, 7, 10.5, { size: 9.5, weight: 600, color: '#ecd08f' });
+    label(`PAR ${course.hole.par} · ${yd(T.length)} ${unit.toUpperCase()}`, 52, 10.5, { size: 9.5, weight: 500, color: 'rgba(255,255,255,0.8)' });
+    // wind, turned into the map's frame
+    const wv = world.env.wind(0, { gust: false });
+    if (wv.mph >= 0.5) {
+      const vf = wv.x * fx + wv.z * fz, vr = wv.x * rx + wv.z * rz;
+      const ang = Math.atan2(vr, vf);
+      const cx = W - 34, cy = 10.5;
+      c.save(); c.translate(cx, cy); c.rotate(ang);
+      c.strokeStyle = '#fff'; c.fillStyle = '#fff'; c.lineWidth = 1.3;
+      c.beginPath(); c.moveTo(0, 5); c.lineTo(0, -4); c.stroke();
+      c.beginPath(); c.moveTo(0, -6); c.lineTo(-3, -2); c.lineTo(3, -2); c.closePath(); c.fill();
+      c.restore();
+      const v = U.isMetric() ? `${(wv.mph * MPH).toFixed(0)}` : `${Math.round(wv.mph)}`;
+      label(v, W - 25, 10.5, { size: 9.5, weight: 600 });
+    }
   }
 }
