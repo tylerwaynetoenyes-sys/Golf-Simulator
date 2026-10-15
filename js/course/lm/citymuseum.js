@@ -9,6 +9,8 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, lit, box, cyl, seeded, canvasTex, tree, SLOT } from './kit.js';
+import { pbr } from '../../scene/pbr.js';
+import { bx } from './riverfront.js';
 
 function batcher() {
   const lists = new Map();
@@ -56,43 +58,6 @@ function mesh(geo, m, x = 0, y = 0, z = 0, ry = 0, rx = 0, rz = 0) {
 
 // ---------- textures ----------
 const BAY = 6, FLOOR = 4.4;
-function facadeTex() {
-  // 4 bays × 4 floors of the warehouse: brick piers, steel-sash windows.
-  const rnd = seeded(1997), rnd2 = seeded(42);
-  const W = 512, H = 512, bw = W / 4, fh = H / 4;
-  const draw = (g, emissive) => {
-    g.fillStyle = emissive ? '#000' : '#8a4632'; g.fillRect(0, 0, W, H);
-    if (!emissive) {
-      for (let y = 0; y < H; y += 4) for (let x = (y / 4 % 2) * 6; x < W; x += 12) {
-        const t = rnd();
-        g.fillStyle = `rgb(${130 + t * 30 | 0},${62 + t * 16 | 0},${44 + t * 10 | 0})`;
-        g.fillRect(x, y, 11, 3);
-      }
-    }
-    for (let f = 0; f < 4; f++) for (let b = 0; b < 4; b++) {
-      const x0 = b * bw, y0 = f * fh;
-      if (!emissive) {
-        g.fillStyle = 'rgba(0,0,0,0.12)'; g.fillRect(x0, y0, 14, fh); // pier shadow
-        g.fillStyle = 'rgba(220,200,170,0.5)'; g.fillRect(x0, y0 + fh - 7, bw, 4); // sill band
-      }
-      const wx = x0 + bw * 0.17, wy = y0 + fh * 0.16, ww = bw * 0.7, wh = fh * 0.62;
-      const on = rnd2() < 0.5, tone = rnd2();
-      if (emissive) {
-        if (on) { g.fillStyle = tone < 0.5 ? '#ffcf8a' : '#ffe6b8'; g.fillRect(wx, wy, ww, wh); }
-      } else {
-        g.fillStyle = '#26303a'; g.fillRect(wx, wy, ww, wh);
-        g.fillStyle = 'rgba(160,190,210,0.22)'; g.fillRect(wx, wy, ww, wh * 0.45);
-        g.strokeStyle = '#c9c6bc'; g.lineWidth = 2;
-        g.strokeRect(wx, wy, ww, wh);
-        for (let k = 1; k < 4; k++) { g.beginPath(); g.moveTo(wx + ww * k / 4, wy); g.lineTo(wx + ww * k / 4, wy + wh); g.stroke(); }
-        g.beginPath(); g.moveTo(wx, wy + wh * 0.5); g.lineTo(wx + ww, wy + wh * 0.5); g.stroke();
-      }
-    }
-  };
-  const t = canvasTex(W, H, (g) => draw(g, false), [1, 1]);
-  const e = canvasTex(W, H, (g) => draw(g, true), [1, 1]);
-  return [t, e];
-}
 function signTex() {
   return canvasTex(512, 64, (g, w, h) => {
     g.fillStyle = '#5a1d16'; g.fillRect(0, 0, w, h);
@@ -100,73 +65,94 @@ function signTex() {
     g.fillText('CITY MUSEUM', w / 2, h / 2 + 2);
   });
 }
-function groundTex() {
-  const rnd = seeded(9);
-  return canvasTex(128, 128, (g, w, h) => {
-    g.fillStyle = '#7a6a58'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 3000; i++) { const t = rnd(); g.fillStyle = `rgb(${90 + t * 70 | 0},${78 + t * 60 | 0},${62 + t * 50 | 0})`; g.fillRect(rnd() * w, rnd() * h, 2, 2); }
-  }, [1, 1]);
-}
-
 export default function build() {
   const group = new THREE.Group();
   const B = batcher();
   const rnd = seeded(1997);
 
-  const [fT, fE] = facadeTex();
-  const facade = new THREE.MeshStandardMaterial({ map: fT, emissiveMap: fE, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.85 });
-  facade.userData.night = 1.0;
-  const concrete = mat(0xb9b2a5, { roughness: 0.9 });
-  const stoneTrim = mat(0xcfc6b2, { roughness: 0.8 });
-  const roofM = mat(0x5d5a55, { roughness: 0.95 });
-  const ground = mat(0xffffff, { map: groundTex(), roughness: 1 });
-  const yellow = mat(0xf2b01e, { roughness: 0.5, metalness: 0.2 });
-  const black = mat(0x1b1b1b, { roughness: 0.6 });
-  const busGlass = mat(0x2a3540, { roughness: 0.2, metalness: 0.4 });
-  const jetM = mat(0xdfe3e6, { roughness: 0.35, metalness: 0.55 });
-  const jetDark = mat(0x34404c, { roughness: 0.3, metalness: 0.4 });
-  const red = mat(0xb3261e, { roughness: 0.45, metalness: 0.3 });
-  const chrome = mat(0xc7cacc, { roughness: 0.25, metalness: 0.85 });
-  const mantisM = mat(0x5f9a3a, { roughness: 0.45, metalness: 0.4 });
-  const castleM = mat(0xa39d90, { roughness: 0.9 });
-  const castleRoof = mat(0x5a3b2c, { roughness: 0.7 });
-  const plank = mat(0x6b6e70, { roughness: 0.6, metalness: 0.6 });
+  // painted and bare steel, brick, stone: photographed surfaces (pbr.js)
+  const paint = (tint, o = {}) => pbr('painted_steel', { scale: 1.5, tint, metal: 0.25, ...o });
+  const brick = pbr('red_brick', { scale: 1.6, tint: 0xa8786a });
+  const glass = mat(0x28313b, { roughness: 0.08, metalness: 0.6 });
+  const lamp = lit(0x28313b, 0xffd29a, { night: 1.1, roughness: 0.08, metalness: 0.6 });
+  const sash = paint(0xd8d4c8, { scale: 1, bright: 1.3 });
+  const concrete = pbr('concrete_wall_008', { scale: 3, tint: 0xd2dcf6, bright: 1.3 });
+  const stoneTrim = pbr('sandstone_blocks_08', { scale: 1.6, tint: 0xf0e6d4, bright: 1.15 });
+  const roofM = pbr('gravel_stones', { scale: 1.5, tint: 0x8a8884 });
+  const ground = pbr('brushed_concrete', { scale: 3, tint: 0xb8b0a4, offset: -1 });
+  const yellow = paint(0xffbe2a, { bright: 1.6 });
+  const black = paint(0x2a2a2c, { metal: 0.4 });
+  const busGlass = glass;
+  const jetM = pbr('painted_steel', { scale: 1.2, tint: 0xdfe3e6, metal: 0.7, rough: 0.6, bright: 1.4 });
+  const jetDark = paint(0x34404c, { metal: 0.4 });
+  const red = paint(0xc8301e, { bright: 1.3 });
+  const chrome = pbr('painted_steel', { scale: 1, tint: 0xd0d4d8, metal: 0.9, rough: 0.4, bright: 1.4 });
+  const mantisM = paint(0x6fae44, { bright: 1.3, metal: 0.4 });
+  const wingM = mat(0x8fbf6a, { roughness: 0.5, metalness: 0.3, transparent: true, opacity: 0.85 });
+  const castleM = pbr('granite_wall', { scale: 1.4, tint: 0xd2dcf6, bright: 1.25 });
+  const castleRoof = pbr('roof_slates_02', { scale: 1.2, tint: 0xb08870 });
+  const plank = pbr('corrugated_iron', { scale: 1, tint: 0x9a9ea2, metal: 0.5 }); // steel grating decks
+  const tankM = pbr('wood_planks_grey', { scale: 1.2, tint: 0xc8a888 });
   const signM = lit(0xffffff, 0xffffff, { map: signTex(), roughness: 0.6, night: 0.6 });
   signM.emissiveMap = signM.map;
   const bulbM = lit(0xfff4d8, 0xffd590, { night: 2.6, roughness: 0.3 });
   const wheelBulb = lit(0xfff0f0, 0xff7a9a, { night: 2.4, roughness: 0.3 });
-  const glow = [facade, signM, bulbM, wheelBulb];
+  const glow = [lamp, signM, bulbM, wheelBulb];
 
   // ---------- the warehouse ----------
   const X0 = -42, X1 = 42, Z0 = -45, ZF = -10, H = 45;
-  const FAC = { su: BAY * 4, sv: FLOOR * 4, top: false };
-  B.add(box(X1 - X0, H - 5, ZF - Z0, facade, 0, 5, (Z0 + ZF) / 2), FAC);
-  B.add(box(X1 - X0 + 0.4, 5, ZF - Z0 + 0.4, concrete, 0, 0, (Z0 + ZF) / 2), { su: 4, sv: 4 });
+  // the glazed core; brick piers and spandrels stand proud of it, so every
+  // window is a real opening with steel sash set back in the wall
+  B.add(box(X1 - X0, H - 5, ZF - Z0, glass, 0, 5, (Z0 + ZF) / 2));
+  const lit_ = seeded(42);
+  const face = (cx, cz, ry, L, y0, y1) => {
+    const sn = Math.sin(ry), cs = Math.cos(ry);
+    const put = (m, w, h, d, u, y, t) => B.add(new THREE.Mesh(bx(w, h, d, cx + u * cs + t * sn, y, cz - u * sn + t * cs, ry), m));
+    const n = Math.round(L / BAY), bw = L / n, floors = Math.round((y1 - y0) / FLOOR);
+    for (let i = 0; i <= n; i++) put(brick, 1.0, y1 - y0, 0.7, -L / 2 + i * bw, y0, 0.35); // piers
+    for (let f = 0; f < floors; f++) {
+      const yf = y0 + f * FLOOR;
+      put(brick, L, 0.9, 0.5, 0, yf, 0.25); // spandrel under the sill
+      put(brick, L, 0.6, 0.5, 0, yf + 3.8, 0.25); // and over the head
+      put(stoneTrim, L, 0.16, 0.8, 0, yf + 0.82, 0.4); // stone sill course
+      put(sash, L, 0.09, 0.08, 0, yf + 2.5, 0.1); // transom bar
+      for (let i = 0; i < n; i++) {
+        const u = -L / 2 + (i + 0.5) * bw;
+        put(sash, bw - 1.0, 0.1, 0.1, u, yf + 0.9, 0.1);
+        if (lit_() < 0.5) put(lamp, bw - 1.0, 2.9, 0.04, u, yf + 0.9, 0.03);
+      }
+    }
+    for (let i = 0; i < n; i++) for (let k = 1; k < 4; k++) put(sash, 0.08, y1 - y0, 0.08, -L / 2 + i * bw + 0.5 + (bw - 1) * k / 4, y0, 0.1); // mullions
+  };
+  face(0, ZF, 0, X1 - X0, 5, H - 1.4);
+  face(0, Z0, Math.PI, X1 - X0, 5, H - 1.4);
+  face(X1, (Z0 + ZF) / 2, Math.PI / 2, ZF - Z0, 5, H - 1.4);
+  face(X0, (Z0 + ZF) / 2, -Math.PI / 2, ZF - Z0, 5, H - 1.4);
+  B.add(box(X1 - X0 + 0.4, 5, ZF - Z0 + 0.4, concrete, 0, 0, (Z0 + ZF) / 2));
   B.add(box(X1 - X0, 0.3, ZF - Z0, roofM, 0, H, (Z0 + ZF) / 2));
   // storefront bays in the base
   for (let x = X0 + 4; x < X1 - 2; x += 6) {
     if (Math.abs(x) < 4) continue;
-    B.add(box(4.2, 3.2, 0.1, busGlass, x + 1, 0.6, ZF + 0.25));
+    B.add(box(4.2, 3.2, 0.1, lamp, x + 1, 0.6, ZF + 0.25));
   }
   // entrance canopy and sign
   B.add(box(14, 0.4, 3.2, concrete, 0, 4.2, ZF + 1.6));
-  B.add(box(9, 3.8, 0.1, busGlass, 0, 0.2, ZF + 0.25));
+  B.add(box(9, 3.8, 0.1, lamp, 0, 0.2, ZF + 0.25));
   B.add(box(16, 2, 0.25, signM, 0, 5.7, ZF + 0.3));
-  // cornice, parapet, belt course, piers proud of the face
-  B.add(box(X1 - X0 + 1.6, 1.2, ZF - Z0 + 1.6, stoneTrim, 0, H - 1.6, (Z0 + ZF) / 2));
-  B.add(box(X1 - X0 + 0.6, 1.6, 0.6, stoneTrim, 0, H - 0.4, ZF + 0.1));
-  B.add(box(X1 - X0 + 0.6, 0.5, ZF - Z0 + 0.6, stoneTrim, 0, 5, (Z0 + ZF) / 2));
-  for (const z of [Z0 + 0.3]) B.add(box(X1 - X0, 1.6, 0.6, stoneTrim, 0, H - 0.4, z));
-  for (const x of [X0 + 0.3, X1 - 0.3]) B.add(box(0.6, 1.6, ZF - Z0, stoneTrim, x, H - 0.4, (Z0 + ZF) / 2));
-  for (let x = X0; x <= X1 + 0.01; x += BAY) {
-    B.add(box(0.9, H - 6.6, 0.35, facade, x, 5.5, ZF + 0.15), FAC);
-  }
-  // rooftop penthouse + water tank
-  B.add(box(14, 5, 9, facade, 26, H, -38), FAC);
+  // cornice, parapet, belt course
+  B.add(box(X1 - X0 + 2.0, 1.2, ZF - Z0 + 2.0, stoneTrim, 0, H - 1.6, (Z0 + ZF) / 2));
+  B.add(box(X1 - X0 + 1.4, 0.5, ZF - Z0 + 1.4, stoneTrim, 0, 5, (Z0 + ZF) / 2));
+  for (const z of [Z0 + 0.3, ZF - 0.3]) B.add(box(X1 - X0, 1.6, 0.6, brick, 0, H - 0.4, z));
+  for (const x of [X0 + 0.3, X1 - 0.3]) B.add(box(0.6, 1.6, ZF - Z0, brick, x, H - 0.4, (Z0 + ZF) / 2));
+  for (const z of [Z0 + 0.3, ZF - 0.3]) B.add(box(X1 - X0 + 0.2, 0.2, 0.8, stoneTrim, 0, H + 1.2, z));
+  for (const x of [X0 + 0.3, X1 - 0.3]) B.add(box(0.8, 0.2, ZF - Z0, stoneTrim, x, H + 1.2, (Z0 + ZF) / 2));
+  // rooftop penthouse + timber water tank on its steel stand
+  B.add(box(14, 5, 9, brick, 26, H, -38));
   B.add(box(14.6, 0.5, 9.6, stoneTrim, 26, H + 5, -38));
   for (const [x, z] of [[-34, -40], [-30, -40], [-34, -36], [-30, -36]]) B.add(cyl(0.18, 0.18, 6, black, x, H, z, 6));
-  B.add(cyl(2.6, 2.6, 4, mat(0x6e5a44, { roughness: 0.9 }), -32, H + 6, -38, 16));
-  B.add(mesh(new THREE.ConeGeometry(2.8, 1.6, 16), black, -32, H + 10.8, -38));
+  B.add(cyl(2.6, 2.6, 4, tankM, -32, H + 6, -38, 20));
+  for (const y of [H + 6.6, H + 8, H + 9.4]) B.add(mesh(new THREE.TorusGeometry(2.63, 0.05, 4, 24).rotateX(Math.PI / 2), black, -32, y, -38));
+  B.add(mesh(new THREE.ConeGeometry(2.8, 1.6, 20), black, -32, H + 10.8, -38));
 
   // ---------- rooftop: school bus cantilevered over the front edge ----------
   {
@@ -206,7 +192,7 @@ export default function build() {
       leg([[sx * 0.4, 3.4, -0.3], [sx * 2.3, 3.9, 0.3], [sx * 3.1, 0.1, 1.2]], 0.12);
       leg([[sx * 0.5, 3.1, -1.0], [sx * 2.6, 3.8, -2.0], [sx * 3.2, 0.1, -3.6]], 0.12);
       // wings folded along the back
-      const w = mesh(new THREE.SphereGeometry(1, 10, 6), mat(0x8fbf6a, { roughness: 0.5, metalness: 0.3, transparent: true, opacity: 0.85 }), sx * 0.35, 3.7, -2.6, sx * 0.08, -0.35);
+      const w = mesh(new THREE.SphereGeometry(1, 10, 6), wingM, sx * 0.35, 3.7, -2.6, sx * 0.08, -0.35);
       w.scale.set(0.5, 0.15, 2.8); B.add(w, null, P);
     }
     for (const sx of [-1, 1]) B.add(box(0.8, 0.3, 0.8, black, sx * 3.1, 0, 1.2), null, P);
@@ -272,7 +258,7 @@ export default function build() {
   const gondColors = [0xe0b030, 0x2f6fb0, 0xb3261e, 0x3d8a4a];
   for (let i = 0; i < 8; i++) {
     const a = i / 8 * Math.PI * 2;
-    const gm = new THREE.Mesh(gondG, mat(gondColors[i % 4], { roughness: 0.5, metalness: 0.3 }));
+    const gm = new THREE.Mesh(gondG, paint(gondColors[i % 4], { bright: 1.3 }));
     gm.position.set(WCX + Math.cos(a) * WR, WCY + Math.sin(a) * WR, WCZ);
     gm.userData.a = a;
     group.add(gm); gondolas.push(gm);
@@ -282,7 +268,7 @@ export default function build() {
   B.add(box(10, 0.5, 5, plank, WCX, H, WCZ));
 
   // ---------- MonstroCity ----------
-  B.add(box(100, 0.08, 64, ground, 0, 0, 22), { su: 6, sv: 6 });
+  B.add(box(100, 0.08, 64, ground, 0, 0, 22));
   const T = [ // x, z, height, half-size
     [-33, 4, 16, 1.4], [-14, 14, 20, 1.6], [6, 6, 17, 1.4], [27, 16, 13, 1.3],
     [-40, 30, 10, 1.2], [-20, 38, 12, 1.3], [3, 32, 15, 1.4], [22, 40, 9, 1.2],
@@ -313,7 +299,7 @@ export default function build() {
   // castle turret
   {
     const cx = 36, cz = 34, r = 3.6, h = 15;
-    B.add(cyl(r, r + 0.3, h, castleM, cx, 0, cz, 20), { su: 3, sv: 3 });
+    B.add(cyl(r, r + 0.3, h, castleM, cx, 0, cz, 20));
     B.add(cyl(r + 0.6, r + 0.6, 1.0, castleM, cx, h, cz, 20));
     for (let i = 0; i < 12; i++) { const a = i / 12 * Math.PI * 2; B.add(mesh(new THREE.BoxGeometry(1.1, 1.1, 0.8), castleM, cx + Math.sin(a) * (r + 0.3), h + 1.55, cz + Math.cos(a) * (r + 0.3), a)); }
     B.add(mesh(new THREE.ConeGeometry(r + 0.4, 6, 20), castleRoof, cx, h + 5, cz));
@@ -359,13 +345,13 @@ export default function build() {
   for (const i of [0, 1, 8]) strand(tTop(i), new THREE.Vector3(T[i][0] * 0.9, 24, ZF + 0.5), 2);
 
   // ---------- assemble ----------
-  B.build(group);
+  for (const m of B.build(group)) if (m.material === ground) { m.userData.noShadow = true; m.castShadow = false; }
   // rods: one instanced cylinder
   const rodG = new THREE.CylinderGeometry(1, 1, 1, 5, 1, true);
-  const rodM = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.55, metalness: 0.55 });
+  const rodM = pbr('rusty_metal_02', { scale: 0.8, metal: 0.5 });
   const rodMesh = new THREE.InstancedMesh(rodG, rodM, rods.length);
   const M = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), d = new THREE.Vector3(), mid = new THREE.Vector3(), sc = new THREE.Vector3(), col = new THREE.Color();
-  const rodCols = [0x7d4a2e, 0x5f6366, 0x9a3a2a];
+  const rodCols = [0xd8b8a8, 0x9aa4b0, 0xc89080]; // rust, galvanised grey, red-primed: tints over the rusty steel
   rods.forEach(([a, b, r, c], i) => {
     d.subVectors(b, a); const L = d.length(); d.normalize();
     q.setFromUnitVectors(up, d); mid.addVectors(a, b).multiplyScalar(0.5);
