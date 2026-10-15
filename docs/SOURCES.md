@@ -247,3 +247,16 @@ recompressed): white_sandstone_bricks, sandstone_blocks_08,
 concrete_wall_008, brushed_concrete, clay_roof_tiles_02, metal_plate,
 corrugated_iron, asphalt_02, granite_wall, red_bricks_02, white_plaster_02,
 roof_slates_02. Laid on in world space by `js/scene/pbr.js`.
+
+## Cars and boats
+
+From Sketchfab, CC BY 4.0; reduced in Blender to one mesh each (parts'
+colours in the vertices, bodywork flagged for paint), about 1-1.5k triangles,
+Draco-compressed (`assets/models/cars/`, `assets/models/boats/`):
+
+- "2018 Ford Everest/Endeavour", "2019 Skoda Karoq", "2016 Volkswagen Polo",
+  "2001 Honda Odyssey EX" by BHP3D (sketchfab.com/BHP3D)
+- "BAYCRUISER" by d2u (sketchfab.com/d2u)
+- "«Progress» motorboat" by isiosiusin (sketchfab.com/isiosiusin)
+
+The crowds use the scanned people already credited above (people_lo.glb).

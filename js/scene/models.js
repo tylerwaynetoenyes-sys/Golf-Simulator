@@ -30,6 +30,10 @@ export const COURSE_MODELS = {
   liberty: ['statue'],
   eaststl: ['lowrider', 'wreck', 'people', 'peopleLo', 'rubble'],
   sawgrass: ['people', 'peopleLo'],
+  // the scanned crowds at the riverfront and in the parks (instanced, js/scene/crowd.js)
+  confluence: ['peopleLo'],
+  alton: ['peopleLo'],
+  forestpark: ['peopleLo'],
 };
 
 const cache = new Map(); // name → THREE.Object3D (the loaded scene)

@@ -34,6 +34,9 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, lit, seeded, canvasTex, tree, SLOT } from './kit.js';
 import { pbr } from '../../scene/pbr.js';
+import { carsAt } from '../../scene/cars.js';
+import { crowdAt } from '../../scene/crowd.js';
+import { boatFleet } from '../../scene/boats.js';
 
 // the baked map, fetched as soon as the module loads (long before a hole is built)
 const BASE = new URL('../../../assets/landmarks/alton/', import.meta.url).href;
@@ -124,24 +127,10 @@ function bulbs(pts, color, size, tex) {
   p.castShadow = false;
   return p;
 }
-/** Instanced low-poly people at [x,y,z,rotY] spots. */
+/** Real scanned people at [x,y,z,rotY] spots (instanced; none if the scans aren't loaded). */
 function crowd(group, spots, rnd) {
-  const n = spots.length;
-  const legs = new THREE.InstancedMesh(new THREE.BoxGeometry(0.32, 0.85, 0.2).translate(0, 0.425, 0), mat(0xffffff), n);
-  const body = new THREE.InstancedMesh(new THREE.BoxGeometry(0.42, 0.62, 0.25).translate(0, 1.16, 0), mat(0xffffff), n);
-  const head = new THREE.InstancedMesh(new THREE.SphereGeometry(0.12, 8, 6).translate(0, 1.6, 0), mat(0xffffff, { roughness: 0.6 }), n);
-  const shirts = [0xc8443a, 0x2f5d8a, 0xe8e2d4, 0x3f6e48, 0xd9a441, 0x6b4b7a, 0x1e2a36, 0xe07a5f, 0x9bb7d4];
-  const skins = [0x8d5524, 0xc68642, 0xe0ac69, 0xf1c27d, 0x5c3a21];
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), e = new THREE.Euler(), v = new THREE.Vector3(), s3 = new THREE.Vector3();
-  spots.forEach(([x, y, z, r], i) => {
-    const s = 0.92 + rnd() * 0.14;
-    m4.compose(v.set(x, y, z), q.setFromEuler(e.set(0, r ?? rnd() * 6.28, 0)), s3.set(s, s, s));
-    legs.setMatrixAt(i, m4); body.setMatrixAt(i, m4); head.setMatrixAt(i, m4);
-    legs.setColorAt(i, c.set(rnd() < 0.5 ? 0x2c3442 : 0x5a5348));
-    body.setColorAt(i, c.set(shirts[Math.floor(rnd() * shirts.length)]));
-    head.setColorAt(i, c.set(skins[Math.floor(rnd() * skins.length)]));
-  });
-  for (const m of [legs, body, head]) { m.castShadow = false; group.add(m); }
+  const g = crowdAt(spots, rnd);
+  if (g) group.add(g);
 }
 /** A flag that waves by vertex displacement (no allocation per frame). */
 function flag(tex, w, h) {
@@ -177,16 +166,17 @@ const GREEN = 0x3e9a3f;
 function argosy(glow, bulbPts) {
   const g = new THREE.Group();
   const B = new Batch();
-  const navy = mat(0x1d2433, { roughness: 0.5, metalness: 0.3 });
-  const red = mat(0xc8322c, { roughness: 0.5 });
-  const redRoof = mat(0xc63a36, { roughness: 0.45, metalness: 0.35 });
-  const yellow = lit(0xf0b734, 0xffd57a, { roughness: 0.6, night: 0.5 });
-  const orange = mat(0xe57a2c, { roughness: 0.6 });
-  const cream = mat(0xf0e6cf, { roughness: 0.7 });
-  const green = lit(GREEN, 0x9dff9a, { roughness: 0.45, metalness: 0.4, night: 0.35 });
-  const blueRoof = mat(0x3f78c8, { roughness: 0.35, metalness: 0.45 });
+  // painted steel, standing-seam roofs and stucco: photographed sets, tinted to the casino's colours
+  const navy = pbr('metal_plate', { scale: 2, tint: 0x2a3550, metal: 0.25, rough: 0.8 });
+  const red = pbr('metal_plate', { scale: 2, tint: 0xd8483c, metal: 0.1 });
+  const redRoof = pbr('corrugated_iron', { scale: 1.6, tint: 0xe0574f, metal: 0.25 });
+  const yellow = pbr('white_plaster_02', { scale: 3, tint: 0xf6c24a, glow: 0xffd57a, night: 0.5 });
+  const orange = pbr('white_plaster_02', { scale: 3, tint: 0xf08a3c });
+  const cream = pbr('white_plaster_02', { scale: 3, tint: 0xf4ecd8 });
+  const green = pbr('metal_plate', { scale: 1.5, tint: 0x54b45a, metal: 0.25, glow: 0x9dff9a, night: 0.35 });
+  const blueRoof = pbr('corrugated_iron', { scale: 1.4, tint: 0x5a8fe0, metal: 0.3 });
   const gold = lit(0xd8b04a, 0xffd27a, { metalness: 0.7, roughness: 0.3, night: 0.7 });
-  const stone = mat(0xbfae8e, { roughness: 0.9 });
+  const stone = pbr('granite_wall', { scale: 2, tint: 0xd8c8a8 });
   glow.push(yellow, green, gold);
 
   // blue glass with green mullions (the rotunda), lit warm inside at night
@@ -246,10 +236,11 @@ function argosy(glow, bulbPts) {
       c.font = 'bold 250px Georgia, "Times New Roman", serif';
       c.fillText('ARGOSY', w / 2, h * 0.56);
     });
-    const signM = new THREE.MeshStandardMaterial({ map: letters, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.4, emissive: 0xe9fff0, emissiveMap: letters, emissiveIntensity: 0 });
+    const signM = new THREE.MeshStandardMaterial({ map: letters, transparent: true, alphaTest: 0.4, side: THREE.FrontSide, roughness: 0.4, emissive: 0xe9fff0, emissiveMap: letters, emissiveIntensity: 0 });
     signM.userData.night = 1.4;
     glow.push(signM);
     for (const s of [-1, 1]) {
+      // one face each way, each read the right way round from its own side
       const m = new THREE.Mesh(new THREE.PlaneGeometry(W - 1, Hs - 1).rotateY(s * Math.PI / 2), signM);
       m.position.set(fx + s * 0.6, y0 + Hs / 2, fz);
       g.add(m);
@@ -277,7 +268,7 @@ function argosy(glow, bulbPts) {
     const tx = gx1 - 3, tz = gz, leg = 2.6, sep = 10, Ht = 30;
     B.add(stone, bx(9, 6, 16, tx, -3, tz));
     // the orange corrugated sheet-pile cell round its foot
-    const pile = mat(0xe08a2a, { roughness: 0.6, metalness: 0.3 });
+    const pile = pbr('corrugated_iron', { scale: 1.2, tint: 0xf09a3a, metal: 0.3 });
     B.add(pile, bx(14, 3.6, 20, tx + 2, -3, tz));
     for (const s of [-1, 1]) {
       const lz = tz + s * sep / 2;
@@ -334,9 +325,9 @@ function spiritOfAmerica(glow) {
   };
   const blue = deckM(deckTex('#3b67b8', '#f2c53d', '#f4e9c6'), 0xffd28a);
   const pink = deckM(deckTex('#d98bb0', '#f4e3ea', '#f6efd8'), 0xffd28a);
-  const navy = mat(0x1a2030, { roughness: 0.5, metalness: 0.3 });
-  const red = mat(0xc32b2b, { roughness: 0.5 });
-  const redRoof = mat(0xb5262a, { roughness: 0.5 });
+  const navy = pbr('metal_plate', { scale: 2, tint: 0x283048, metal: 0.25, rough: 0.8 });
+  const red = pbr('metal_plate', { scale: 2, tint: 0xd23a3a, metal: 0.1 });
+  const redRoof = pbr('corrugated_iron', { scale: 1.4, tint: 0xc8403e, metal: 0.2 });
   const gold = lit(0xdcb24a, 0xffd27a, { metalness: 0.7, roughness: 0.3, night: 0.8 });
   const yellow = mat(0xf2c53d, { roughness: 0.55 });
   glow.push(gold);
@@ -382,10 +373,10 @@ function spiritOfAmerica(glow) {
 function blueBoat() {
   const g = new THREE.Group();
   const B = new Batch();
-  B.add(mat(0x4e9ad8, { roughness: 0.45 }), bx(16, 4, 48, 0, -2.6, 0));
+  B.add(pbr('metal_plate', { scale: 2, tint: 0x62aaf0, metal: 0.15 }), bx(16, 4, 48, 0, -2.6, 0));
   B.add(mat(0xf2c53d, { roughness: 0.5 }), bx(16.3, 0.8, 48.3, 0, 1.2, 0), bx(14.6, 0.6, 40, 0, 6.2, -2));
   B.add(lit(0x23415e, 0xffd28a, { night: 0.6, roughness: 0.25 }), bx(14, 4, 42, 0, 2.0, -2));
-  B.add(mat(0xf3f1ea, { roughness: 0.5 }), bx(12, 3.2, 28, 0, 6.8, -5));
+  B.add(pbr('white_plaster_02', { scale: 3 }), bx(12, 3.2, 28, 0, 6.8, -5));
   B.add(mat(0x2a6cb8, { roughness: 0.4 }), bx(12.6, 0.4, 29, 0, 10, -5));
   B.add(mat(0xd13a2e, { roughness: 0.5 }), place(new THREE.BoxGeometry(5, 3, 7).translate(0, 1.5, 0), 0, 10.4, 20, 0));
   B.build(g);
@@ -404,9 +395,10 @@ function elevators(B, glow, group, gy) {
     for (let i = 0; i < 70; i++) { g.fillStyle = `rgba(80,72,60,${0.04 + r() * 0.08})`; g.fillRect(r() * w, r() * h * 0.3, 1 + r() * 3, h * (0.3 + r() * 0.7)); }
     for (let y = 0; y < h; y += 16) { g.fillStyle = 'rgba(0,0,0,0.04)'; g.fillRect(0, y, w, 1); }
   }, [1, 1]);
-  const silo = mat(0xffffff, { map: tex, roughness: 0.9 });
-  const roofM = mat(0x8b8780, { roughness: 0.8 });
-  const steel = mat(0x7c7f80, { metalness: 0.4, roughness: 0.6 });
+  void tex;
+  const silo = pbr('concrete_wall_008', { scale: 5, tint: 0xf4f2ec });
+  const roofM = pbr('brushed_concrete', { scale: 4, tint: 0xb0aca4 });
+  const steel = pbr('metal_plate', { scale: 2, tint: 0x8c9196, metal: 0.4 });
   const hw = lit(0x39424a, 0xffcf8a, { night: 0.7 });
   glow.push(hw);
   const bins = (x0, z0, rows, cols, r, h) => {
@@ -460,7 +452,7 @@ function elevators(B, glow, group, gy) {
   bins(-200, -760, 2, 6, 4.2, 32);
   // the low annex inland, metal-roofed
   const ya = gy(-108, -650);
-  B.add(mat(0xb9b4aa, { roughness: 0.8 }), bx(22, 11, 140, -108, ya, -650));
+  B.add(pbr('corrugated_iron', { scale: 1.6, tint: 0xd2cec6, metal: 0.3 }), bx(22, 11, 140, -108, ya, -650));
   B.add(roofM, bx(23, 0.6, 141, -108, ya + 11, -650));
   // conveyor gallery out to the marine leg over the water
   B.add(steel, span(new THREE.Vector3(-184, y1 + 40, -652), new THREE.Vector3(-222, 18, -652), 2.6, 2.8));
@@ -505,10 +497,10 @@ function clarkBridge(B, glow, halos, navLights, gy, carSpots) {
     return 18 - (18 - 2.5) * k * k * (3 - 2 * k) ** 0.5 * 0.9 - (18 - 2.5) * 0.1 * k;
   };
   const P = (u, lat = 0, dy = 0) => { const a = at(u); return new THREE.Vector3(a.x - a.dz * lat, H(u) + dy, a.z + a.dx * lat); };
-  const deckM = mat(0x8f9294, { roughness: 0.8 });
-  const girder = mat(0xb9bdc0, { roughness: 0.55, metalness: 0.35 });
-  const concrete = mat(0xc9c5bc, { roughness: 0.8 });
-  const iron = mat(0x2a2d31, { metalness: 0.5, roughness: 0.5 });
+  const deckM = pbr('asphalt_02', { scale: 6, tint: 0xc8c8c8 });
+  const girder = pbr('metal_plate', { scale: 2.5, tint: 0xd0d4d8, metal: 0.4 });
+  const concrete = pbr('concrete_wall_008', { scale: 5, tint: 0xece8e0 });
+  const iron = pbr('metal_plate', { scale: 1, tint: 0x3a3e44, metal: 0.5 });
   const cableM = lit(0xf1d64a, 0xfff0a0, { roughness: 0.4, night: 0.35 });
   const lamp = lit(0xfff6e4, 0xffd59a, { night: 2.4, roughness: 0.3 });
   glow.push(cableM, lamp);
@@ -584,10 +576,10 @@ function clarkBridge(B, glow, halos, navLights, gy, carSpots) {
 // point, with a railed steel deck and a stair; the granite smallpox memorial
 // (2002) in its round brick plaza with granite benches; the boat ramp.
 function lincolnShields(B, gy) {
-  const conc = mat(0xb4ada1, { roughness: 0.85 });
-  const steel = mat(0x2c3035, { metalness: 0.5, roughness: 0.5 });
-  const granite = mat(0x9d9a95, { roughness: 0.6 });
-  const brick = mat(0xa8704f, { roughness: 0.9 });
+  const conc = pbr('concrete_wall_008', { scale: 3, tint: 0xd8d2c6 });
+  const steel = pbr('metal_plate', { scale: 1, tint: 0x3a3e44, metal: 0.5 });
+  const granite = pbr('granite_wall', { scale: 1.5, tint: 0xc8c4be });
+  const brick = pbr('red_bricks_02', { scale: 1.6 });
   const tx = -835, tz = -147, ty = gy(tx, tz);
   const y0 = ty - 0.3; // on the levee's crown (in the ground)
   B.add(conc, bx(7, 8.5, 7, tx, y0, tz));
@@ -609,7 +601,7 @@ function lincolnShields(B, gy) {
   for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2 + 0.3; B.add(granite, bx(3.2, 0.55, 1.1, mx + Math.cos(a) * 7.5, my + 0.3, mz + Math.sin(a) * 7.5, -a)); }
   // the boat ramp into the backwater
   const rp = [-808, -103];
-  B.add(mat(0xa8a49b, { roughness: 0.9 }), span(new THREE.Vector3(rp[0] + 14, gy(rp[0] + 14, rp[1]) + 0.1, rp[1]), new THREE.Vector3(rp[0] - 14, WY - 1.2, rp[1]), 8, 0.4));
+  B.add(pbr('brushed_concrete', { scale: 3 }), span(new THREE.Vector3(rp[0] + 14, gy(rp[0] + 14, rp[1]) + 0.1, rp[1]), new THREE.Vector3(rp[0] - 14, WY - 1.2, rp[1]), 8, 0.4));
 }
 
 /**
@@ -618,10 +610,10 @@ function lincolnShields(B, gy) {
  * house, twin black stacks, and a big red stern paddle wheel. ~100 m long.
  */
 function sternwheeler(B, glow) {
-  const white = mat(0xf6f5f0, { roughness: 0.55 });
-  const red = mat(0xb02a26, { roughness: 0.5 });
-  const black = mat(0x18191b, { roughness: 0.6 });
-  const blue = mat(0x2f5f8a, { roughness: 0.5 });
+  const white = pbr('white_plaster_02', { scale: 2.5, tint: 0xfbfaf6 });
+  const red = pbr('metal_plate', { scale: 2, tint: 0xc23a34, metal: 0.1 });
+  const black = pbr('metal_plate', { scale: 2, tint: 0x2a2c30, metal: 0.3 });
+  const blue = pbr('corrugated_iron', { scale: 1.4, tint: 0x4a7aa8, metal: 0.2 });
   const cabins = new THREE.MeshStandardMaterial({
     roughness: 0.5, emissive: 0xffffff, emissiveIntensity: 0,
     map: canvasTex(256, 32, (g, w, h) => { g.fillStyle = '#f6f5f0'; g.fillRect(0, 0, w, h); for (let i = 0; i < 16; i++) { g.fillStyle = '#2a3440'; g.fillRect(i * 16 + 3, 6, 10, 18); } g.fillStyle = '#b02a26'; g.fillRect(0, 28, w, 3); }),
@@ -660,11 +652,11 @@ function sternwheeler(B, glow) {
 function tow(glow) {
   const g = new THREE.Group();
   const B = new Batch();
-  const rust = mat(0x5a3b2b, { roughness: 0.85 });
-  const black = mat(0x1d1f22, { roughness: 0.7 });
-  const covers = [mat(0x355a7a, { roughness: 0.7 }), mat(0x8a5c34, { roughness: 0.8 }), mat(0x3f5f46, { roughness: 0.75 })];
-  const white = mat(0xeeeeea, { roughness: 0.5 });
-  const red = mat(0xa52a26, { roughness: 0.55 });
+  const rust = pbr('metal_plate', { scale: 2, tint: 0x8a5a40, metal: 0.3 });
+  const black = pbr('metal_plate', { scale: 2, tint: 0x2c2e32, metal: 0.3 });
+  const covers = [pbr('corrugated_iron', { scale: 1.5, tint: 0x5a86b0 }), pbr('corrugated_iron', { scale: 1.5, tint: 0xb08050 }), pbr('corrugated_iron', { scale: 1.5, tint: 0x6a8a68 })];
+  const white = pbr('white_plaster_02', { scale: 2.5 });
+  const red = pbr('metal_plate', { scale: 2, tint: 0xc03a34, metal: 0.1 });
   const glass = lit(0x1e2a33, 0xffd89a, { night: 1.2, roughness: 0.2 });
   glow.push(glass);
   let i = 0;
@@ -1031,20 +1023,6 @@ function parkedCars(D, gy, skipAt, rnd, near) {
   return spots;
 }
 
-/** Instanced cars at [x, y, z, yaw] (body + glasshouse), in everyday colours. */
-function cars(spots, rnd) {
-  const body = new THREE.InstancedMesh(new THREE.BoxGeometry(4.6, 0.8, 1.85).translate(0, 0.55, 0), mat(0xffffff, { roughness: 0.35, metalness: 0.5 }), spots.length);
-  const top = new THREE.InstancedMesh(new THREE.BoxGeometry(2.5, 0.6, 1.6).translate(-0.2, 1.25, 0), mat(0x1c232b, { roughness: 0.15, metalness: 0.6 }), spots.length);
-  const cols = [0xd9d9d9, 0x1d1f22, 0x8b8f94, 0xf2f2f0, 0xe8e8e6, 0x7a1d1d, 0x2b4b7a, 0x5a5f63, 0x9aa3a8, 0xc7c9cc, 0x3d4a3c];
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), v = new THREE.Vector3(), s = new THREE.Vector3(1, 1, 1), c = new THREE.Color();
-  spots.forEach(([x, y, z, r], i) => {
-    m4.compose(v.set(x, y, z), q.setFromEuler(e.set(0, r, 0)), s);
-    body.setMatrixAt(i, m4); top.setMatrixAt(i, m4);
-    body.setColorAt(i, c.set(cols[Math.floor(rnd() * cols.length)]));
-  });
-  for (const m of [body, top]) { m.castShadow = false; m.receiveShadow = true; }
-  return [body, top];
-}
 
 export default function build() {
   const group = new THREE.Group(); // the park round the amphitheater, in the hole's footprint
@@ -1055,17 +1033,17 @@ export default function build() {
   const halo = haloTex();
   const halos = [];
   const grass = mat(0x5f8a40, { roughness: 0.95 });
-  const paving = mat(0xc9c1b2, { roughness: 0.8 });
+  const paving = pbr('brushed_concrete', { scale: 3, tint: 0xeee6d8 });
 
   // ── Riverfront Park amphitheater: tensile canopy over the stage, lawn bowl ──
   const SC = new THREE.Vector3(-25, 0, 0); // stage centre (the mapped theatre is centred on the origin)
   {
-    const conc = mat(0xcfc9bd, { roughness: 0.8 });
+    const conc = pbr('concrete_wall_008', { scale: 3, tint: 0xf0ebe0 });
     // (from Tyler's photographs) a circular brick-red stage plaza with
     // concentric bands, a long white arched membrane on stone-block pylons,
     // a round fountain in the plaza behind and a splash pad beside it
     const brick = lit(0x8a3d30, 0xffb46a, { night: 0.5, roughness: 0.9 });
-    const brickL = mat(0xa45a46, { roughness: 0.9 });
+    const brickL = pbr('red_bricks_02', { scale: 1.4, tint: 0xe8c0b0 });
     glow.push(brick);
     B.add(conc, place(new THREE.CylinderGeometry(19, 19.4, 1.1, 48).translate(0, 0.55, 0), SC.x - 4, 0, SC.z));
     B.add(brick, place(new THREE.CylinderGeometry(18.4, 18.4, 0.12, 48).translate(0, 0.06, 0), SC.x - 4, 1.1, SC.z));
@@ -1176,7 +1154,7 @@ export default function build() {
 
   // the crowd on the lawn and two flags at the plaza
   const people = [];
-  for (let i = 0; i < 70; i++) {
+  for (let i = 0; i < 30; i++) {
     const k = Math.floor(rnd() * 8), t = -0.9 + rnd() * 1.8, r = 14 + k * 4 + 1.5 + rnd() * 2;
     people.push([SC.x + Math.cos(t) * r, 0.42 * k + 0.42, SC.z + Math.sin(t) * r, Math.PI / 2 - t + Math.PI]);
   }
@@ -1277,9 +1255,9 @@ export default function build() {
     // long ones (the blue and white roofs), cruisers in the slips, the breakwater
     const boats = [];
     {
-      const dock = mat(0xb9ad98, { roughness: 0.85 });
-      const roofs = [mat(0x7e9fc4, { roughness: 0.45, metalness: 0.4 }), mat(0xdfe3e6, { roughness: 0.45, metalness: 0.4 })];
-      const post = mat(0x8a8e92, { metalness: 0.4, roughness: 0.6 });
+      const dock = pbr('brushed_concrete', { scale: 2.5, tint: 0xe4dccb });
+      const roofs = [pbr('corrugated_iron', { scale: 1.4, tint: 0x9cbbe0, metal: 0.4 }), pbr('corrugated_iron', { scale: 1.4, tint: 0xf0f2f4, metal: 0.4 })];
+      const post = pbr('metal_plate', { scale: 1, tint: 0xa0a4a8, metal: 0.4 });
       let r = 0;
       for (const p of D.piers) {
         const cx = p.reduce((s, q) => s + q[0], 0) / p.length, cz = p.reduce((s, q) => s + q[1], 0) / p.length;
@@ -1305,7 +1283,7 @@ export default function build() {
           }
         }
       }
-      const rip = mat(0x6e675d, { roughness: 1, flatShading: true });
+      const rip = pbr('granite_wall', { scale: 1.2, tint: 0x9a9286 });
       for (const p of D.breakwaters) {
         const cx = p[0][0], cz = p[0][1];
         if (Math.hypot(cx, cz) > 1300) continue;
@@ -1316,21 +1294,10 @@ export default function build() {
         }
       }
     }
-    const hullG = (() => {
-      const s = new THREE.Shape();
-      s.moveTo(-0.5, -0.5); s.lineTo(0.28, -0.5); s.quadraticCurveTo(0.5, -0.45, 0.5, 0); s.quadraticCurveTo(0.5, 0.45, 0.28, 0.5); s.lineTo(-0.5, 0.5); s.closePath();
-      return new THREE.ExtrudeGeometry(s, { depth: 1, bevelEnabled: false, curveSegments: 4 }).rotateX(-Math.PI / 2).translate(0, -0.35, 0);
-    })();
-    const cabinG = mergeGeometries([new THREE.BoxGeometry(0.42, 0.55, 0.62).translate(-0.08, 0.92, 0), new THREE.BoxGeometry(0.1, 0.38, 0.56).translate(0.17, 0.85, 0)]);
-    const hulls = new THREE.InstancedMesh(hullG, mat(0xffffff, { roughness: 0.35 }), boats.length);
-    const cabins = new THREE.InstancedMesh(cabinG, mat(0xffffff, { roughness: 0.3, metalness: 0.2 }), boats.length);
-    {
-      const c = new THREE.Color(), hc = [0xf4f4f2, 0xf0ede6, 0x1c2c44, 0xf4f4f2, 0x7a1c1c, 0xe9eef2];
-      boats.forEach((b, i) => { hulls.setColorAt(i, c.set(hc[i % hc.length])); cabins.setColorAt(i, c.set(i % 3 ? 0x2a3440 : 0xe8e6e0)); });
-      hulls.castShadow = cabins.castShadow = false;
-      ext.add(hulls, cabins);
-    }
-    live.boats = { boats, hulls, cabins };
+    // real cruisers and runabouts in the slips (js/scene/boats.js), bobbing
+    // about a third of the slips taken (the roofs hide the rest from the course)
+    for (let i = boats.length - 1; i >= 0; i--) if (rnd() > 0.15) boats.splice(i, 1);
+    boatFleet(boats.length, rnd).then((f) => { if (f) { ext.add(f.group); live.boats = { boats, fleet: f }; } });
 
     // a towboat pushing hopper barges up the channel
     const towG = tow(glow);
@@ -1339,12 +1306,14 @@ export default function build() {
     live.tow = towG;
 
     // parked cars (the casino's lots fullest) and the traffic on the bridge
-    for (const m of cars([...parkedCars(D, gy, skipAt, rnd, (x, z) => Math.hypot(x + 150, z + 470) < 260), ...carSpots], rnd)) ext.add(m);
+    // real cars (js/scene/cars.js): the casino's lot fills first, then the nearest lots; traffic on the bridge
+    carsAt(parkedCars(D, gy, skipAt, rnd, (x, z) => Math.hypot(x + 150, z + 470) < 260), rnd, { max: 36, near: [-150, -470] }).then((g) => ext.add(g));
+    carsAt(carSpots, rnd, { max: 10 }).then((g) => ext.add(g));
 
     // walkers on the riverfront trail
     const walk = [];
     for (const r of D.roads) {
-      if (!['footway', 'cycleway', 'path'].includes(r.k) || walk.length > 70) continue;
+      if (!['footway', 'cycleway', 'path'].includes(r.k) || walk.length > 16) continue;
       for (const [x, z] of r.p) if (Math.hypot(x, z + 200) < 420 && !skipAt(x, z) && rnd() < 0.35) walk.push([x + (rnd() - 0.5) * 2, gy(x, z) + 0.15, z + (rnd() - 0.5) * 2]);
     }
     crowd(ext, walk, rnd);
@@ -1388,16 +1357,12 @@ export default function build() {
     if (live.nav) { live.nav.material.opacity = n * (Math.sin(t * 2.2) > 0.2 ? 1 : 0.15); live.nav.visible = n > 0.02; }
     ripple.offset.set(0, (t * 0.01) % 1);
     if (live.boats) {
-      const { boats, hulls, cabins } = live.boats;
+      const { boats, fleet } = live.boats;
       for (let i = 0; i < boats.length; i++) {
         const [x, z, yaw, L] = boats[i], ph = i * 1.7;
-        e.set(Math.sin(t * 0.8 + ph) * 0.025, yaw, Math.sin(t * 1.1 + ph) * 0.02);
-        m4.compose(v.set(x, WY + Math.sin(t * 0.9 + ph) * 0.07, z), q.setFromEuler(e), sc.set(L, L * 0.16, L * 0.34));
-        hulls.setMatrixAt(i, m4);
-        m4.compose(v.set(x, WY + Math.sin(t * 0.9 + ph) * 0.07 - L * 0.04, z), q, sc.set(L, L * 0.224, L * 0.34));
-        cabins.setMatrixAt(i, m4);
+        e.set(Math.sin(t * 0.8 + ph) * 0.025, yaw + Math.PI / 2, Math.sin(t * 1.1 + ph) * 0.02);
+        fleet.place(i, x, WY + Math.sin(t * 0.9 + ph) * 0.07, z, e, L);
       }
-      hulls.instanceMatrix.needsUpdate = cabins.instanceMatrix.needsUpdate = true;
     }
     if (live.tow) {
       // up the channel at 1.4 m/s, round again from below the bridge

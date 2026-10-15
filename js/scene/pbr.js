@@ -24,7 +24,24 @@ function set(id) {
       t.anisotropy = 4;
       return t;
     };
-    sets.set(id, { diff: load('diff', true), rough: load('rough', false), nor: load('nor_gl', false) });
+    // each photograph is normalised to one mid albedo once it loads, so the
+    // tint, not the photo's own exposure, sets how light a surface is
+    const gain = { value: 1 };
+    const diff = load('diff', true);
+    const img = new Image();
+    img.onload = () => {
+      const c = document.createElement('canvas'); c.width = c.height = 32;
+      const g = c.getContext('2d'); g.drawImage(img, 0, 0, 32, 32);
+      const d = g.getImageData(0, 0, 32, 32).data;
+      let sum = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        const lin = (v) => { v /= 255; return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
+        sum += 0.2126 * lin(d[i]) + 0.7152 * lin(d[i + 1]) + 0.0722 * lin(d[i + 2]);
+      }
+      gain.value = Math.min(4, 0.42 / Math.max(0.02, sum / (d.length / 4)));
+    };
+    img.src = `${BASE}${id}_diff.jpg`;
+    sets.set(id, { diff, rough: load('rough', false), nor: load('nor_gl', false), gain });
   }
   return sets.get(id);
 }
@@ -37,7 +54,7 @@ export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow
   const m = new THREE.MeshStandardMaterial({ color: tint, metalness: metal, roughness: 1, side });
   if (offset) Object.assign(m, { polygonOffset: true, polygonOffsetFactor: offset, polygonOffsetUnits: offset });
   if (glow != null) { m.emissive = new THREE.Color(glow); m.emissiveIntensity = 0; m.userData.night = night; }
-  const uni = { uTriD: { value: tx.diff }, uTriR: { value: tx.rough }, uTriN: { value: tx.nor }, uTriS: { value: 1 / scale }, uTriRough: { value: rough } };
+  const uni = { uTriG: tx.gain, uTriD: { value: tx.diff }, uTriR: { value: tx.rough }, uTriN: { value: tx.nor }, uTriS: { value: 1 / scale }, uTriRough: { value: rough } };
   m.onBeforeCompile = (sh) => {
     Object.assign(sh.uniforms, uni);
     sh.vertexShader = sh.vertexShader
@@ -54,13 +71,13 @@ export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', `#include <common>
 varying vec3 vTriW; varying vec3 vTriN;
-uniform sampler2D uTriD; uniform sampler2D uTriR; uniform sampler2D uTriN; uniform float uTriS; uniform float uTriRough;
+uniform sampler2D uTriD; uniform sampler2D uTriR; uniform sampler2D uTriN; uniform float uTriS; uniform float uTriRough; uniform float uTriG;
 vec3 triW() { vec3 w = pow(abs(normalize(vTriN)), vec3(4.0)); return w / (w.x + w.y + w.z); }`)
       .replace('#include <map_fragment>', `
         vec3 tw = triW();
         vec3 tp = vTriW * uTriS;
         vec3 tc = texture2D(uTriD, tp.zy).rgb * tw.x + texture2D(uTriD, tp.xz).rgb * tw.y + texture2D(uTriD, tp.xy).rgb * tw.z;
-        diffuseColor.rgb *= tc;`)
+        diffuseColor.rgb *= min(tc * uTriG, vec3(1.0));`)
       .replace('#include <roughnessmap_fragment>', `
         float roughnessFactor = roughness * uTriRough * (texture2D(uTriR, tp.zy).g * tw.x + texture2D(uTriR, tp.xz).g * tw.y + texture2D(uTriR, tp.xy).g * tw.z);`)
       .replace('#include <normal_fragment_maps>', `
