@@ -11,13 +11,14 @@
 //   the reconstructed stockade: the log palisade with bastions that walled
 //     the central precinct, a section rebuilt east of the plaza
 //   the Interpretive Center, on its footprint
-//   a neighbourhood of thatched, clay-daubed houses outside the palisade
+//   neighbourhoods of thatched, clay-daubed houses round the plaza and outside the palisade
 // Surfaces are photographed PBR sets (js/scene/pbr.js).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { pbr } from '../../scene/pbr.js';
 import { place, bx, Batch, pavingMeshes } from './riverfront.js';
 import { model } from '../../scene/models.js';
+import { cull } from '../../scene/instanceCull.js';
 
 const BASE = new URL('../../../assets/landmarks/cahokia/', import.meta.url).href;
 let DATA = null;
@@ -36,11 +37,13 @@ export default function build() {
       const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
       const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
       const inPlay = (x, z) => { toW(x, z); const pr = T.project(w.x, w.z); return Math.abs(pr.d) < T.oobLateral + 6 && pr.s > -40 && pr.s < T.length + 60; };
-      const go = (D) => lay(D, gy, inPlay);
+      // the fairway or green itself, for the small things (houses, people) that may stand right beside play
+      const onField = (x, z) => { toW(x, z); const pr = T.project(w.x, w.z); return Math.abs(pr.d) < Math.max(T.fwHalf || 0, 14) + 12 && pr.s > -25 && pr.s < T.length + 30; };
+      const go = (D) => lay(D, gy, inPlay, onField);
       if (DATA) go(DATA); else ready.then((d) => d && go(d));
     },
   };
-  function lay(D, gy, inPlay) {
+  function lay(D, gy, inPlay, onField) {
     const m = {
       cedar: pbr('bark_brown_02', { scale: 1.2, tint: 0xb07a58 }),
       log: pbr('bark_brown_02', { scale: 1.2, tint: 0x8c7058 }),
@@ -110,9 +113,12 @@ export default function build() {
       const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
       const walls = [], poles = [], roofs = [], doors = [], hearth = [];
       yards.length = 0;
-      for (let i = 0; i < 14; i++) {
-        const x = 300 + (i % 4) * 24 + (rnd() - 0.5) * 9, z = -40 + Math.floor(i / 4) * 26 + (rnd() - 0.5) * 9;
-        if (inPlay(x, z)) continue;
+      // [x0, z0, columns, rows]: east of Monks Mound, west of the Grand Plaza, south of the Twin Mounds, and west toward Woodhenge (ground checked clear of mounds in the LiDAR)
+      const hoods = [[300, -40, 4, 4], [-280, 455, 4, 3], [-280, 855, 4, 3], [-710, 275, 4, 3]];
+      const lots = hoods.flatMap(([x0, z0, c, r]) => Array.from({ length: c * r }, (_, i) => [x0 + (i % c) * 24, z0 + Math.floor(i / c) * 26]));
+      for (const [lx, lz] of lots) {
+        const x = lx + (rnd() - 0.5) * 9, z = lz + (rnd() - 0.5) * 9;
+        if (onField(x, z)) continue;
         const w = 4.6 + rnd() * 2, d = 3.6 + rnd() * 1.4, h = 1.9, ry = (rnd() - 0.5) * 0.5, y = gy(x, z) - 0.15;
         walls.push(place(new THREE.BoxGeometry(w, h, d).translate(0, h / 2, 0), x, y, z, ry));
         // the posts set in the wall trenches show at the corners and along the eaves
@@ -149,16 +155,17 @@ export default function build() {
     g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
     group.add(g);
     for (const mesh of pavingMeshes(D, gy, inPlay, { paths: true })) group.add(mesh);
-    people(gy, inPlay);
+    people(gy, onField);
   }
   // ── the people of the city, about 1100 CE (assets/models/cahokia_people.glb):
   // MakeHuman figures dressed from the archaeological record (the Keller and
   // Birger figurines, excavated shell beads and copper ear spools): women in
   // woven-fibre wrap skirts and deerskin mantles, men in breechcloths, all in
-  // moccasins; a basket of maize, a red-slipped bottle, grass for thatch, and
-  // chunkey, the city's great game, on the Grand Plaza ──
+  // moccasins; elders and children too; a basket of maize, a red-slipped
+  // bottle, a bowl, grass for thatch, and chunkey, the city's great game, on the
+  // Grand Plaza with a crowd round the court ──
   const yards = [];
-  function people(gy, inPlay) {
+  function people(gy, onField) {
     const set = model('cahokiaPeople');
     if (!set) return;
     const proto = {};
@@ -174,17 +181,13 @@ export default function build() {
     });
     let seed = 1100;
     const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+    const placed = {}; // kind -> [x, y, z, yaw, scale]
     const put = (kind, x, z, yaw) => {
-      if (!proto[kind] || inPlay(x, z)) return;
-      const f = proto[kind].clone(true);
-      f.position.set(x, gy(x, z) - 0.02, z);
-      f.rotation.y = yaw;
-      f.scale.setScalar(0.96 + rnd() * 0.08);
-      f.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-      group.add(f);
+      if (!proto[kind] || onField(x, z)) return;
+      (placed[kind] ||= []).push([x, gy(x, z) - 0.02, z, yaw, 0.96 + rnd() * 0.08]);
     };
     // at home: beyond the hearths in the yards, turned back toward hearth and house
-    const home = ['woman_basket', 'woman_jar', 'man_thatch', 'woman_jar', 'woman_basket', 'man_thatch'];
+    const home = ['woman_basket', 'elder_potter', 'man_thatch', 'girl', 'woman_jar', 'elder_man', 'woman_basket', 'man_thatch', 'woman_jar'];
     yards.forEach(([hx, hz, ry], i) => {
       if (i % 2) return;
       const kind = home[(i / 2) % home.length], a = ry + (rnd() - 0.5) * 1.2, r = 1.4 + rnd() * 0.8;
@@ -192,6 +195,31 @@ export default function build() {
     });
     // chunkey on the Grand Plaza, below the stair of Monks Mound: players, poles in hand, facing each other down the court
     for (const [x, z, yaw] of [[-74, 300, 0.2], [-62, 304, -0.3], [-48, 360, Math.PI + 0.1], [-60, 364, Math.PI - 0.25]]) put('man_chunkey', x, z, yaw);
+    // and people of the city watching from round the court
+    const watch = ['elder_man', 'woman_jar', 'girl', 'woman_basket', 'elder_potter', 'man_thatch', 'girl', 'woman_jar', 'elder_man', 'woman_basket'];
+    watch.forEach((kind, i) => {
+      const a = (i / watch.length) * Math.PI * 2 + (rnd() - 0.5) * 0.3, r = 34 + rnd() * 6;
+      const x = -61 + Math.cos(a) * r * 0.55, z = 332 + Math.sin(a) * r;
+      put(kind, x, z, Math.atan2(-61 - x, 332 - z));
+    });
+    // drawn instanced: one draw per figure and material however many stand about,
+    // each figure culled on its own (scene/instanceCull.js)
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), up = new THREE.Vector3(0, 1, 0), v = new THREE.Vector3(), sc = new THREE.Vector3();
+    set.updateMatrixWorld(true);
+    for (const [kind, list] of Object.entries(placed)) {
+      const root = proto[kind], inv = root.matrixWorld.clone().invert();
+      root.traverse((o) => {
+        if (!o.isMesh) return;
+        const rel = inv.clone().multiply(o.matrixWorld);
+        const inst = new THREE.InstancedMesh(o.geometry, o.material, list.length);
+        list.forEach(([x, y, z, yaw, k], i) => inst.setMatrixAt(i, m4.compose(v.set(x, y, z), q.setFromAxisAngle(up, yaw), sc.set(k, k, k)).multiply(rel)));
+        inst.castShadow = false;
+        inst.receiveShadow = true;
+        inst.computeBoundingSphere();
+        cull(inst, 2.4); // a standing figure and what it carries
+        group.add(inst);
+      });
+    }
   }
   return res;
 }

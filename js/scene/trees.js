@@ -365,7 +365,7 @@ export const THEME_TREES = {
   // Forest Park: open lawns under big oaks, maples and sycamores, the odd pine
   forestpark: { broad: [0, 2, 3, 1], conifer: [4, 5], density: 0.62, scatter: 0.4 },
   // Cahokia: open mown grounds, woods along the creeks and ponds
-  cahokia: { broad: [0, 2, 3, 6], conifer: [4], density: 0.45, scatter: 0.35 },
+  cahokia: { broad: [0, 2, 3, 6], conifer: [4], density: 0.16, scatter: 0.12 }, // the city's open ground stays open, so the mounds read
   // Confluence Point: the open farmland of the American Bottom, tree lines along the ditches
   confluencepoint: { broad: [6, 2, 3], conifer: [4], density: 0.3, scatter: 0.25 },
   // Alton: river-bottom cottonwoods, silver maples and sycamores, open parks along the water
