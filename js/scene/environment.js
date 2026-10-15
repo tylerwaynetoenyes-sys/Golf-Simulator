@@ -266,6 +266,11 @@ export class Environment {
     if (cam.right !== shadowSize) {
       Object.assign(cam, { left: -shadowSize, right: shadowSize, top: shadowSize, bottom: -shadowSize });
       cam.updateProjectionMatrix();
+      // the bias follows the texel size: with the wide daytime box a fixed 2 cm
+      // let the ground shadow itself, a dark square round the player
+      const texel = (2 * shadowSize) / (key.shadow.mapSize.x || 1024);
+      key.shadow.normalBias = Math.max(0.02, texel * 1.4);
+      key.shadow.bias = -0.0004 - texel * 0.002;
     }
     const hemi = w.range.hemi;
     hemi.color.copy(lerpC(NIGHT.hemiSky, DAY.hemiSky, d));

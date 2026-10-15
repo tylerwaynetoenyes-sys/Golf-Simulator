@@ -678,8 +678,8 @@ diffuseColor.rgb *= stripes * turf;`);
   }
 
   /**
-   * Build the hole's landmark and place it beside the hole. On the drawn
-   * (non-DEM) holes, the ground under it is then levelled to its base: a
+   * Build the hole's landmark and place it beside the hole. The ground under
+   * it is then levelled to its base: a
    * pad on the terrain over its footprint, eased out toward the field of play,
    * so walls, roads and plazas stand on the ground instead of in it. A
    * landmark can give its own footprint (`pads`: local [x0, x1, z0, z1]
@@ -707,7 +707,7 @@ diffuseColor.rgb *= stripes * turf;`);
     holder.rotation.y = Math.atan2(-T.finalDir.x, -T.finalDir.z) + (lmSpec.rot || 0);
     holder.scale.setScalar(lmSpec.scale || 1);
     holder.updateMatrix();
-    const wantPad = !T.F && !lmSpec.onCreek && lm.pad !== false && (lm.pads || lm.pad === true || !lm.fit);
+    const wantPad = !lmSpec.onCreek && lm.pad !== false && (lm.pads || lm.pad === true || !lm.fit);
     if (wantPad) {
       let rects = lm.pads;
       if (!rects) {
@@ -1578,6 +1578,12 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
         const at = this._nearAt;
         if (still && (!at || Math.hypot(b.x - at.x, b.z - at.z) > 9)) this._nearGrassAt(b.x, b.z);
       }
+    }
+    // the thick patch only reads up close: from the intro's orbit or a flyover it would
+    // show as a dark square on the ground, so it is drawn only with the camera near it
+    if (this.nearGrass && camera && this._nearAt) {
+      const c = camera.position, at = this._nearAt;
+      this.nearGrass.visible = Math.hypot(c.x - at.x, c.z - at.z) < 70 && c.y - (this.T?.meshHeight(at.x, at.z) ?? 0) < 30;
     }
     // rough grass: wind (the way the air moves) and the ball it parts around
     this._cullChunks(camera);

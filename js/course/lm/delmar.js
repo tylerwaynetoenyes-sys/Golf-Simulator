@@ -71,7 +71,7 @@ const brickMat = (c) => { const [id, tint] = BRICK[c] || ['red_bricks_02', 0xfff
  * A storefront in its row's frame: the front on x = 0 facing +x, the body
  * behind it, from z0 along +z for `width` metres, standing at y.
  */
-function building(B, M, z0, width, storeys, brick, rnd, y, { awning = null, depth = 18 } = {}) {
+export function building(B, M, z0, width, storeys, brick, rnd, y, { awning = null, depth = 18 } = {}) {
   const h = 4.6 + storeys * 3.6;
   const zc = z0 + width / 2, wall = brickMat(brick);
   B.add(wall, bx(depth, h + 1.2, width, -depth / 2, y - 1.2, zc)); // sunk into the slope at its low end
@@ -89,6 +89,21 @@ function building(B, M, z0, width, storeys, brick, rnd, y, { awning = null, dept
   B.add(M.stone, bx(0.8, 0.4, width, 0.2, y + 4.4, zc));
   if (awning) B.add(M.awning(awning), place(new THREE.BoxGeometry(2.4, 0.15, width - 1.6), 1.2, y + 3.9, zc, 0, 1, 1, 1, 0, -0.28));
   return h;
+}
+
+/** The storefront surfaces (building()'s M); the lit ones go into glow. */
+export function shopMats(glow) {
+  const M = {
+    stone: pbr('white_sandstone_bricks', { scale: 1.2, tint: 0xf0e4d0 }),
+    frame: pbr('metal_plate', { scale: 1, tint: 0x2c2826, metal: 0.4 }),
+    roof: pbr('gravel_stones', { scale: 1.5, tint: 0x80807c }),
+    glass: mat(0x28313b, { roughness: 0.08, metalness: 0.6 }),
+    lamp: lit(0x28313b, 0xffd9a0, { night: 1.1, roughness: 0.08, metalness: 0.6 }),
+    shop: lit(0x46525c, 0xffd29a, { night: 1.3, roughness: 0.1, metalness: 0.45 }),
+    awning: (c) => mat(c, { roughness: 0.9 }),
+  };
+  glow.push(M.lamp, M.shop);
+  return M;
 }
 
 /** The Loop Trolley car: a heritage-style streetcar on 4 ft 8½ in track. */
@@ -234,16 +249,7 @@ export default function build() {
     g.add(new THREE.Mesh(mergeGeometries(bits.rail), rail), new THREE.Mesh(mergeGeometries(bits.paint), paint), new THREE.Mesh(mergeGeometries(bits.kerb), kerbM));
 
     // ── the two sides of the street ──
-    const M = {
-      stone: pbr('white_sandstone_bricks', { scale: 1.2, tint: 0xf0e4d0 }),
-      frame: pbr('metal_plate', { scale: 1, tint: 0x2c2826, metal: 0.4 }),
-      roof: pbr('gravel_stones', { scale: 1.5, tint: 0x80807c }),
-      glass: mat(0x28313b, { roughness: 0.08, metalness: 0.6 }),
-      lamp: lit(0x28313b, 0xffd9a0, { night: 1.1, roughness: 0.08, metalness: 0.6 }),
-      shop: lit(0x46525c, 0xffd29a, { night: 1.3, roughness: 0.1, metalness: 0.45 }),
-      awning: (c) => mat(c, { roughness: 0.9 }),
-    };
-    glow.push(M.lamp, M.shop);
+    const M = shopMats(glow);
     const bricks = ['#8a4a36', '#9a5a3c', '#7d4434', '#a8705a', '#6f3d30', '#b88a64', '#8c5640', '#7a5444'];
     // a row in its own frame: fronts on x = 0 facing +x; `named` fixes a building at a z with its own size
     const row = (frontX, flip, named) => {

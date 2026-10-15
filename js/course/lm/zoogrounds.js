@@ -77,12 +77,33 @@ export default function build() {
       const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
       // the field of play itself: fairway, green and a little either side
       const onField = (x, z, pad = 0) => { toW(x, z); const pr = T.project(w.x, w.z); return Math.abs(pr.d) < Math.max(T.fwHalf || 0, 14) + 10 + pad && pr.s > -20 && pr.s < T.length + 30; };
-      const go = (D) => lay(D, gy, onField);
+      // hole terms (arc length s, lateral d) to this frame, for the exhibit and the gallery beside the hole
+      const Li = L.clone().invert();
+      const atHole = (s, d) => { const p = T.pointAt(s); w.set(p.x + p.rx * d, 0, p.z + p.rz * d).applyMatrix4(Li); return [w.x, w.z]; };
+      const go = (D) => lay(D, gy, onField, { T, atHole });
       if (DATA) go(DATA); else ready.then((d) => d && go(d));
     },
   };
 
-  function lay(D, gy, onField) {
+  function lay(D, gy, onField, H = null) {
+    // the zoo's exhibits, and one more close beside this hole (clear of the map's buildings and ponds)
+    const ex = [...EXHIBITS];
+    if (H) {
+      const { T, atHole } = H;
+      const free = (x, z, R) => !(D.buildings || []).some((b) => b.p.some(([bx2, bz]) => Math.hypot(bx2 - x, bz - z) < R + 8))
+        && !(D.lakes || []).some((l) => l.p.some(([lx, lz]) => Math.hypot(lx - x, lz - z) < R + 6));
+      const kinds = [['giraffe', 3, 9, 14], ['zebra', 4, 8, 13], ['elephant', 2, 8, 14], ['lion', 2, 6, 11], ['polarbear', 2, 6, 11]];
+      const pick = kinds[Math.floor(T.length) % kinds.length];
+      const off = Math.max(T.fwHalf || 0, 14) + 12 + pick[3];
+      for (const f of [0.45, 0.65, 0.3, 0.8]) {
+        let done = false;
+        for (const side of [1, -1]) {
+          const [x, z] = atHole(T.length * f, side * off);
+          if (inZoo(x, z) && free(x, z, pick[3])) { ex.push([pick[0], pick[1], x, z, pick[2], pick[3]]); done = true; break; }
+        }
+        if (done) break;
+      }
+    }
     const rnd = seeded(1904);
     const m = {
       brick: pbr('red_bricks_02', { scale: 2.2 }),
@@ -182,7 +203,7 @@ export default function build() {
 
     // ── the exhibits: rocks and a post-and-rail fence round each yard ──
     const rocks = [], greyRocks = [], rails = [], scans = [];
-    for (const [kind, , x0, z0, spread, R] of EXHIBITS) {
+    for (const [kind, , x0, z0, spread, R] of ex) {
       const red = kind !== 'polarbear' && kind !== 'penguin';
       const n = kind === 'penguin' ? 7 : 6;
       for (let i = 0; i < n; i++) {
@@ -260,7 +281,7 @@ export default function build() {
         a.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
         group.add(a);
       };
-      for (const [kind, n, x0, z0, spread] of EXHIBITS) {
+      for (const [kind, n, x0, z0, spread] of ex) {
         for (let i = 0; i < n; i++) {
           const a = rnd() * Math.PI * 2, d = rnd() * spread;
           const x = x0 + Math.cos(a) * d, z = z0 + Math.sin(a) * d;
@@ -341,21 +362,31 @@ export default function build() {
     const spots = [];
     for (const r of D.roads || []) {
       if (!r.p || r.n && /Drive|Avenue/.test(r.n)) continue;
-      for (let i = 0; i + 1 < r.p.length && spots.length < 140; i++) {
+      for (let i = 0; i + 1 < r.p.length && spots.length < 420; i++) {
         const [ax, az] = r.p[i], [cx, cz] = r.p[i + 1];
-        if (!inZoo(ax, az) || rnd() > 0.35) continue;
+        if (!inZoo(ax, az) || rnd() > 0.8) continue;
         const t = rnd(), x = ax + (cx - ax) * t + (rnd() - 0.5) * 2, z = az + (cz - az) * t + (rnd() - 0.5) * 2;
         if (onField(x, z, 4)) continue;
         spots.push([x, gy(x, z), z, Math.atan2(cx - ax, cz - az) + (rnd() < 0.5 ? 0 : Math.PI)]);
       }
     }
     // and at the rails of the yards, looking in
-    for (const [, , x0, z0, , R] of EXHIBITS) {
+    for (const [, , x0, z0, , R] of ex) {
       if (!R) continue;
       for (let i = 0; i < 6; i++) {
         const a = rnd() * Math.PI * 2, x = x0 + Math.cos(a) * (R + 1.2), z = z0 + Math.sin(a) * (R + 1.2);
         if (onField(x, z, 4)) continue;
         spots.push([x, gy(x, z), z, Math.atan2(x0 - x, z0 - z)]);
+      }
+    }
+    // and a gallery along this hole, off the edge of play, turned to watch
+    if (H) {
+      const { T, atHole } = H, edge = Math.max(T.fwHalf || 0, 14);
+      for (let i = 0; i < 44; i++) {
+        const sAt = T.length * (0.15 + 0.85 * rnd()), d = (rnd() < 0.5 ? -1 : 1) * (edge + 12 + rnd() * 6);
+        const [x, z] = atHole(sAt, d), [tx, tz] = atHole(sAt, 0);
+        if (!inZoo(x, z)) continue;
+        spots.push([x, gy(x, z), z, Math.atan2(tx - x, tz - z) + (rnd() - 0.5) * 0.8]);
       }
     }
     const crowd = crowdAt(spots, rnd);

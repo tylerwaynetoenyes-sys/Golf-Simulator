@@ -140,8 +140,9 @@ export function buildCity(data, T, style = 'paris', pull = null) {
     area /= 2;
     if (Math.abs(area) < 12) continue;
     // keep the field of play clear
-    const pr = T.project(cx, cz);
-    if (Math.abs(pr.d) < T.oobLateral + 4 && pr.s > -40 && pr.s < T.length + 60) continue;
+    // (every corner and edge midpoint, not just the middle: a big footprint behind the tee can reach over it)
+    const inPlay = (x, z) => { const pr = T.project(x, z); return Math.abs(pr.d) < T.oobLateral + 4 && pr.s > -40 && pr.s < T.length + 60; };
+    if (inPlay(cx, cz) || pts.some(([x, z], i) => { const [x2, z2] = pts[(i + 1) % n]; return inPlay(x, z) || inPlay((x + x2) / 2, (z + z2) / 2); })) continue;
     const h0 = Math.min(...pts.map(([x, z]) => T.baseGround(x, z))) - 0.4;
     let h = b.h || (style === 'paris' ? 18.5 + rnd() * 3.5 : 14 + rnd() * 8);
     const tall = h > 45;

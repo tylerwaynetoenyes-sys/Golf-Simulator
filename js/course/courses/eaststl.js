@@ -36,8 +36,8 @@ export default {
     },
     {
       n: 2, name: 'Eads Bridge', par: 3,
-      note: "James B. Eads's bridge (1874) was the first major structure built chiefly of steel: three arches of 502, 520 and 502 feet carry the road over the rail line.",
-      pts: [[-250, 30], [-90, -40]], fw: 0,
+      note: "Down on the bank, straight at the bridge: James B. Eads's bridge (1874) was the first major structure built chiefly of steel, three arches of 502, 520 and 502 feet with the road over the rail line. The Arch rises across the river beyond it.",
+      pts: [[-720, 60], [-840, -50]], fw: 0,
       green: { r: 14, slope: [-0.01, 0.006] }, pin: [-3, 2],
       bunkers: [{ t: 0.92, off: -15, rx: 9, rz: 6 }, { t: 1.07, off: 13, rx: 7, rz: 5 }],
       water: [],
@@ -59,7 +59,7 @@ export default {
       green: { r: 14, slope: [-0.012, 0] }, pin: [2, 3],
       bunkers: [{ t: 0.6, off: -22, rx: 10, rz: 6 }, { t: 1.0, off: -16, rx: 7, rz: 7 }],
       water: [], trees: [{ t: 0.5, off: 40, r: 12, n: 6 }],
-      lm: { type: 'railyard', at: [70, 40], rot: 0.1 },
+      lm: { type: 'railyard', at: [44, 150], rot: 0 },
     },
     {
       n: 5, name: 'Miles', par: 3,
@@ -77,7 +77,7 @@ export default {
       green: { r: 15, slope: [0, -0.012] }, pin: [2, -4],
       bunkers: [{ t: 0.52, off: 21, rx: 11, rz: 6 }, { t: 0.98, off: -15, rx: 8, rz: 6 }],
       water: [],
-      lm: { type: 'railyard', at: [-80, 90], rot: -0.2 },
+      lm: { type: 'railyard', at: [-72, 150], rot: 0 },
     },
     {
       n: 7, name: 'Katherine Dunham', par: 4,

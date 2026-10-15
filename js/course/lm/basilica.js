@@ -9,6 +9,20 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { lit, box, cyl, seeded, tree, SLOT } from './kit.js';
 import { pbr } from '../../scene/pbr.js';
 import { crowdAt } from '../../scene/crowd.js';
+import { carsAt } from '../../scene/cars.js';
+import { building, shopMats } from './delmar.js';
+import { Batch, bx } from './riverfront.js';
+
+/** A lit hotel sign: gold capitals on dark. */
+function canvasTex2(text) {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 140;
+  const g = c.getContext('2d');
+  g.fillStyle = '#16120e'; g.fillRect(0, 0, c.width, c.height);
+  g.font = 'bold 84px Georgia'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffd68a'; g.shadowColor = '#ffb040'; g.shadowBlur = 18;
+  g.fillText(text, c.width / 2, c.height / 2 + 4);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
 
 // ---------- batching: merge everything that shares a material ----------
 function batcher() {
@@ -373,6 +387,79 @@ export default function build() {
   if (people) group.add(people);
   group.traverse((o) => { if (o.isMesh) o.receiveShadow = true; });
 
+  // ---------- the Central West End round it ----------
+  // Lindell Boulevard across the front (here between the plaza and the golfer),
+  // Newstead Avenue down the east side, and the neighbours along Lindell: brick
+  // and limestone apartment blocks of four to six storeys either side, with the
+  // Chase Park Plaza's tower rising to the west. Cars at the kerbs, people out.
+  {
+    const asphalt = pbr('asphalt_02', { scale: 4, tint: 0x9a9ea4 });
+    const walk = pbr('brushed_concrete', { scale: 2.5, tint: 0xe8e2d8, bright: 1.2 });
+    const paint = pbr('white_plaster_02', { scale: 1, tint: 0xf4f0e0 });
+    const LZ = 58; // Lindell's centre line
+    group.add(box(520, 0.08, 16, asphalt, 0, 0.04, LZ));
+    group.add(box(520, 0.22, 5, walk, 0, 0.11, LZ - 10.5), box(520, 0.22, 5, walk, 0, 0.11, LZ + 10.5));
+    for (let x = -255; x < 255; x += 9) group.add(box(4, 0.02, 0.18, paint, x, 0.09, LZ));
+    // Newstead Avenue, down the east side of the cathedral
+    group.add(box(12, 0.08, 220, asphalt, 68, 0.05, LZ - 120));
+    group.add(box(4, 0.22, 220, walk, 60, 0.11, LZ - 122), box(4, 0.22, 220, walk, 76, 0.11, LZ - 122));
+    const RB = new Batch();
+    const Ms = shopMats(glow);
+    const rr = seeded(4431);
+    const fronts = ['#8a4a36', '#b88a64', '#9a5a3c', '#c9b48e', '#7d4434', '#a8705a'];
+    // a row of apartment blocks along Lindell, fronts facing it (+z), running away from x0
+    const row = (x0, dir, len) => {
+      const G = new THREE.Group(), B2 = new Batch();
+      let z = 0, i = 0;
+      while (z < len - 10) {
+        const w = 18 + Math.floor(rr() * 3) * 6, st = 3 + Math.floor(rr() * 3);
+        building(B2, Ms, z, w, st, fronts[i++ % fronts.length], rr, 0, { depth: 24 });
+        z += w + 2.5;
+      }
+      B2.build(G);
+      // row frame: fronts on x = 0 facing +x, running along +z; turned to face +z
+      G.rotation.y = -Math.PI / 2; // fronts to +z, the row running west from x0
+      G.position.set(x0, 0, LZ - 13);
+      group.add(G);
+    };
+    row(-62, -1, 190); // west of the cathedral, toward Kingshighway
+    row(240, -1, 160); // east of Newstead, back toward it
+    // the Chase Park Plaza's tower (1929-31), west along Lindell: a tall brick shaft with stone setbacks
+    {
+      const brick = pbr('red_bricks_02', { scale: 2, tint: 0xd8b8a0 });
+      const stone = pbr('white_sandstone_bricks', { scale: 2, tint: 0xf0e4d0 });
+      const win = lit(0x2a3440, 0xffd9a0, { night: 1.0, roughness: 0.1, metalness: 0.4 });
+      glow.push(win);
+      const tx = -330, tz = -40;
+      RB.add(brick, bx(40, 60, 30, tx, 0, tz), bx(30, 22, 22, tx, 60, tz), bx(20, 14, 16, tx, 82, tz));
+      RB.add(stone, bx(41, 1.2, 31, tx, 59.4, tz), bx(31, 1.2, 23, tx, 81.4, tz), bx(21, 3, 17, tx, 95.5, tz));
+      for (let y = 3; y < 94; y += 3.4) {
+        const w = y < 60 ? 40 : y < 82 ? 30 : 20;
+        for (let x = -w / 2 + 2; x < w / 2 - 1; x += 2.6) RB.add(win, bx(1.3, 1.9, 0.12, tx + x, y, tz + (y < 60 ? 15 : y < 82 ? 11 : 8) + 0.02));
+      }
+      const sign = new THREE.MeshStandardMaterial({ map: canvasTex2('THE CHASE PARK PLAZA'), emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.6 });
+      sign.emissiveMap = sign.map; sign.userData.night = 1.6; glow.push(sign);
+      const sm = new THREE.Mesh(new THREE.PlaneGeometry(18, 2.6), sign);
+      sm.position.set(tx, 64, tz + 11.2);
+      group.add(sm);
+    }
+    const rg = new THREE.Group();
+    RB.build(rg);
+    group.add(rg);
+    // cars along both kerbs of Lindell, people on its walks and on the cathedral's steps
+    const cars = [];
+    for (let x = -250; x < 250; x += 6.4) {
+      if (Math.abs(x) < 60) continue; // no parking in front of the cathedral
+      if (rr() < 0.65) cars.push([x, 0.08, LZ - 6.2, Math.PI / 2]);
+      if (rr() < 0.55) cars.push([x, 0.08, LZ + 6.2, -Math.PI / 2]);
+    }
+    carsAt(cars, rr, { max: 50 }).then((cg) => cg && group.add(cg));
+    const spots = [];
+    for (let i = 0; i < 46; i++) { const x = -240 + rr() * 480; spots.push([x, 0.22, LZ + (rr() < 0.5 ? -10.5 : 10.5) + (rr() - 0.5) * 3, rr() < 0.5 ? Math.PI / 2 : -Math.PI / 2]); }
+    for (let i = 0; i < 18; i++) spots.push([-30 + rr() * 60, 0.25, 34 + rr() * 10, rr() * 6.28]);
+    const ppl = crowdAt(spots, rr);
+    if (ppl) group.add(ppl);
+  }
   return { group, glow, trees: treeList };
 
   // ---------- helpers (closures over B and materials) ----------
