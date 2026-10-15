@@ -230,14 +230,32 @@ export function buildVenue(group, { quality, updaters, dayHooks }) {
   const gang = new THREE.Mesh(box(3.6, 0.35, 0.8, 0, 0, 2.2), steel); picker.add(gang);
   picker.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   group.add(picker);
-  const lane = { x: -40, dir: 1 };
-  let pz = -70;
+  // it mows the range in straight passes, row by row, turning round a tight U at
+  // each end onto the next row (the way a picker works a range), at a steady 2.4 m/s
+  const P = { x: -42, z: -66, h: 0, phase: 'run', dir: -1, side: 1, a: 0, cx: 0, cz: 0 };
+  const ROW = 6, R = ROW / 2, Z0 = -66, Z1 = -232, SPEED = 2.4, XMAX = 44;
+  // heading for a direction of travel (vx, vz): rotation.y turns the cart's front (-z) onto it
+  const headTo = (vx, vz) => Math.atan2(-vx, -vz);
   updaters.push((t, dt) => {
-    // up and down the range in passes, turning at the ends
-    pz += lane.dir * dt * 2.4;
-    if (pz < -230 || pz > -60) { lane.dir *= -1; lane.x += 7; if (lane.x > 40) lane.x = -40; pz = Math.max(-230, Math.min(-60, pz)); }
-    picker.position.set(lane.x, groundHeight(lane.x, pz), pz);
-    picker.rotation.y = lane.dir > 0 ? Math.PI : 0;
+    if (P.phase === 'run') {
+      P.z += P.dir * SPEED * dt;
+      P.h = headTo(0, P.dir);
+      if ((P.dir < 0 && P.z <= Z1) || (P.dir > 0 && P.z >= Z0)) {
+        P.z = P.dir < 0 ? Z1 : Z0;
+        // work across the range one way, then back the other
+        if (P.x + ROW > XMAX) P.side = -1; else if (P.x - ROW < -XMAX) P.side = 1;
+        P.cx = P.x + P.side * R; P.cz = P.z; P.a = 0; P.phase = 'turn';
+      }
+    } else {
+      // a half circle onto the next row, bulging past the end of the pass
+      P.a = Math.min(Math.PI, P.a + (SPEED / R) * dt);
+      P.x = P.cx - P.side * R * Math.cos(P.a);
+      P.z = P.cz + P.dir * R * Math.sin(P.a);
+      P.h = headTo(P.side * Math.sin(P.a), P.dir * Math.cos(P.a));
+      if (P.a >= Math.PI) { P.dir *= -1; P.phase = 'run'; }
+    }
+    picker.position.set(P.x, groundHeight(P.x, P.z), P.z);
+    picker.rotation.y = P.h;
   });
 
   // ── people in the bays: groups at each, someone at the mat, friends on the sofa ──
