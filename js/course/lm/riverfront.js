@@ -1,8 +1,8 @@
 // Alton, Illinois riverfront (hole 4). Local +X faces the fairway; the
 // Mississippi runs along local Z on the far (-X) side. Includes the Clark Bridge
 // (1994: single concrete pylons carrying two planes of yellow-sheathed stays),
-// the riverfront grain elevators, the Argosy Casino Alton (moored 1991, the
-// state's first riverboat casino), the Riverfront Park amphitheater with its
+// the riverfront grain elevators, the Argosy Casino Alton (from 1991, the
+// state's first riverboat casino; a glass-walled casino boat, not a steamer), the Riverfront Park amphitheater with its
 // white tensile canopy, the marina and the river-walk promenade.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -116,40 +116,38 @@ function usFlagTex() {
   });
 }
 
-// ── the Argosy Casino Alton: a permanently moored, steamboat-styled casino ──
+// ── the Argosy Casino Alton: a permanently moored casino boat ──
+// Not a steamer: a broad three-deck vessel walled in tinted glass, its decks
+// banded in the casino's purple, teal and red, with a lit marquee on the roof
+// facing the course (+X) and a second one toward the river.
 function casino(tex, glow, B, bulbPts) {
-  // the Argosy is painted a warm yellow with white railings and gold trim
-  const white = mat(0xf0d57a, { roughness: 0.55 });
-  const hull = mat(0x1f2b38, { roughness: 0.5, metalness: 0.3 });
-  const gold = lit(0xc9a24a, 0xffcf70, { metalness: 0.7, roughness: 0.35, night: 0.5 });
-  const red = mat(0xa3202a, { roughness: 0.5 });
-  const black = mat(0x16181b, { roughness: 0.6 });
+  const white = mat(0xf2f0ea, { roughness: 0.4 });
+  const hull = mat(0x23314a, { roughness: 0.45, metalness: 0.3 });
+  const gold = lit(0xd6ae4e, 0xffcf70, { metalness: 0.7, roughness: 0.3, night: 0.6 });
   const rail = mat(0xffffff, { roughness: 0.5 });
-  glow.push(gold);
-  // window-band facade
-  const winTex = canvasTex(256, 64, (g, w, h) => {
-    g.fillStyle = '#f0d47c'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 8; i++) {
-      const x = i * 32 + 7;
-      g.fillStyle = '#26323e'; g.fillRect(x, 16, 18, 34);
-      g.beginPath(); g.arc(x + 9, 16, 9, Math.PI, 0); g.fill();
-    }
-    g.fillStyle = '#b8902f'; g.fillRect(0, 58, w, 4);
-    g.fillStyle = '#9a1f28'; g.fillRect(0, 2, w, 3);
+  const bands = [0x6a2a8c, 0x14868c, 0xb3202e].map((c) => lit(c, c, { roughness: 0.35, metalness: 0.2, night: 1.1 }));
+  glow.push(gold, ...bands);
+  // tinted glass with white mullions; slot machines and chandeliers glow behind it at night
+  const glassTex = canvasTex(256, 64, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#5f86a8'); gr.addColorStop(0.55, '#2c4a68'); gr.addColorStop(1, '#1d3249');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.fillStyle = 'rgba(255,255,255,0.18)';
+    for (let i = 0; i < 6; i++) g.fillRect(i * 44 + 10, 0, 14, h); // sky reflections
+    g.fillStyle = '#eceae4';
+    for (let x = 0; x < w; x += 32) g.fillRect(x, 0, 3, h);
+    g.fillRect(0, 0, w, 3); g.fillRect(0, h - 3, w, 3);
   });
-  const winEm = canvasTex(256, 64, (g, w, h) => {
+  const glassEm = canvasTex(256, 64, (g, w, h) => {
     g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
-    for (let i = 0; i < 8; i++) {
-      const x = i * 32 + 7;
-      g.fillStyle = i % 3 === 1 ? '#ff9d5c' : '#ffd38a'; g.fillRect(x, 16, 18, 34);
-      g.beginPath(); g.arc(x + 9, 16, 9, Math.PI, 0); g.fill();
-    }
-    g.fillStyle = '#ffcf70'; g.fillRect(0, 58, w, 4);
+    const cols = ['#ffcf7a', '#ff6fb0', '#7fe0ff', '#ffd98f', '#c58aff'];
+    for (let x = 3; x < w; x += 32) for (let k = 0; k < 6; k++) { g.fillStyle = cols[(x + k * 7) % cols.length]; g.fillRect(x + 4 + k * 4, 20 + (k % 3) * 9, 3, 18); }
+    g.fillStyle = '#ffe3a0'; g.fillRect(0, 6, w, 4);
   });
-  for (const t of [winTex, winEm]) { t.wrapS = THREE.RepeatWrapping; }
-  const deckWin = new THREE.MeshStandardMaterial({ map: winTex, emissiveMap: winEm, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.5 });
-  deckWin.userData.night = 1.4;
-  glow.push(deckWin);
+  for (const t of [glassTex, glassEm]) t.wrapS = THREE.RepeatWrapping;
+  const glass = new THREE.MeshStandardMaterial({ map: glassTex, emissiveMap: glassEm, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.12, metalness: 0.5 });
+  glass.userData.night = 1.6;
+  glow.push(glass);
   const band = (w, h, d, x, y, z) => {
     const g = new THREE.BoxGeometry(w, h, d).translate(x, y + h / 2, z);
     const n = g.attributes.normal, uv = g.attributes.uv;
@@ -160,62 +158,57 @@ function casino(tex, glow, B, bulbPts) {
     }
     return g;
   };
-  // hull / barge
-  B.add(hull, bx(23, 2.6, 78, 0, -0.5, 0));
-  B.add(red, bx(23.2, 0.35, 78.2, 0, 1.7, 0));
-  const decks = [[0, 2.1, 22.4, 76, 18, 66, 4.6], [1, 7.0, 21, 72, 16.4, 58, 4.0], [2, 11.3, 19, 62, 13, 38, 3.4]];
+  // the barge hull, painted navy with a white boot top
+  B.add(hull, bx(30, 3.0, 96, 0, -0.9, 0));
+  B.add(white, bx(30.2, 0.5, 96.2, 0, 1.9, 0));
+  // three casino decks, each glazed all round and capped with a colour band
+  const decks = [[0, 2.4, 29, 92, 26, 86, 5.0], [1, 7.8, 27, 86, 24, 78, 4.6], [2, 12.8, 24, 72, 21, 62, 4.2]];
   for (const [k, y, sw, sl, ew, el, eh] of decks) {
-    B.add(white, bx(sw, 0.4, sl, 0, y, 0));
-    B.add(gold, bx(sw + 0.15, 0.22, sl + 0.15, 0, y + 0.05, 0));
-    B.add(deckWin, band(ew, eh, el, 0, y + 0.4, k === 2 ? -6 : 0));
-    // railing posts + top rail around the deck edge
-    const yy = y + 0.4;
-    for (let z = -sl / 2 + 1; z <= sl / 2 - 1; z += 2) for (const s of [-1, 1]) B.add(rail, bx(0.07, 1.05, 0.07, s * (sw / 2 - 0.25), yy, z));
-    for (let x = -sw / 2 + 1; x <= sw / 2 - 1; x += 2) for (const s of [-1, 1]) B.add(rail, bx(0.07, 1.05, 0.07, x, yy, s * (sl / 2 - 0.25)));
-    for (const s of [-1, 1]) {
-      B.add(rail, bx(0.12, 0.1, sl - 0.4, s * (sw / 2 - 0.25), yy + 1.05, 0), bx(sw - 0.4, 0.1, 0.12, 0, yy + 1.05, s * (sl / 2 - 0.25)));
-      B.add(gold, bx(0.06, 0.06, sl - 0.4, s * (sw / 2 - 0.25), yy + 0.5, 0));
+    B.add(white, bx(sw, 0.45, sl, 0, y, 0));
+    B.add(glass, band(ew, eh, el, 0, y + 0.45, 0));
+    B.add(bands[k], bx(ew + 0.3, 0.7, el + 0.3, 0, y + 0.45 + eh - 0.7, 0));
+    const yy = y + 0.45;
+    for (const sd of [-1, 1]) {
+      B.add(rail, bx(0.12, 0.1, sl - 0.4, sd * (sw / 2 - 0.25), yy + 1.05, 0), bx(sw - 0.4, 0.1, 0.12, 0, yy + 1.05, sd * (sl / 2 - 0.25)));
+      B.add(gold, bx(0.06, 0.06, sl - 0.4, sd * (sw / 2 - 0.25), yy + 0.5, 0));
     }
-    // white columns carrying the deck above
-    if (k < 2) for (let z = -sl / 2 + 3; z <= sl / 2 - 3; z += 6) for (const s of [-1, 1]) B.add(white, bx(0.3, decks[k + 1][1] - yy, 0.3, s * (sw / 2 - 0.6), yy, z));
-    // string lights along the shore side and the ends
-    for (let z = -sl / 2; z <= sl / 2; z += 1.6) bulbPts.push(sw / 2, y + 0.3, z, -sw / 2, y + 0.3, z);
-    for (let x = -sw / 2; x <= sw / 2; x += 1.6) bulbPts.push(x, y + 0.3, sl / 2, x, y + 0.3, -sl / 2);
+    for (let z = -sl / 2 + 1; z <= sl / 2 - 1; z += 2.5) for (const sd of [-1, 1]) B.add(rail, bx(0.07, 1.05, 0.07, sd * (sw / 2 - 0.25), yy, z));
+    // marquee bulbs along every deck edge
+    for (let z = -sl / 2; z <= sl / 2; z += 1.4) bulbPts.push(sw / 2, y + 0.3, z, -sw / 2, y + 0.3, z);
+    for (let x = -sw / 2; x <= sw / 2; x += 1.4) bulbPts.push(x, y + 0.3, sl / 2, x, y + 0.3, -sl / 2);
   }
-  // roof, pilot house and cresting
-  B.add(white, bx(14.5, 0.35, 42, 0, 15.1, -6));
-  B.add(gold, bx(14.7, 0.25, 42.2, 0, 15.15, -6));
-  B.add(deckWin, band(7, 2.8, 7, 0, 15.45, -20));
-  B.add(white, bx(8.2, 0.3, 8.2, 0, 18.25, -20));
-  B.add(gold, place(new THREE.ConeGeometry(1.2, 1.4, 8).translate(0, 0.7, 0), 0, 18.55, -20));
-  for (let x = -3.6; x <= 3.6; x += 0.9) B.add(gold, place(new THREE.ConeGeometry(0.18, 0.7, 4).translate(0, 0.35, 0), x, 18.55, -24.1));
-  // twin decorative stacks with gold feathered crowns, forward of the pilot house
-  for (const s of [-1, 1]) {
-    B.add(black, cy(1.05, 1.15, 15, s * 4.4, 15.4, -27, 16));
-    const crown = new THREE.CylinderGeometry(2.0, 1.2, 2.2, 16, 1, true);
-    const p = crown.attributes.position;
-    for (let i = 0; i < p.count; i++) if (p.getY(i) > 0) { const k = (Math.round((Math.atan2(p.getZ(i), p.getX(i)) / (Math.PI * 2)) * 16) + 16) % 2; const f = k ? 1.0 : 0.7; p.setXYZ(i, p.getX(i) * f, p.getY(i) + (k ? 0.6 : 0), p.getZ(i) * f); }
-    crown.computeVertexNormals();
-    B.add(gold, place(crown, s * 4.4, 31.5, -27));
-    B.add(gold, cy(1.2, 1.2, 0.4, s * 4.4, 23, -27, 16));
-  }
-  B.add(gold, bx(8.8, 0.25, 0.25, 0, 26, -27)); // spreader bar between stacks
-  // decorative stern paddle wheel
-  const wheel = new THREE.CylinderGeometry(5.2, 5.2, 15, 20, 1, false).rotateZ(Math.PI / 2);
-  B.add(red, place(wheel, 0, 4.2, 41.6));
-  for (let k = 0; k < 10; k++) B.add(white, place(new THREE.BoxGeometry(15.4, 0.3, 11), 0, 4.2, 41.6, 0, 1, 1, 1, (k / 10) * Math.PI));
-  // sign on the shore side of the Texas deck
-  const sign = canvasTex(512, 96, (g, w, h) => {
-    g.fillStyle = '#7d1520'; g.fillRect(0, 0, w, h);
-    g.strokeStyle = '#d8b25a'; g.lineWidth = 6; g.strokeRect(5, 5, w - 10, h - 10);
-    g.fillStyle = '#f5d98a'; g.font = 'bold 56px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-    g.fillText('ARGOSY CASINO', w / 2, h / 2 + 3);
+  // roof, a glass atrium dome over the main stair, and the gold cornice
+  B.add(white, bx(23, 0.4, 66, 0, 17.0, 0));
+  B.add(gold, bx(23.3, 0.3, 66.3, 0, 17.1, 0));
+  B.add(glass, place(new THREE.SphereGeometry(5, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2).scale(1, 0.6, 1), 0, 17.4, 14));
+  for (let z = -32; z <= 32; z += 1.4) bulbPts.push(11.5, 17.5, z, -11.5, 17.5, z);
+  // rooftop marquee: a lit sign box on a steel frame, one face to the course, one to the river
+  const sign = canvasTex(512, 128, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, w, 0);
+    gr.addColorStop(0, '#4a1667'); gr.addColorStop(0.5, '#7a2394'); gr.addColorStop(1, '#4a1667');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.strokeStyle = '#f2c862'; g.lineWidth = 8; g.strokeRect(6, 6, w - 12, h - 12);
+    g.fillStyle = '#ffe08a'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = 'bold 74px Georgia, serif'; g.fillText('ARGOSY', w / 2, h * 0.42);
+    g.font = '600 28px Georgia, serif'; g.fillText('C A S I N O   ·   A L T O N', w / 2, h * 0.8);
   });
-  const signM = new THREE.MeshStandardMaterial({ map: sign, emissiveMap: sign, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.5 });
-  signM.userData.night = 1.0;
+  const signM = new THREE.MeshStandardMaterial({ map: sign, emissiveMap: sign, emissive: 0xffffff, emissiveIntensity: 0, roughness: 0.4 });
+  signM.userData.night = 1.3;
   glow.push(signM);
-  const sm = new THREE.Mesh(new THREE.PlaneGeometry(20, 3.6).rotateY(Math.PI / 2), signM);
-  sm.position.set(6.6, 13.4, 2);
+  const frame = mat(0x2a2d33, { metalness: 0.6, roughness: 0.4 });
+  for (const z of [-11, 11]) B.add(frame, bx(0.5, 3.2, 0.5, 0, 17.4, z - 6));
+  B.add(frame, bx(1.4, 6.6, 25, 0, 20.6, -6));
+  const sm = new THREE.Group();
+  for (const sd of [-1, 1]) {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(24, 6).rotateY(sd * Math.PI / 2), signM);
+    m.position.set(sd * 0.75, 23.9, -6);
+    sm.add(m);
+  }
+  for (let z = -18; z <= 6; z += 1.2) bulbPts.push(0.9, 27.3, z, -0.9, 27.3, z, 0.9, 20.5, z, -0.9, 20.5, z);
+  // the name low on the course side too, over the gangway
+  const low = new THREE.Mesh(new THREE.PlaneGeometry(16, 4).rotateY(Math.PI / 2), signM);
+  low.position.set(12.2, 8.6, 0);
+  sm.add(low);
   return sm;
 }
 
@@ -316,8 +309,8 @@ export default function build() {
   }, [14, 22]);
   ripple.colorSpace = THREE.NoColorSpace;
   const water = new THREE.MeshStandardMaterial({ color: 0x2c4847, roughness: 0.15, metalness: 0.2, normalMap: ripple, normalScale: new THREE.Vector2(0.35, 0.35) });
-  const river = new THREE.Mesh(new THREE.PlaneGeometry(108, 360).rotateX(-Math.PI / 2), water);
-  river.position.set(-160 + 54, WY, -40);
+  const river = new THREE.Mesh(new THREE.PlaneGeometry(108, 500).rotateX(-Math.PI / 2), water);
+  river.position.set(-160 + 54, WY, 30);
   river.receiveShadow = true; river.castShadow = false;
   group.add(river);
 
@@ -326,24 +319,24 @@ export default function build() {
   const paving = mat(0xc9c1b2, { roughness: 0.8 });
   const grass = mat(0x5f8a40, { roughness: 0.95 });
   const ironM = mat(0x23272b, { metalness: 0.5, roughness: 0.5 });
-  B.add(stone, bx(3, QY + 1.2, 360, -54.5, -1.2, -40)); // river wall
-  B.add(paving, bx(10, QY, 360, -48, 0, -40)); // promenade
-  B.add(ironM, bx(0.08, 0.06, 360, -55.8, QY + 1.0, -40)); // railing top
-  for (let z = -219; z <= 139; z += 2.5) B.add(ironM, bx(0.05, 1.0, 0.05, -55.8, QY, z));
+  B.add(stone, bx(3, QY + 1.2, 500, -54.5, -1.2, 30)); // river wall
+  B.add(paving, bx(10, QY, 500, -48, 0, 30)); // promenade
+  B.add(ironM, bx(0.08, 0.06, 500, -55.8, QY + 1.0, 30)); // railing top
+  for (let z = -219; z <= 279; z += 2.5) B.add(ironM, bx(0.05, 1.0, 0.05, -55.8, QY, z));
   // grassy bank from the promenade down to the park
   {
-    const pos = [-43, QY, 140, -43, QY, -220, -38, 0, -220, -43, QY, 140, -38, 0, -220, -38, 0, 140];
+    const pos = [-43, QY, 280, -43, QY, -220, -38, 0, -220, -43, QY, 280, -38, 0, -220, -38, 0, 280];
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.computeVertexNormals();
-    if (g.attributes.normal.getY(0) < 0) { g.setAttribute('position', new THREE.Float32BufferAttribute([-43, QY, 140, -38, 0, -220, -43, QY, -220, -43, QY, 140, -38, 0, 140, -38, 0, -220], 3)); g.computeVertexNormals(); }
+    if (g.attributes.normal.getY(0) < 0) { g.setAttribute('position', new THREE.Float32BufferAttribute([-43, QY, 280, -38, 0, -220, -43, QY, -220, -43, QY, 280, -38, 0, 280, -38, 0, -220], 3)); g.computeVertexNormals(); }
     B.add(grass, g);
   }
   // promenade lamps (cast-iron posts with globes) and benches
   const lampHead = lit(0xfff6e4, 0xffd59a, { night: 2.4, roughness: 0.3 });
   glow.push(lampHead);
   const halos = [];
-  for (let z = -215; z <= 135; z += 15) {
+  for (let z = -215; z <= 275; z += 15) {
     B.add(ironM, cy(0.08, 0.12, 3.8, -51.8, QY, z, 6));
     B.add(lampHead, place(new THREE.SphereGeometry(0.28, 10, 8), -51.8, QY + 4.05, z));
     halos.push(-51.8, QY + 4.05, z);
@@ -351,7 +344,12 @@ export default function build() {
   }
 
   // ── Clark Bridge ──
-  const S0 = new THREE.Vector3(56, 0, -30);
+  // the Illinois end lands to the left of the amphitheater (as you face the
+  // river), east of it in reality (OSM: amphitheater 38.8875 −90.1819,
+  // bridge 38.8840 −90.1754, marina 38.8849 −90.1770); the deck climbs out
+  // over the marina, which sits partly beneath it, and the Argosy is moored
+  // off to the right in clear view
+  const S0 = new THREE.Vector3(56, 0, 230);
   const th = 42 * Math.PI / 180;
   const D = new THREE.Vector3(-Math.cos(th), 0, -Math.sin(th));
   const N = new THREE.Vector3(-D.z, 0, D.x);
@@ -363,7 +361,7 @@ export default function build() {
   const concrete = mat(0xc3c0b8, { roughness: 0.8 });
   const cableM = lit(0xf3e7a6, 0xfff2b0, { roughness: 0.4, night: 0.35 });
   glow.push(cableM);
-  const SEND = 300, sP = [150, 275];
+  const SEND = 300, sP = [160, 285]; // pylons in the river: just off the quay (clear of the silos), and mid-channel
   for (let s = 0; s < SEND; s += 10) {
     const a = P(s), b = P(Math.min(SEND, s + 10));
     B.add(deckM, span(a, b, 24, 0.35));
@@ -504,10 +502,10 @@ export default function build() {
     // entrance pavilion on land
     const pav = lit(0xf1ede2, 0xffe2b0, { night: 0.6 });
     glow.push(pav);
-    B.add(pav, bx(8, 7, 22, -33, 0, -40));
-    B.add(mat(0x9a1f28), bx(9.4, 0.6, 23.4, -33, 7, -40));
-    B.add(mat(0xc9a24a, { metalness: 0.6, roughness: 0.4 }), bx(9.6, 0.3, 23.6, -33, 7.6, -40));
-    B.add(lit(0x2a2f36, 0xffd38a, { night: 1.2 }), bx(0.2, 3.5, 8, -28.9, 0.3, -40));
+    B.add(pav, bx(8, 4.2, 22, -33, 0, -40)); // kept low: the boat stays in view from the course
+    B.add(mat(0x6a2a8c), bx(9.4, 0.6, 23.4, -33, 4.2, -40));
+    B.add(mat(0xc9a24a, { metalness: 0.6, roughness: 0.4 }), bx(9.6, 0.3, 23.6, -33, 4.8, -40));
+    B.add(lit(0x2a2f36, 0xffd38a, { night: 1.2 }), bx(0.2, 3.2, 8, -28.9, 0.3, -40));
     glow.push(B.m.get([...B.m.keys()].pop())?.[0] ? [...B.m.keys()].pop() : pav);
     B.add(paving, bx(14, 0.08, 30, -38, 0, -40));
   }
@@ -518,7 +516,7 @@ export default function build() {
     const SB = new Batch();
     sternwheeler(SB, glow);
     SB.build(sg);
-    sg.position.set(-80, WY + 1.2, 150);
+    sg.position.set(-80, WY + 1.2, 200); // upstream of the bridge
     group.add(sg);
   }
 
@@ -651,6 +649,9 @@ export default function build() {
       boatInst.push([-99 + s * 8, z + 4.5, s, 7.5 + rnd() * 4]);
     }
     for (let z = 70; z <= 120; z += 10) boatInst.push([-73 + (z % 20 ? 0 : 1), z, 1, 8 + rnd() * 3]);
+    // none moored against the bridge pier
+    const pier = P(sP[0]);
+    for (let i = boatInst.length - 1; i >= 0; i--) if (Math.hypot(boatInst[i][0] - pier.x, boatInst[i][1] - pier.z) < 12) boatInst.splice(i, 1);
     B.add(ironM, bx(0.4, 0.4, 0.4, -99, WY + 0.6, 125));
   }
   const hullG = (() => {
@@ -679,7 +680,7 @@ export default function build() {
 
   // ── trees, people, flags ──
   const tl = [];
-  for (let z = -200; z <= 80; z += 11) if (Math.abs(z + 40) > 16 && Math.abs(z - 40) > 22) { const r = 2.6 + rnd(); tl.push(tree(-40.5 + (rnd() - 0.5), 0, z, r * 3.1, r, { slot: SLOT.maple })); }
+  for (let z = -200; z <= 80; z += 11) if (Math.abs(z + 40) > 26 && Math.abs(z - 40) > 22) { const r = 2.6 + rnd(); tl.push(tree(-40.5 + (rnd() - 0.5), 0, z, r * 3.1, r, { slot: SLOT.maple })); }
   for (let i = 0; i < 40; i++) {
     const x = -30 + rnd() * 85, z = -200 + rnd() * 330;
     const dB = Math.abs((x - S0.x) * N.x + (z - S0.z) * N.z);
@@ -687,7 +688,7 @@ export default function build() {
     if (Math.hypot(x - SC.x, z - SC.z) < 72 && x > SC.x - 10) continue;
     if (dB < 18 && alongB > -5 && alongB < 140) continue;
     if (x < 10 && z > 80) continue;
-    if (Math.abs(z + 40) < 18 && x < -20) continue;
+    if (Math.abs(z + 40) < 32 && x < 25) continue; // a clear view of the casino from the course
     const r = 3 + rnd() * 1.6;
     tl.push(tree(x, 0, z, r * 3.1, r));
   }
