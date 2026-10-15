@@ -203,6 +203,9 @@ function slopeAt(terrain, x, z) {
  */
 export function simulateShot(launch, opts = {}) {
   const wet = Math.max(0, Math.min(1, opts.wet || 0));
+  // the ball: its dimples scale drag and lift, its cover how hard backspin bites (less when wet for ionomer)
+  const ballK = opts.ball || { cd: 1, cl: 1, grip: 1, wetKeep: 0.9 };
+  const grip = ballK.grip * (1 - wet * (1 - (ballK.wetKeep ?? 0.9)));
   const wetCache = {};
   const surfaceOf = (id) => {
     const g = GROUND[id];
@@ -249,8 +252,8 @@ export function simulateShot(launch, opts = {}) {
     const rvx = ux - wind.x, rvy = uy, rvz = uz - wind.z;
     const sp = Math.hypot(rvx, rvy, rvz) || 1e-6;
     const S = (BALL.radius * w) / sp;
-    const cd = dragCoeff(sp, S);
-    const cl = liftCoeff(S);
+    const cd = dragCoeff(sp, S) * ballK.cd;
+    const cl = liftCoeff(S) * ballK.cl;
     // Magnus direction = spinAxis x velocityDir
     let mx = ay * rvz - az * rvy;
     let my = az * rvx - ax * rvz;
@@ -366,14 +369,14 @@ export function simulateShot(launch, opts = {}) {
       const thl = Math.hypot(tx, tz) || 1;
       const rightDot = -ax * (tz / thl) + az * (tx / thl);
       const backOmega = omega * Math.max(-1, Math.min(1, rightDot));
-      const rw = BALL.radius * backOmega * (surf.spinGrip ?? 1);
+      const rw = BALL.radius * backOmega * (surf.spinGrip ?? 1) * grip;
       // Steeper landings (relative to the surface) bite harder.
       const impact = (Math.atan2(vn, ts) * 180) / Math.PI;
       const bite = Math.min(1, Math.max(0.25, Math.sin((impact * Math.PI) / 180) * 1.25));
       let hNew = ts - surf.friction * bite * (ts + rw) * (2 / 7) * 2.2;
       // a little zip back at most: none out of rough or sand (the grass
       // between ball and face takes the spin off), most on a receptive green
-      hNew = Math.max(hNew, -Math.min(0.12 * ts, surf.zipMax ?? 1));
+      hNew = Math.max(hNew, -Math.min(0.12 * ts, (surf.zipMax ?? 1) * Math.min(1, grip)));
       if (ts > 1e-6 && hNew < ts * 0.04 && rw < ts) hNew = Math.max(hNew, ts * 0.04);
       if (ground.surface === 'sand') hNew = Math.min(hNew, ts * 0.08); // plugs / dies in the bunker
       hNew = Math.min(hNew, ts); // turf never adds speed along the ground

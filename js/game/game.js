@@ -6,7 +6,7 @@ import { simulateShot, simulatePutt, puttSpeedFor, samplePath, MPH, YD, BALL } f
 import { bus } from '../core/events.js';
 import { units } from '../core/units.js';
 import * as U from '../core/units.js';
-import { CLUBS, clubById, demoLaunch } from '../data/clubs.js';
+import { CLUBS, clubById, demoLaunch, rebuildClubs, currentBall } from '../data/clubs.js';
 import { partyCalls, partyRule } from './party.js';
 import { store } from '../data/store.js';
 import { audio } from '../audio/audio.js';
@@ -206,6 +206,7 @@ export class Game {
     this.world.tracer.clearGhosts();
     this.hud.clearDots();
     if (id !== 'course') this.world.setScene('range');
+    this.refreshEquipment();
     this.mode.start(opts);
     this._syncEnvUI();
     this.shot = null;
@@ -216,6 +217,14 @@ export class Game {
       this._prepareTurn(true);
       toast(this.mode.name, { kind: 'info', sub: this.mode.blurb, ms: 3600 });
     }
+  }
+
+  /** The bag and ball for this mode: the whole catalogue and the range ball on the range, the player's bag on a course. */
+  refreshEquipment() {
+    const st = store.settings, course = this.mode?.id === 'course';
+    rebuildClubs({ bag: st.bag, all: !course, driverHead: st.driverHead, ironHead: st.ironHead, ball: course ? st.ball : st.rangeBall });
+    this.club = clubById(this.club?.id);
+    this.hud.renderClubs(this.club.id);
   }
 
   restartMode() {
@@ -507,7 +516,7 @@ export class Game {
     } else {
       this.hud.setPrompt(h && !h.putt
         ? `${key('Space')} hold &amp; release${helperText} · ${key('← →')} aim`
-        : `${key('Space')} hold, release in the green for a pure strike · ${key('← →')} aim · ${key('1–7')} club`);
+        : `${key('Space')} hold, release in the green for a pure strike · ${key('← →')} aim · ${key('1–9 ↑↓')} club`);
     }
   }
 
@@ -543,6 +552,7 @@ export class Game {
         this.updatePrompt();
         break;
       case 'camera': this.world.rig.setStyle(value); break;
+      case 'bag': case 'driverHead': case 'ironHead': case 'ball': case 'rangeBall': this.refreshEquipment(); this._updateHelper?.(); break;
       case 'quality': this.world.setQuality(value); break;
       case 'volume': audio.setVolume(value); break;
       case 'ambience': audio.setAmbience(value); break;
@@ -658,7 +668,7 @@ export class Game {
     const lie = this.mode.adjustLaunch ? this.mode.adjustLaunch(launch, s) : launch;
     const result = simulateShot(lie, {
       terrain: this.world.terrainFn, wind: this.mode.wind(), origin: s.origin, heading: s.heading, cup: this.mode.cup?.(s) || null,
-      trees: this.mode.course ? this.world.course.treeHit : null, wet: this.world.env.wet,
+      trees: this.mode.course ? this.world.course.treeHit : null, wet: this.world.env.wet, ball: currentBall(),
     });
     // the club comes down and the ball leaves on the contact frame (the
     // demo swing is already at the top; a launch-monitor swing replays fast)
@@ -1369,7 +1379,7 @@ export class Game {
           }
           break;
         default:
-          if (/^[1-7]$/.test(e.key)) this.selectClub(CLUBS[Number(e.key) - 1].id);
+          if (/^[1-9]$/.test(e.key) && CLUBS[Number(e.key) - 1]) this.selectClub(CLUBS[Number(e.key) - 1].id);
       }
     });
     window.addEventListener('keyup', (e) => {

@@ -30,6 +30,12 @@ const DEFAULT_SETTINGS = {
   display: 'standard', // standard | tv
   timeOfDay: 'night', // night | day
   weather: 'clear', // clear | cloudy | breezy | windy | rain
+  // equipment (js/data/equipment.js): the bag, head designs and balls
+  bag: ['DR', '3W', '5W', '4H', '5I', '6I', '7I', '8I', '9I', 'PW', 'GW', 'SW', 'LW'],
+  driverHead: 'std', // max | std | tour
+  ironHead: 'players', // gi | players | blade
+  ball: 'tour', // on the course
+  rangeBall: 'range', // on the driving range
   rangeCinema: true, // the range: the ball out of the dispenser with the camera turning in, and venue cutaways
   rings: 'putt', // on the green: putt (putt it out, optional) | tight | standard | generous (rings settle it)
   r10Putts: 'radar', // paired: radar (putt on the mat) | screen (putts on screen, the R10 for full swings only)

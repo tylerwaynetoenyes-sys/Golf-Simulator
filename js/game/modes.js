@@ -17,12 +17,11 @@ import { store } from '../data/store.js';
 import { proximity, dist, distUnit } from '../core/units.js';
 import { CLUBS } from '../data/clubs.js';
 
-const STOCK_CARRY = { DR: 255, '3W': 235, '5I': 195, '7I': 168, '9I': 145, PW: 128, SW: 95 };
 
 export function clubForYards(yards) {
   let best = CLUBS[0], bd = Infinity;
   for (const c of CLUBS) {
-    const d = Math.abs(STOCK_CARRY[c.id] - yards);
+    const d = Math.abs(c.carry - yards);
     if (d < bd) { bd = d; best = c; }
   }
   return best.id;

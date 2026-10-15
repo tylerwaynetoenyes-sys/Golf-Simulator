@@ -9,7 +9,6 @@ import { MPH, YD } from '../core/physics.js';
 import { GREENS, CTP_GREEN, LAYOUT } from '../scene/layout.js';
 import { esc as escape } from './dom.js';
 
-const STOCK_CARRY = { DR: 255, '3W': 235, '5I': 195, '7I': 168, '9I': 145, PW: 128, SW: 95 };
 
 export class HUD {
   constructor({ onClub }) {
@@ -38,7 +37,7 @@ export class HUD {
     this.rail.innerHTML = CLUBS.map((c, i) => `
       <button class="club" data-club="${c.id}" aria-pressed="${c.id === activeId}" title="${esc(c.name)} (${i + 1})">
         <span class="c-id">${c.short}</span>
-        <span class="c-dist">${U.isMetric() ? Math.round(STOCK_CARRY[c.id] * YD) : STOCK_CARRY[c.id]}${U.distUnit()}</span>
+        <span class="c-dist">${U.isMetric() ? Math.round(c.carry * YD) : c.carry}${U.distUnit()}</span>
       </button>`).join('');
     for (const b of this.rail.querySelectorAll('.club')) {
       b.addEventListener('click', () => this.onClub(b.dataset.club));
@@ -786,7 +785,7 @@ export class HUD {
       // (±4.5°), the club tag and carry at the landing spot, the rise or fall
       // there, and what's left from there to the pin
       const id = course.game.club?.id;
-      const carry = (STOCK_CARRY[id] || 0) * YD;
+      const carry = (CLUBS.find((c) => c.id === id)?.carry || 0) * YD;
       if (carry) {
         const a = ((setup.heading + aimDeg) * Math.PI) / 180;
         const lx = o.x + Math.sin(a) * carry, lz = o.z - Math.cos(a) * carry;
