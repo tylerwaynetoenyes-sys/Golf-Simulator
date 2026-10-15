@@ -3,6 +3,7 @@
 // feed the physics (`terrain`) and the mesh builder (`meshHeight`), so what
 // you see is what the ball plays on.
 import { YD } from '../core/physics.js';
+import { enrichHole } from './design.js';
 
 const smooth = (a, b, x) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -97,6 +98,8 @@ export class Outline {
 
 export class HoleTerrain {
   constructor(hole) {
+    // made-up courses get the design pass (js/course/design.js)
+    if (hole.enrich) hole = enrichHole(hole);
     this.hole = hole;
     this.pts = hole.line.map(([x, z]) => ({ x: x * YD, z: z * YD }));
     this.segs = [];

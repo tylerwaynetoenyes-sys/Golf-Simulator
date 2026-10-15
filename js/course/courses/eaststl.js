@@ -9,6 +9,7 @@ export default {
   place: 'Riverfront · East St. Louis, Illinois',
   theme: 'industrial',
   dem: true,
+  enrich: true, // design pass: bunkering, greenside sand, shaping (js/course/design.js)
   blurb: 'Nine holes on the Illinois riverfront: grain elevators, rail yards and the Eads Bridge, with the Arch across the Mississippi.',
   credit: 'Elevation: USGS 3DEP via AWS Terrain Tiles; landmark positions © OpenStreetMap contributors; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',
   // the Mississippi at St. Louis, near normal pool

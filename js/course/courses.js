@@ -19,7 +19,8 @@ const CONFLUENCE = {
   place: 'St. Louis & Alton',
   theme: 'parkland',
   blurb: 'Eighteen holes past the Arch, Chain of Rocks, Cahokia, the Basilica and the old Alton riverfront.',
-  holes: HOLES,
+  // the design pass adds bunkering and shaping; the valleys are deepened by half
+  holes: HOLES.map((h) => ({ ...h, enrich: true, elevScale: 1.5 })),
 };
 
 /** Every course, in picker order (holes may still need loading: see loadCourse). */

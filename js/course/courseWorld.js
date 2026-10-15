@@ -12,6 +12,7 @@ import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
 import { plantTrees, updateTrees, THEME_TREES } from '../scene/trees.js';
 import { tuftGeometry, grassMaterial, GRASS } from './grass.js';
 import { buildCity } from './buildings.js';
+import { dressLots } from './streetlife.js';
 import { buildDecay } from './decay.js';
 import { dressPinFlag, flagpole, fireworks } from './usa.js';
 
@@ -132,6 +133,7 @@ export class CourseWorld {
     const T = (this.T = new HoleTerrain(hole));
     this._nearAt = null;
     this._nearPrev = null;
+    this.streetLife = null;
     this.nearGrass = null;
     const g = (this.holeGroup = new THREE.Group());
     this.root.add(g);
@@ -522,7 +524,11 @@ diffuseColor.rgb *= stripes * (0.78 + 0.44 * detail);`);
         if (T.greenEdge(x, z) < 40 || Math.hypot(x, z) < 40) return true;
         return T.terrain(x, z).surface === 'water';
       };
-      g.add(buildDecay(T, rand, (x, z) => T.meshHeight(x, z), clear));
+      const decay = buildDecay(T, rand, (x, z) => T.meshHeight(x, z), clear);
+      g.add(decay);
+      // the wrecks, the lowriders and the people round them, in the lots
+      this.streetLife = dressLots(decay.userData.lots || [], rand, (x, z) => T.meshHeight(x, z));
+      g.add(this.streetLife.group);
     }
 
     // ── long grass in the rough: tufts thicken away from the fairway ──
@@ -1302,6 +1308,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
   }
 
   update(t, dt = 1 / 60, camera = null) {
+    this.streetLife?.update(dt);
     // thick rough wherever the ball settles (checked twice a second)
     if (this.ballPos && this.T) {
       this._nearT = (this._nearT || 0) + dt;

@@ -214,9 +214,11 @@ export function buildDecay(T, rand, ground, clear) {
   }
   // cracked asphalt lots with rubble heaps and weeds through the cracks
   const rubbleGeos = [], weedGeos = [];
-  for (let i = 0; i < 3; i++) {
+  const lots = [];
+  for (let i = 0; i < 5; i++) {
     const at = placeOut(T.oobLateral + 4, T.oobLateral + 60);
     if (!at) continue;
+    lots.push(at);
     const w = 24 + rand() * 30, d = 18 + rand() * 24;
     const lot = new THREE.Mesh(new THREE.PlaneGeometry(w, d, 8, 8).rotateX(-Math.PI / 2), M.asphalt);
     const p = lot.geometry.attributes.position;
@@ -244,5 +246,6 @@ export function buildDecay(T, rand, ground, clear) {
   if (rubbleGeos.length) g.add(new THREE.Mesh(mergeGeometries(rubbleGeos.map(strip)), M.rubble));
   if (weedGeos.length) g.add(new THREE.Mesh(mergeGeometries(weedGeos.map(strip)), M.weed));
   void corridor;
+  g.userData.lots = lots;
   return g;
 }
