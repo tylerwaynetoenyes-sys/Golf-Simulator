@@ -379,6 +379,8 @@ export const THEME_TREES = {
   alton: { broad: [6, 2, 3, 0], conifer: [4], density: 0.5, scatter: 0.45 },
   // TPC Sawgrass: live oaks, sabal palms and slash pine
   sawgrass: { broad: [0, 12, 12, 1], conifer: [8], density: 0.75, scatter: 0.6 },
+  // Torrey Pines: the Torrey pine itself (open, wind-bent crowns on the bluffs, taller inland), the odd eucalyptus
+  torreypines: { broad: [9, 9, 8, 3], conifer: [8, 9], density: 0.45, conifersFirst: true, scatter: 0.6 },
 };
 
 /** The tree set for a hole: its course's own, else its theme's. */

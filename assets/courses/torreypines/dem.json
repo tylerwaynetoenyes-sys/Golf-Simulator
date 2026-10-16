@@ -1,0 +1,37 @@
+{
+  "lat": 32.89717,
+  "lon": -117.24756,
+  "size": 2200.0,
+  "step": 1,
+  "n": 2201,
+  "min": -0.35,
+  "max": 137.43,
+  "lidar": false,
+  "source": "USGS 3DEP 1 m bare-earth DEM (CA_SanDiegoCo_D24, San_Diego_CA_2014_LiDAR), public domain; 13.5% from Terrarium tiles (AWS Open Data)",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 11 x47y364 CA_SanDiegoCo_D24",
+      "project": "CA_SanDiegoCo_D24",
+      "published": "2026-09-14",
+      "samples": 2143599
+    },
+    {
+      "tile": "USGS 1 Meter 11 x47y365 CA_SanDiegoCo_D24",
+      "project": "CA_SanDiegoCo_D24",
+      "published": "2026-09-14",
+      "samples": 1916209
+    },
+    {
+      "tile": "USGS 1 Meter 11 x47y364 San_Diego_CA_2014_LiDAR",
+      "project": "San_Diego_CA_2014_LiDAR",
+      "published": "2024-04-25",
+      "samples": 65047
+    },
+    {
+      "tile": "USGS 1 Meter 11 x47y365 San_Diego_CA_2014_LiDAR",
+      "project": "San_Diego_CA_2014_LiDAR",
+      "published": "2024-04-25",
+      "samples": 63325
+    }
+  ]
+}
