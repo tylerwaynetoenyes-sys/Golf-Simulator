@@ -1,0 +1,85 @@
+{
+  "lat": 33.49927,
+  "lon": -82.02375,
+  "size": 16000,
+  "step": 32,
+  "n": 501,
+  "min": 17.4,
+  "max": 160.1,
+  "lidar": false,
+  "source": "USGS 3DEP 1 m bare-earth DEM (GA_Statewide_2018_B18_DRRA, SC_SavannahPeeDee_2019_B19), public domain; 0.5% from Terrarium tiles (AWS Open Data)",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 17 x39y370 GA_Statewide_2018_B18_DRRA",
+      "project": "GA_Statewide_2018_B18_DRRA",
+      "published": "2022-05-31",
+      "samples": 2564
+    },
+    {
+      "tile": "USGS 1 Meter 17 x39y371 GA_Statewide_2018_B18_DRRA",
+      "project": "GA_Statewide_2018_B18_DRRA",
+      "published": "2022-05-31",
+      "samples": 30614
+    },
+    {
+      "tile": "USGS 1 Meter 17 x39y372 GA_Statewide_2018_B18_DRRA",
+      "project": "GA_Statewide_2018_B18_DRRA",
+      "published": "2022-05-31",
+      "samples": 15458
+    },
+    {
+      "tile": "USGS 1 Meter 17 x40y370 GA_Statewide_2018_B18_DRRA",
+      "project": "GA_Statewide_2018_B18_DRRA",
+      "published": "2022-05-31",
+      "samples": 8652
+    },
+    {
+      "tile": "USGS 1 Meter 17 x40y371 GA_Statewide_2018_B18_DRRA",
+      "project": "GA_Statewide_2018_B18_DRRA",
+      "published": "2022-05-31",
+      "samples": 92459
+    },
+    {
+      "tile": "USGS 1 Meter 17 x40y372 GA_Statewide_2018_B18_DRRA",
+      "project": "GA_Statewide_2018_B18_DRRA",
+      "published": "2022-05-31",
+      "samples": 24839
+    },
+    {
+      "tile": "USGS 1 Meter 17 x41y370 GA_Statewide_2018_B18_DRRA",
+      "project": "GA_Statewide_2018_B18_DRRA",
+      "published": "2022-05-31",
+      "samples": 2644
+    },
+    {
+      "tile": "USGS 1 Meter 17 x41y371 GA_Statewide_2018_B18_DRRA",
+      "project": "GA_Statewide_2018_B18_DRRA",
+      "published": "2022-05-31",
+      "samples": 14842
+    },
+    {
+      "tile": "USGS 1 Meter 17 x40y371 SC_SavannahPeeDee_2019_B19",
+      "project": "SC_SavannahPeeDee_2019_B19",
+      "published": "2022-05-06",
+      "samples": 5479
+    },
+    {
+      "tile": "USGS 1 Meter 17 x40y372 SC_SavannahPeeDee_2019_B19",
+      "project": "SC_SavannahPeeDee_2019_B19",
+      "published": "2022-05-06",
+      "samples": 24044
+    },
+    {
+      "tile": "USGS 1 Meter 17 x41y371 SC_SavannahPeeDee_2019_B19",
+      "project": "SC_SavannahPeeDee_2019_B19",
+      "published": "2022-05-06",
+      "samples": 13590
+    },
+    {
+      "tile": "USGS 1 Meter 17 x41y372 SC_SavannahPeeDee_2019_B19",
+      "project": "SC_SavannahPeeDee_2019_B19",
+      "published": "2022-05-06",
+      "samples": 14620
+    }
+  ]
+}

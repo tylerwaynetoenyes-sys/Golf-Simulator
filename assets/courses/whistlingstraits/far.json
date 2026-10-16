@@ -1,0 +1,67 @@
+{
+  "lat": 43.85013,
+  "lon": -87.73221,
+  "size": 16000,
+  "step": 32,
+  "n": 501,
+  "min": 147.0,
+  "max": 251.1,
+  "lidar": false,
+  "source": "USGS 3DEP 1 m bare-earth DEM (WI_2County_B23, WI_Oshkosh_3Rivers_2018_D19), public domain; 43.1% from Terrarium tiles (AWS Open Data); Lake Michigan bed sloped in under the hydro-flattened lake (0.35 m at the shore, 1 m per 40 m out, to 30 m)",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 16 x43y485 WI_Oshkosh_3Rivers_2018_D19",
+      "project": "WI_Oshkosh_3Rivers_2018_D19",
+      "published": "2023-02-25",
+      "samples": 16794
+    },
+    {
+      "tile": "USGS 1 Meter 16 x43y486 WI_Oshkosh_3Rivers_2018_D19",
+      "project": "WI_Oshkosh_3Rivers_2018_D19",
+      "published": "2023-02-25",
+      "samples": 67339
+    },
+    {
+      "tile": "USGS 1 Meter 16 x43y487 WI_Oshkosh_3Rivers_2018_D19",
+      "project": "WI_Oshkosh_3Rivers_2018_D19",
+      "published": "2023-02-25",
+      "samples": 4288
+    },
+    {
+      "tile": "USGS 1 Meter 16 x44y485 WI_Oshkosh_3Rivers_2018_D19",
+      "project": "WI_Oshkosh_3Rivers_2018_D19",
+      "published": "2023-02-25",
+      "samples": 8607
+    },
+    {
+      "tile": "USGS 1 Meter 16 x44y486 WI_Oshkosh_3Rivers_2018_D19",
+      "project": "WI_Oshkosh_3Rivers_2018_D19",
+      "published": "2023-02-25",
+      "samples": 18789
+    },
+    {
+      "tile": "USGS 1 Meter 16 x44y487 WI_Oshkosh_3Rivers_2018_D19",
+      "project": "WI_Oshkosh_3Rivers_2018_D19",
+      "published": "2023-02-25",
+      "samples": 2691
+    },
+    {
+      "tile": "USGS 1 Meter 16 x43y487 WI_2County_B23",
+      "project": "WI_2County_B23",
+      "published": "2024-06-03",
+      "samples": 19214
+    },
+    {
+      "tile": "USGS 1 Meter 16 x44y486 WI_2County_B23",
+      "project": "WI_2County_B23",
+      "published": "2024-06-03",
+      "samples": 99
+    },
+    {
+      "tile": "USGS 1 Meter 16 x44y487 WI_2County_B23",
+      "project": "WI_2County_B23",
+      "published": "2024-06-03",
+      "samples": 5058
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "lat": 35.19149,
+  "lon": -79.46053,
+  "size": 16000,
+  "step": 32,
+  "n": 501,
+  "min": 88.04,
+  "max": 188.82,
+  "lidar": false,
+  "source": "NOAA Digital Coast lidar DEM (); 100.0% from Terrarium tiles (AWS Open Data)",
+  "tiles": []
+}

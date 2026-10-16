@@ -24,7 +24,8 @@ import zoogrounds from './zoogrounds.js';
 import backnine from './backnine.js';
 import centralpark from './centralpark.js';
 import seine from './seine.js';
+import torreypines from './torreypines.js';
 import woodlands from './woodlands.js';
 
-const all = { archonly: () => arch({ downtown: false }), zoo, delmar, arch, riverfront, riverboat, piasa, chainofrocks, cahokia, basilica, citymuseum, altonlegends, forestpark, confluencepoint, gatewayarch, cahokiasite, zoogrounds, centralpark, ...woodlands, ...western, ...harbor, ...paris, ...eaststl, ...cassis, ...backnine, ...seine };
+const all = { archonly: () => arch({ downtown: false }), zoo, delmar, arch, riverfront, riverboat, piasa, chainofrocks, cahokia, basilica, citymuseum, altonlegends, forestpark, confluencepoint, gatewayarch, cahokiasite, zoogrounds, centralpark, ...western, ...harbor, ...paris, ...eaststl, ...cassis, ...backnine, ...seine, ...torreypines, ...woodlands };
 export const EXTRA = Object.fromEntries(Object.entries(all).filter(([, b]) => typeof b === 'function'));

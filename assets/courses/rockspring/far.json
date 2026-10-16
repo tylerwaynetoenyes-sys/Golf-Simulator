@@ -1,0 +1,85 @@
+{
+  "lat": 38.90969,
+  "lon": -90.16158,
+  "size": 16000,
+  "step": 32,
+  "n": 501,
+  "min": 92.14,
+  "max": 198.44,
+  "lidar": false,
+  "source": "USGS 3DEP 1 m bare-earth DEM (IL_10CountyNRCS_D23, IL_MadisonCo_2014, MO_SaintLouis_2017, MO_WestCentral_2018_D19), public domain; 0.0% from Terrarium tiles (AWS Open Data)",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 15 x73y432 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 14931
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y431 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 28231
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y432 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 83412
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y431 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 29387
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y432 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 34470
+    },
+    {
+      "tile": "USGS 1 Meter 15 x73y431 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 12997
+    },
+    {
+      "tile": "USGS 1 Meter 15 x73y432 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 1639
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y431 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 44519
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y432 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 157
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y431 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 832
+    },
+    {
+      "tile": "USGS one meter x73y431 MO SaintLouis 2017",
+      "project": "MO_SaintLouis_2017",
+      "published": "2020-03-30",
+      "samples": 337
+    },
+    {
+      "tile": "USGS one meter x74y431 IL MadisonCo 2014",
+      "project": "IL_MadisonCo_2014",
+      "published": "2020-03-30",
+      "samples": 1
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "course": "Rock Spring Golf Course, 2400 College Avenue (Rock Spring Park), Alton, Illinois 62002",
+  "source": "GolfPass scorecard: https://www.golfpass.com/courses/5007-rock-spring-golf-course/scorecard-and-layout/scorecard-and-layout (the club publishes no card online; par 35 and 3,015 yards agree with illinoisgolf.com/golfcourses/rock-spring-golf-course and riversandroutes.com)",
+  "retrieved": "2026-10-16",
+  "notes": "Nine holes, par 35. The hole figures sum to the totals (Blue 3015, Red 2501). GolfPass's tee table also lists the red tee at 2886 yards, which the hole figures don't support; the hole figures are used. Ratings are nine-hole ratings.",
+  "back": "blue",
+  "par": [4, 4, 3, 4, 4, 4, 3, 5, 4],
+  "handicap": [7, 5, 2, 8, 3, 1, 9, 4, 6],
+  "tees": {
+    "blue": [382, 363, 179, 345, 333, 375, 93, 545, 400],
+    "red": [286, 303, 160, 294, 276, 331, 72, 460, 319]
+  },
+  "ratings": {
+    "men": { "blue": "34.3/117" },
+    "women": { "red": "32.5/109" }
+  }
+}

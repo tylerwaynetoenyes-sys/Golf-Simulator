@@ -1,0 +1,26 @@
+{
+ "lat": 33.49927,
+ "lon": -82.02375,
+ "size": 1900.0,
+ "step": 1,
+ "n": 1901,
+ "min": 46.32,
+ "max": 103.9,
+ "lidar": true,
+ "source": "USGS 3DEP 1 m bare-earth DEM (GA_Statewide_2018_B18_DRRA), public domain",
+ "tiles": [
+  {
+   "tile": "USGS 1 Meter 17 x40y371 GA_Statewide_2018_B18_DRRA",
+   "project": "GA_Statewide_2018_B18_DRRA",
+   "published": "2022-05-31",
+   "samples": 3613801
+  }
+ ],
+ "edits": [
+  {
+   "what": "the 15th's championship tee (OSM way 856563240), built after the 2018 flight: bare earth under it raised to the 68.8 m plateau in front, feathered over 6 m (raised only)",
+   "cells": 694,
+   "maxLift": 6.38
+  }
+ ]
+}

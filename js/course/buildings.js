@@ -40,6 +40,8 @@ const STYLE = {
   carmel: { roof: 'hip', house: true, lamp: '#ffd7a0' },
   florida: { roof: 'hip', house: true, lamp: '#ffe0b0' },
   midwest: { roof: 'hip', house: true, lamp: '#ffd090' },
+  straits: { roof: 'hip', house: true, lamp: '#ffd090' },
+  carolina: { roof: 'hip', house: true, lamp: '#ffd8a8' },
   paris: {
     bay: 3.4, floor: 3.25, roof: 'mansard',
     facade: (g, w, h) => {
@@ -121,6 +123,19 @@ const REAL = {
     roof: ['clay_roof_tiles_02', { scale: 2, tint: 0xe0ae8c }],
     cap: ['clay_roof_tiles_02', { scale: 2, tint: 0xd8a888 }],
   },
+  // Pinehurst village (the resort clubhouse behind No. 2's 18th: long, low, cream walls and white
+  // colonnades under red-brown roofs; white clapboard cottages under grey and brown shingle)
+  carolina: {
+    walls: [
+      ['white_plaster_02', { scale: 3, tint: 0xf1e9d8 }, { bay: 4.2, floor: 3.2, win: [0.3, 0.7, 0.3, 0.8], frame: 0xf6f4ee, lit: 0.35 }],
+      ['wood_planks_grey', { scale: 1.6, tint: 0xf2eee4 }, { bay: 4.2, floor: 3.0, win: [0.3, 0.7, 0.3, 0.8], frame: 0xf6f4ee, lit: 0.35 }],
+      ['wood_planks_grey', { scale: 1.6, tint: 0xe8dfc8 }, { bay: 4.2, floor: 3.0, win: [0.3, 0.7, 0.3, 0.8], frame: 0xf6f4ee, lit: 0.35 }],
+    ],
+    roofs: [['roof_slates_02', { scale: 1.4, tint: 0x9a5444 }], ['roof_slates_02', { scale: 1.4, tint: 0x5e5a56 }], ['roof_slates_02', { scale: 1.4, tint: 0x6e5a48 }]],
+    glass: null,
+    roof: ['roof_slates_02', { scale: 1.4, tint: 0x9a5444 }],
+    cap: ['roof_slates_02', { scale: 1.4, tint: 0x9a5444 }],
+  },
   // Godfrey, Illinois (the Rolling Hills clubhouse is a low ranch): tan brick and beige siding under brown shingles
   midwest: {
     walls: [
@@ -132,6 +147,18 @@ const REAL = {
     glass: null,
     roof: ['roof_slates_02', { scale: 1.4, tint: 0x6a5a4c }],
     cap: ['roof_slates_02', { scale: 1.4, tint: 0x6a5a4c }],
+  },
+  // Whistling Straits: the clubhouse and the cottages round it are built as an Irish farmstead,
+  // grey-brown fieldstone under dark slate, with deep-set white-framed windows
+  straits: {
+    walls: [
+      ['granite_wall', { scale: 2.4, tint: 0xd2c6b4 }, { bay: 4.4, floor: 3.2, win: [0.32, 0.68, 0.28, 0.78], frame: 0xf2efe8, lit: 0.35 }],
+      ['sandstone_blocks_08', { scale: 2.4, tint: 0xc4b8a6 }, { bay: 4.4, floor: 3.2, win: [0.32, 0.68, 0.28, 0.78], frame: 0xf2efe8, lit: 0.35 }],
+    ],
+    roofs: [['roof_slates_02', { scale: 1.4, tint: 0x5a5c60 }], ['roof_slates_02', { scale: 1.4, tint: 0x4a4c50 }]],
+    glass: null,
+    roof: ['roof_slates_02', { scale: 1.4, tint: 0x55575c }],
+    cap: ['roof_slates_02', { scale: 1.4, tint: 0x55575c }],
   },
   paris: {
     walls: [
@@ -404,7 +431,8 @@ export function buildCity(data, T, style = 'paris', pull = null) {
     const inPlay = S.house
       ? (x, z) => { const pr = T.project(x, z); return Math.abs(pr.d) < T.oobLateral * 0.7 && pr.s > -6 && pr.s < T.length + 15; }
       : (x, z) => { const pr = T.project(x, z); return Math.abs(pr.d) < T.oobLateral + 4 && pr.s > -40 && pr.s < T.length + 60; };
-    if (inPlay(cx, cz) || pts.some(([x, z], i) => { const [x2, z2] = pts[(i + 1) % n]; return inPlay(x, z) || inPlay((x + x2) / 2, (z + z2) / 2); })) continue;
+    // (`keep`: checked against the aerial as standing clear of the shot, e.g. a pro shop beside the first tee)
+    if (!b.keep && (inPlay(cx, cz) || pts.some(([x, z], i) => { const [x2, z2] = pts[(i + 1) % n]; return inPlay(x, z) || inPlay((x + x2) / 2, (z + z2) / 2); }))) continue;
     // seated on its own ground: walls reach below the lowest corner (no gap on a slope), and the
     // building stands from the footprint's average ground, eaves clear of the highest corner
     const gs = pts.map(([x, z]) => T.drawnHeight(x, z));

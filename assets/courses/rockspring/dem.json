@@ -1,0 +1,25 @@
+{
+  "lat": 38.90969,
+  "lon": -90.16158,
+  "size": 1500.0,
+  "step": 1,
+  "n": 1501,
+  "min": 139.52,
+  "max": 183.5,
+  "lidar": true,
+  "source": "USGS 3DEP 1 m bare-earth DEM (IL_10CountyNRCS_D23), public domain",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 15 x74y431 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 253895
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y432 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 1999106
+    }
+  ]
+}

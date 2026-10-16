@@ -27,8 +27,8 @@ function paint(g, col, tip = null) {
 const strip = (g) => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'color'].includes(k)) g.deleteAttribute(k); return g.index ? g.toNonIndexed() : g; };
 
 /** A strap leaf: a narrow blade of length L arching out from the base toward (dx, dz). */
-function blade(L, w, ang, lean, rnd) {
-  const n = 5, pos = [];
+function blade(L, w, ang, lean, rnd, n = 5) {
+  const pos = [];
   const pt = (t, side) => {
     const bend = lean * t * t;
     const x = Math.cos(ang) * bend, z = Math.sin(ang) * bend, y = L * t * (1 - 0.25 * lean * t);
@@ -48,26 +48,41 @@ function blade(L, w, ang, lean, rnd) {
 let seed = 11;
 const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
 
-function cattailClump() {
+// `lo`: the same clump for distance, from the same draws: half the leaves (a
+// little wider, fewer segments), coarse heads and plumes
+function cattailClump(lo = false) {
   const parts = [];
-  for (let i = 0; i < 16; i++) parts.push(paint(blade(1.1 + rnd() * 0.8, 0.04, rnd() * 6.28, 0.25 + rnd() * 0.5, rnd), C(0.33, 0.42, 0.16), C(0.6, 0.57, 0.3)));
+  for (let i = 0; i < 16; i++) {
+    const L = 1.1 + rnd() * 0.8, a = rnd() * 6.28, lean = 0.25 + rnd() * 0.5;
+    if (!lo || i % 2 === 0) parts.push(paint(lo ? blade(L, 0.07, a, lean, rnd, 2) : blade(L, 0.04, a, lean, rnd), C(0.33, 0.42, 0.16), C(0.6, 0.57, 0.3)));
+  }
   for (let i = 0; i < 4; i++) {
     const h = 1.5 + rnd() * 0.5, ox = (rnd() - 0.5) * 0.25, oz = (rnd() - 0.5) * 0.25;
+    if (lo) { parts.push(paint(new THREE.CylinderGeometry(0.03, 0.03, 0.4, 4, 1, true).translate(ox, h - 0.18, oz), C(0.28, 0.17, 0.09))); continue; }
     parts.push(paint(new THREE.CylinderGeometry(0.006, 0.009, h, 4).translate(ox, h / 2, oz), C(0.32, 0.38, 0.18)));
     parts.push(paint(new THREE.CapsuleGeometry(0.03, 0.22, 3, 8).translate(ox, h - 0.18, oz), C(0.28, 0.17, 0.09))); // the brown head
     parts.push(paint(new THREE.CylinderGeometry(0.002, 0.004, 0.16, 3).translate(ox, h + 0.03, oz), C(0.45, 0.4, 0.25)));
   }
   return mergeGeometries(parts.map(strip));
 }
-function reedClump() {
+function reedClump(lo = false) {
   const parts = [];
   for (let i = 0; i < 22; i++) {
     const h = 1.6 + rnd() * 0.9, a = rnd() * 6.28, ox = Math.cos(a) * rnd() * 0.3, oz = Math.sin(a) * rnd() * 0.3;
-    parts.push(paint(blade(h, 0.016, a, 0.1 + rnd() * 0.2, rnd).translate(ox, 0, oz), C(0.33, 0.4, 0.17), C(0.6, 0.56, 0.32)));
+    const lean = 0.1 + rnd() * 0.2, keep = !lo || i % 2 === 0;
+    if (keep) parts.push(paint((lo ? blade(h, 0.03, a, lean, rnd, 2) : blade(h, 0.016, a, lean, rnd)).translate(ox, 0, oz), C(0.33, 0.4, 0.17), C(0.6, 0.56, 0.32)));
     // the feathery plume, purple-brown going to straw
-    if (rnd() < 0.6) parts.push(paint(new THREE.ConeGeometry(0.06, 0.3, 5).rotateX(Math.PI).translate(ox + Math.cos(a) * 0.15, h + 0.05, oz + Math.sin(a) * 0.15), C(0.66, 0.6, 0.46)));
+    if (rnd() < 0.6 && keep) parts.push(paint(new THREE.ConeGeometry(0.06, 0.3, lo ? 3 : 5, 1, lo).rotateX(Math.PI).translate(ox + Math.cos(a) * 0.15, h + 0.05, oz + Math.sin(a) * 0.15), C(0.66, 0.6, 0.46)));
   }
   return mergeGeometries(parts.map(strip));
+}
+/** A clump and its distant version, from the same draws (the sequence goes on from the full one). */
+function withLo(make) {
+  const s0 = seed, hi = make(false), s1 = seed;
+  seed = s0;
+  const lo = make(true);
+  seed = s1;
+  return { hi, lo };
 }
 function lilyPad() {
   // a disc with its notch, a touch dished
@@ -130,7 +145,7 @@ function kit() {
   const flower = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.6, emissive: 0x222018 });
   const weed = new THREE.MeshStandardMaterial({ map: weedTexture(), transparent: true, depthWrite: false, roughness: 0.6, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
   KIT = {
-    cattail: [cattailClump(), cattailClump(), cattailClump()], reed: [reedClump(), reedClump()], pad: lilyPad(), flower: lilyFlower(),
+    cattail: [withLo(cattailClump), withLo(cattailClump), withLo(cattailClump)], reed: [withLo(reedClump), withLo(reedClump)], pad: lilyPad(), flower: lilyFlower(),
     weed: new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2), plant, padM: pad, flowerM: flower, weedM: weed,
   };
   return KIT;
@@ -141,9 +156,12 @@ const noise = (x, z) => 0.5 + 0.5 * Math.sin(x * 0.11 + Math.sin(z * 0.07) * 2.3
 /**
  * Plants round water. `rings`: [{ pts: [[x, z], ...] (closed outline, any winding),
  * level }]. `skip(x, z)` keeps them off what must stay clear (a green, a tee).
- * `budget` caps the clumps per kind.
+ * `budget` caps the clumps per kind. `chunked(group, matrices, hi, lo, mat, opts)`
+ * (CourseWorld._chunked) bins the cattails and reeds into cells that drop out
+ * of view and out of the shadow camera on their own, and draw a lighter clump
+ * past `lodAt`; without it each kind is one InstancedMesh at full detail.
  */
-export function shoreLife(rings, { skip = () => false, budget = 900 } = {}) {
+export function shoreLife(rings, { skip = () => false, budget = 900, chunked = null } = {}) {
   const K = kit();
   const group = new THREE.Group();
   const lists = { cattail: K.cattail.map(() => []), reed: K.reed.map(() => []), pad: [], flower: [], weed: [] };
@@ -198,8 +216,20 @@ export function shoreLife(rings, { skip = () => false, budget = 900 } = {}) {
     im.computeBoundingSphere();
     group.add(im);
   };
-  K.cattail.forEach((g, i) => inst(g, K.plant, lists.cattail[i]));
-  K.reed.forEach((g, i) => inst(g, K.plant, lists.reed[i]));
+  const CELL = 80;
+  const plants = (kinds, lists) => {
+    if (!chunked) return kinds.forEach((g, i) => inst(g.hi, K.plant, lists[i]));
+    // chunked: one clump per kind in each cell (they still differ cell to cell),
+    // so a cell is one draw per kind, not one per clump shape
+    const by = kinds.map(() => []);
+    for (const it of lists.flat()) {
+      const cx = Math.floor(it[0] / CELL), cz = Math.floor(it[2] / CELL);
+      by[(((cx * 73856093) ^ (cz * 19349663)) >>> 0) % kinds.length].push(m4.compose(v.set(it[0], it[1], it[2]), q.setFromEuler(e.set(0, it[3], 0)), s.setScalar(it[4])).clone());
+    }
+    kinds.forEach((g, i) => by[i].length && chunked(group, by[i], g.hi, g.lo, K.plant, { cell: CELL, lodAt: 45, far: 600, shadow: true }));
+  };
+  plants(K.cattail, lists.cattail);
+  plants(K.reed, lists.reed);
   inst(K.pad, K.padM, lists.pad, { shadow: false, flat: true });
   inst(K.flower, K.flowerM, lists.flower, { shadow: false });
   inst(K.weed, K.weedM, lists.weed, { shadow: false, flat: true });
