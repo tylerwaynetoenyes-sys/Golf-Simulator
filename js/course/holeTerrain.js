@@ -226,7 +226,7 @@ export class HoleTerrain {
         for (let x = bb.minx; x <= bb.maxx; x += st) for (let z = bb.minz; z <= bb.maxz; z += st) if (o.poly.inside(x, z)) hs.push(this.F ? this.F.height(x, z) : 0);
         hs.sort((a, b) => a - b);
         const level = (hs.length ? hs[Math.floor(hs.length / 2)] : 0) + (w.level ?? -0.15);
-        this.ponds.push({ ...o, level, off: w.level ?? -0.15, island: !!w.island, mapped: true });
+        this.ponds.push({ ...o, level, off: w.level ?? -0.15, island: !!w.island, mapped: true, shore: w.shore !== false });
       } else if (w.creek != null) {
         this.creeks.push({ s: w.creek * this.length, half: w.width / 2, level: this.elevAt(w.creek) - 1.2 });
       } else {

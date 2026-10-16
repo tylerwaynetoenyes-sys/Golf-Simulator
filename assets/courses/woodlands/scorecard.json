@@ -1,0 +1,20 @@
+{
+  "course": "The Woodlands Golf Club, 2839 Harris Lane, Alton, Illinois 62002",
+  "source": "GolfPass scorecard and layout (https://www.golfpass.com/travel-advisor/courses/5009-the-woodlands-golf-club/scorecard-and-layout); par and every hole's yardage and handicap agree with OpenGolfAPI (ODbL, https://courses.opengolfapi.org/courses/IL/the-woodlands-golf-club); tee ratings agree with the club's own course page (https://thewoodlandsgolfclub.com/the-course/)",
+  "retrieved": "2026-10-16",
+  "notes": "Routing (which hole is which) from the club's course layout diagram (https://thewoodlandsgolfclub.com/wp-content/uploads/2020/07/woodlandsgolfcourse.png); positions are measured from USGS LiDAR and NAIP, not from the diagram. The Red total is printed as 4,529 on the card and 4,429 in the tee table; the hole figures sum to 4,529.",
+  "back": "black",
+  "par": [4, 3, 4, 4, 4, 5, 4, 3, 5, 5, 4, 4, 3, 4, 4, 3, 4, 5],
+  "handicap": [4, 11, 15, 9, 17, 6, 2, 13, 8, 7, 3, 14, 16, 18, 1, 10, 12, 5],
+  "tees": {
+    "black": [372, 209, 355, 406, 302, 512, 442, 194, 425, 510, 450, 313, 135, 318, 407, 145, 411, 517],
+    "blue": [359, 197, 333, 388, 283, 490, 422, 184, 417, 487, 417, 289, 125, 300, 392, 126, 405, 488],
+    "white": [349, 189, 311, 373, 262, 480, 384, 176, 410, 470, 398, 265, 120, 285, 374, 115, 338, 446],
+    "gold": [324, 139, 253, 343, 238, 428, 341, 164, 375, 450, 372, 210, 110, 265, 276, 105, 273, 400],
+    "red": [255, 130, 246, 307, 225, 413, 300, 122, 363, 370, 307, 190, 100, 232, 239, 90, 265, 375]
+  },
+  "ratings": {
+    "men": { "black": "72.6/125", "blue": "70.3/123", "white": "68.9/120", "gold": "64.9/109", "red": "62.2/99" },
+    "women": { "red": "67.2/112" }
+  }
+}

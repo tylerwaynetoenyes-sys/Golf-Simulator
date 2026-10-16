@@ -377,6 +377,8 @@ export const THEME_TREES = {
   confluencepoint: { broad: [6, 2, 3], conifer: [4], density: 0.3, scatter: 0.25 },
   // Alton: river-bottom cottonwoods, silver maples and sycamores, open parks along the water
   alton: { broad: [6, 2, 3, 0], conifer: [4], density: 0.5, scatter: 0.45 },
+  // The Woodlands: oak-hickory on the bluffs, sycamores and cottonwoods along the West Fork, maples round the houses, the odd red cedar
+  woodlands: { broad: [0, 2, 3, 6, 1], conifer: [4], density: 0.7, scatter: 0.5 },
   // TPC Sawgrass: live oaks, sabal palms and slash pine
   sawgrass: { broad: [0, 12, 12, 1], conifer: [8], density: 0.75, scatter: 0.6 },
 };

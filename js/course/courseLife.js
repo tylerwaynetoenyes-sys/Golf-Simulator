@@ -53,6 +53,7 @@ export function courseLife(T, hole, { style = 'club', rnd = Math.random } = {}) 
 
   if (style === 'club') {
     // ── the cart path: a ribbon from behind the tee, along the hole, round the green ──
+    // (a hole that draws its own real path asks for none: `cartPath: false`)
     const half = 1.2, pts = [];
     for (let s = -12; s <= T.length + T.greenR + 14; s += 3) {
       const near = Math.max(0, s - (T.length - T.greenR - 20)) / (T.greenR + 34); // ease out round the green
@@ -61,7 +62,7 @@ export function courseLife(T, hole, { style = 'club', rnd = Math.random } = {}) 
       pts.push(at(s, d));
     }
     const pos = [];
-    for (let i = 0; i + 1 < pts.length; i++) {
+    for (let i = 0; i + 1 < pts.length && hole.cartPath !== false; i++) {
       const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
       const ok = (x, z) => { const sf = surf(x, z); return sf !== 'water' && sf !== 'sand' && sf !== 'green' && sf !== 'tee'; };
       if (!ok(ax, az) || !ok(bx, bz)) continue;

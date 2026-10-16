@@ -11,6 +11,7 @@ import gatewayarch from './courses/gatewayarch.js';
 import cahokia from './courses/cahokia.js';
 import stlzoo from './courses/stlzoo.js';
 import rollinghills from './courses/rollinghills.js';
+import woodlands from './courses/woodlands.js';
 import sawgrass from './courses/sawgrass.js';
 import pebble from './courses/pebble.js';
 import liberty from './courses/liberty.js';
@@ -31,7 +32,7 @@ const CONFLUENCE = {
 };
 
 /** Every course, in picker order (holes may still need loading: see loadCourse). */
-export const COURSES = [CONFLUENCE, alton, eaststl, oregon, paris, cassis, centralpark, liberty, pebble, sawgrass, rollinghills, forestpark, confluencepoint, gatewayarch, cahokia, stlzoo];
+export const COURSES = [CONFLUENCE, alton, eaststl, oregon, paris, cassis, centralpark, liberty, pebble, sawgrass, rollinghills, woodlands, forestpark, confluencepoint, gatewayarch, cahokia, stlzoo];
 
 export const courseById = (id) => COURSES.find((c) => c.id === id) || CONFLUENCE;
 

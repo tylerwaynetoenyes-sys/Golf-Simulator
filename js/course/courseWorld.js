@@ -318,8 +318,9 @@ export class CourseWorld {
       g.add(m);
     }
     // the life at its edges: cattails, reeds, lily pads, duckweed
-    if (T.ponds.length && !hole.noShore) {
-      const rings = T.ponds.map((p) => ({ pts: p.poly ? p.poly.pts : ellipseRing(p), level: p.level }));
+    // (a creek reach or a stone-lined channel can opt out: `shore: false` on its water)
+    if (T.ponds.some((p) => p.shore !== false) && !hole.noShore) {
+      const rings = T.ponds.filter((p) => p.shore !== false).map((p) => ({ pts: p.poly ? p.poly.pts : ellipseRing(p), level: p.level }));
       const skip = (x, z) => T.greenEdge(x, z) < 6 || Math.hypot(x, z) < 12;
       g.add(shoreLife(rings, { skip, budget: this.r?.quality?.pixelRatio < 1.5 ? 500 : 900 }));
     }

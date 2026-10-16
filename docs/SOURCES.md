@@ -15,6 +15,7 @@ Government work); credit given anyway: "Elevation: U.S. Geological Survey,
 | Course | Files | Projects |
 |---|---|---|
 | Rolling Hills (Godfrey, IL) | `assets/courses/rollinghills/dem.*` (1 m over 1.8 km), `far.*` (32 m over 16 km) | Playing area: tile `x74y432` of **IL_10CountyNRCS_D23** (published April 2026). Surround: the same project, then IL_SouthCentral_2021_D21, IL_19County_D24, MO_WestCentral_2018_D19 and others, with Terrarium tiles only where no LiDAR covers. Each file's JSON lists the tiles used. |
+| The Woodlands (Alton, IL) | `assets/courses/woodlands/dem.*` (1 m over 1.8 km), `far.*` (32 m over 16 km) | Playing area: tile `x74y432` of **IL_10CountyNRCS_D23**. Surround as for Rolling Hills. |
 
 The script ignores any LiDAR sample more than 15 m from the coarse Terrarium
 surface. Tile `x74y431` of IL_10CountyNRCS_D23 has a strip that reads a
@@ -504,3 +505,32 @@ normal and roughness, laid on the bunkers with rake furrows drawn over it.
 - Motion: CMU Graphics Lab Motion Capture Database, subject 64 (golf): swing 64_01, putt 64_11
   (the CMU data carries no restrictions on use), as the cgspeed BVH conversions from
   github.com/Shriinivas/cmubvh (Sequence-060-075/64). Retargeted onto MPFB's cmu_mb rig.
+
+## The Woodlands (Alton, IL)
+
+OpenStreetMap maps only three of the 18 holes (lines for the 3rd, 4th and 7th), four greens, four
+fairways, two bunkers, one tee, the ponds and the streams. Everything else was measured from public-domain
+U.S. Government data:
+
+- **USGS NAIP imagery** (`USGSNAIPImagery` ImageServer, https://imagery.nationalmap.gov, 0.5 m):
+  green outlines (region grown from each green's centre), fairway outlines, bunkers, cart paths, the
+  porta-potty's place.
+- **USGS 3DEP point cloud** (`IL_10CoNRCS_3_D23`, public `usgs-lidar-public` Entwine bucket): return
+  intensity (mown turf against rough; bunker sand reads darker than concrete paths and bright turf),
+  the leaf-off canopy (the chutes through the wooded holes, the green of the 6th in its clearing, the
+  thicket on the 2nd hole's bluff and ravine), the trees (`tools/fetch-trees.py --ept`), and building
+  heights and roofs (`tools/fetch-building-shapes.py`). Footprints the OSM map lacks were traced from
+  the cloud's class-6 (building) returns.
+- **USGS 3DEP 1 m bare earth**: tee pads (level rectangles: the 2nd tee is a 15 × 20 m pad at
+  155.4 m on the bluff, 20 m above the creek bed) and raised greens (the 8th and 12th).
+- **Routing** (which hole is which): the club's own course diagram,
+  https://thewoodlandsgolfclub.com/wp-content/uploads/2020/07/woodlandsgolfcourse.png. Only the
+  numbering was taken from it; no positions.
+- **Scorecard**: GolfPass (https://www.golfpass.com/travel-advisor/courses/5009-the-woodlands-golf-club/scorecard-and-layout),
+  which matches OpenGolfAPI (ODbL) hole for hole; ratings also on the club's course page.
+- The creek reaches are the OSM/NHD stream lines (West Fork Wood River and its tributary) snapped to the
+  lowest LiDAR ground across the channel; ponds are OSM.
+- Ground colour: EOxCloudless 2024 as for the other DEM courses.
+
+The user's own photographs and Apple Maps screenshots were used only to check the result by eye.
+
