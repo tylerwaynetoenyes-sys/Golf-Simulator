@@ -5,6 +5,7 @@
                                 [--cache ~/.cache/fairway/lpc] [--cell 0.5]
                                 [--min-height 4] [--crs EPSG:3436]
     python tools/fetch-trees.py <courseId> --ept WI_Oshkosh_3Rivers_B2_2018 [--box x0,z0,x1,z1]
+    python tools/fetch-trees.py <courseId> --chm-raster meta [--cell 1]
 
 --ept reads the same flight from the public Entwine copy (usgs-lidar-public,
 EPSG:3857, as tools/fetch-building-shapes.py does) instead of downloading LAZ
@@ -32,6 +33,13 @@ area is that grid (centre, size) from assets/courses/<id>/dem.json.
 4. Measures each crown along eight rays (out to where the canopy falls away or
    climbs into the next tree) and calls it a conifer when the crown is narrow
    for its height, or compact and opaque in this leaf-off flight.
+
+Where no public point cloud covers a course, --chm-raster takes the canopy
+height model from a raster instead of step 2: a GeoTIFF path or URL, or
+"meta" for Meta and WRI's 1 m Global Canopy Height Map (CC BY 4.0, on AWS Open
+Data; heights from Maxar imagery, so a few metres less exact than LiDAR). With
+no leaf-off pulse density, a tree is a conifer when its crown is narrow for
+its height alone.
 
 Writes assets/courses/<id>/trees.json:
   {"source", "tiles", "cell", "minHeight", "count",
@@ -69,6 +77,7 @@ ap.add_argument('--crs', default=None, help='override the tiles\' horizontal CRS
 ap.add_argument('--ept', default=None, help='3DEP work unit in the public usgs-lidar-public EPT bucket (instead of LAZ tiles)')
 ap.add_argument('--veg', default='4,5', help='ASPRS classes that are vegetation; a flight that never classified it (only ground) puts trees in 1, unclassified: --veg 1 also masks the buildings.json footprints')
 ap.add_argument('--box', default=None, help='x0,z0,x1,z1: with --ept, read only this part of the grid (DEM-frame metres)')
+ap.add_argument('--chm-raster', default=None, help='canopy height GeoTIFF (path/URL), or "meta", instead of the point cloud')
 args = ap.parse_args()
 VEG = [int(c) for c in args.veg.split(',')]
 
@@ -180,6 +189,31 @@ def accumulate(path):
 
 
 
+META_CHM = 'https://dataforgood-fb-data.s3.amazonaws.com/forests/v1/alsgedi_global_v6_float/chm'
+
+
+def raster_chm(src_path):
+    """Resample a canopy-height raster onto the CHM grid (max of the source pixels)."""
+    import rasterio
+    from rasterio.enums import Resampling
+    from rasterio.transform import from_origin
+    from rasterio.warp import reproject
+    if src_path == 'meta':
+        # the zoom-9 web-mercator tile (quadkey) under the course centre
+        z, n = 9, 2 ** 9
+        tx = int((LON + 180) / 360 * n)
+        ty = int((1 - math.log(math.tan(math.radians(LAT)) + 1 / math.cos(math.radians(LAT))) / math.pi) / 2 * n)
+        qk = ''.join(str(((tx >> (i - 1)) & 1) + 2 * ((ty >> (i - 1)) & 1)) for i in range(z, 0, -1))
+        url = f'{META_CHM}/{qk}.tif'
+        src_path = download({'url': url, 'title': f'Meta canopy height tile {qk}', 'bytes': 0})
+    local = CRS.from_proj4(f'+proj=eqc +lat_ts={LAT} +lat_0={LAT} +lon_0={LON} +x_0=0 +y_0=0 +a={R} +b={R} +units=m +no_defs')
+    out = np.zeros((N, N), np.float32)
+    with rasterio.open(src_path) as src:
+        reproject(rasterio.band(src, 1), out, dst_transform=from_origin(-HALF, HALF, CELL, CELL),
+                  dst_crs=local.to_wkt(), dst_nodata=0, resampling=Resampling.max if CELL > src.res[0] else Resampling.bilinear)
+    return np.clip(out, 0, 60), src_path
+
+
 EPT = 'https://s3-us-west-2.amazonaws.com/usgs-lidar-public'
 
 
@@ -257,10 +291,15 @@ def accumulate_ept(work):
                 print(f'    {done}/{len(keys)} nodes, {kept} first returns so far')
     return [{'ept': work, 'nodes': len(keys), 'firstReturns': kept, 'datumOffset': round(off, 2)}]
 
+raster = None
 # the gridded returns are kept beside the tiles, so tuning the steps below
 # doesn't mean reading 2-3 GB of LAZ again
 grids = os.path.join(args.cache, f'{args.id}-{args.ept or args.project}-{CELL:g}{"-veg" + args.veg.replace(",", "") if args.veg != "4,5" else ""}.npz')
-if os.path.exists(grids) and not args.fresh:
+if args.chm_raster:
+    chm, raster = raster_chm(args.chm_raster)
+    used = [{'raster': os.path.basename(raster)}]
+    print(f'{args.id}: canopy heights from {raster}')
+elif os.path.exists(grids) and not args.fresh:
     g = np.load(grids, allow_pickle=False)
     chm, n_first, n_high = g['chm'], g['n_first'], g['n_high']
     used = json.loads(str(g['used']))
@@ -325,13 +364,17 @@ crown = np.clip(np.mean(reach, axis=1), 1.0, 0.45 * h + 2)
 k = max(1, int(round(1.5 / CELL)))
 dense = ndimage.uniform_filter(n_high.astype(np.float32), 2 * k + 1) / np.maximum(ndimage.uniform_filter(n_first.astype(np.float32), 2 * k + 1), 1e-3)
 conifer = ((crown / h) < 0.22) | ((dense[tj, ti] > 0.95) & ((crown / h) < 0.35))
+if raster:
+    conifer = (crown / h) < 0.35  # no pulse density from a raster: the crown's shape alone
 
 x = -HALF + (ti + 0.5) * CELL
 z = -HALF + (tj + 0.5) * CELL
 order = np.lexsort((x, z))
 trees = [[round(float(x[i]), 1), round(float(z[i]), 1), round(float(h[i]), 1), round(float(crown[i]), 1), int(conifer[i])] for i in order]
 out = {
-    'source': f'USGS 3DEP LiDAR point cloud ({args.ept or args.project}{", Entwine copy" if args.ept else ""}), public domain: vegetation returns over the bare-earth DEM',
+    'source': ('Meta and WRI Global Canopy Height Map (1 m, CC BY 4.0, AWS Open Data)' if args.chm_raster == 'meta'
+               else f'canopy height raster {os.path.basename(raster)}') if raster else
+              f'USGS 3DEP LiDAR point cloud ({args.ept or args.project}{", Entwine copy" if args.ept else ""}), public domain: vegetation returns over the bare-earth DEM',
     'tiles': used, 'cell': CELL, 'minHeight': args.min_height, 'count': len(trees),
     'heights': {p: round(float(np.percentile(h, q)), 1) for p, q in (('p10', 10), ('median', 50), ('p90', 90), ('max', 100))},
     'conifers': int(conifer.sum()),
