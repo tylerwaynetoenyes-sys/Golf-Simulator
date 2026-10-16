@@ -43,7 +43,9 @@ const DEFAULT_SETTINGS = {
   courseLength: 9,
   courseStart: 1,
   clubSet: 'cavity', // the branded set (js/data/equipment.js SETS): its heads, lofts, bag and look
-  showClub: true, // the club at address and through the strike
+  showClub: true, // (old: kept so older saves migrate to `show`)
+  golfer: 'james', // who swings (each player can choose their own: roster gear)
+  show: 'club', // at address: 'club' (the club alone), 'golfer' (beta: a golfer swinging it), 'ball' (just the ball)
   partyMode: false, // drinking-game prompts (js/game/party.js); off unless asked for
 };
 

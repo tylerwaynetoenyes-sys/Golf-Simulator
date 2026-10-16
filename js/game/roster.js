@@ -93,7 +93,7 @@ export class Roster {
    */
   gearOf(p) {
     const st = store.settings, g = p?.gear || {};
-    return { clubSet: g.clubSet || st.clubSet || 'cavity', bag: g.bag || st.bag || null, ball: g.ball || st.ball || 'tour' };
+    return { clubSet: g.clubSet || st.clubSet || 'cavity', bag: g.bag || st.bag || null, ball: g.ball || st.ball || 'tour', golfer: g.golfer || st.golfer || 'james' };
   }
 
   setGear(id, gear) {

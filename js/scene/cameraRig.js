@@ -90,14 +90,18 @@ export class CameraRig {
     // a little behind and to the side of the ball (off the clubhead, which sits behind it), low enough to
     // see it on its tee or in its lie, and pitched so the ball sits in the lower third: clear of the
     // prompts below it, the hole opening up above
-    const back = 2.5, side = 0.62, up = 1.3;
+    // with the golfer standing to it, from further back on a longer lens (the broadcast "down the line" view):
+    // him on the left, the ball clear in front of the clubface, the hole opening up beyond
+    const g = this.withGolfer;
+    const back = g ? 6.2 : 2.5, side = g ? 1.05 : 0.62, up = g ? 1.55 : 1.3;
+    this.addressFov = g ? 30 : 44;
     const rx = -fz, rz = fx; // to the right of the line
     const x = o.x - fx * back + rx * side, z = o.z - fz * back + rz * side;
     const cy = Math.max(o.y + up, this.ground(x, z) + 0.9);
     this.desiredPos.set(x, cy, z);
     const dist = Math.hypot(o.x - x, o.z - z);
     const below = Math.atan2(cy - o.y, dist);                         // the ball's angle below level
-    const half = THREE.MathUtils.degToRad((this.baseFov || 44) / 2);
+    const half = THREE.MathUtils.degToRad((this.addressFov || 44) / 2);
     const pitch = below - Math.atan(0.42 * Math.tan(half));            // ball 0.42 of the half-frame below centre
     // turn halfway between the ball and the line ahead: the ball just left of centre, the hole opening up right
     const L = 60;
@@ -113,7 +117,7 @@ export class CameraRig {
     this._addressTargets();
     this.rate = 2.4;
     this.lookRate = 3;
-    this.baseFov = 44;
+    this.baseFov = this.addressFov || 44;
     if (immediate) {
       this.pos.copy(this.desiredPos);
       this.look.copy(this.desiredLook);
@@ -406,7 +410,7 @@ export class CameraRig {
       this.desiredLook.copy(this.look);
       this.flyOcclude = s >= f.occludeAfter;
       // settle the lens back to the address view's as the flight lands there
-      if (f.toAddress) this.baseFov = THREE.MathUtils.lerp(f.fov, 44, THREE.MathUtils.smoothstep(s, 0.75, 1));
+      if (f.toAddress) this.baseFov = THREE.MathUtils.lerp(f.fov, this.addressFov || 44, THREE.MathUtils.smoothstep(s, 0.75, 1));
       if (f.t >= f.seconds) {
         const done = f.done;
         this.fly = null;

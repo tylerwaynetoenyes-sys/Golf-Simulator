@@ -120,6 +120,7 @@ export function loadEquipment(path) {
       o.castShadow = true;
       o.receiveShadow = true;
     });
+    g.scene.userData.animations = g.animations; // (a rigged model's clips travel with its scene)
     eqCache.set(path, g.scene);
     return g.scene;
   }).catch((e) => { console.warn(`equipment ${path} unavailable`, e); eqCache.set(path, null); return null; });

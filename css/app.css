@@ -987,3 +987,5 @@ body.flyover .turn-wrap { opacity: 0; }
 #fullscreenButton[aria-pressed="true"] .fs-exit { display: block; }
 #fullscreenButton[aria-pressed="true"] .fs-enter { display: none; }
 .lie-view.big canvas { cursor: zoom-out; }
+.btn-tee[aria-pressed="true"] { color: var(--accent); border-color: rgba(var(--accent-rgb), 0.55); background: rgba(var(--accent-rgb), 0.1); }
+.beta-tag { display: inline-block; margin: 0 4px 0 2px; padding: 1px 6px; border-radius: 999px; font: 700 9px/1.4 var(--display); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-ink); background: var(--accent); vertical-align: 1px; }

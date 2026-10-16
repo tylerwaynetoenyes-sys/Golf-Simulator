@@ -242,6 +242,9 @@ export class Game {
     rebuildClubs({ set: g.clubSet, bag: g.bag, all: !course, ball: course ? g.ball : st.rangeBall });
     this.world.ball.setModel(currentBall().id);
     if (this._shownSet !== g.clubSet) { this._shownSet = g.clubSet; this.world.club.setSet(g.clubSet); }
+    // their golfer (loads on first use, then steps up to the ball)
+    this.world.golfer.onReady = () => { if (this.state === 'ready') { this._addressClub(); this.world.rig.setAim(this.aimDeg); } };
+    this.world.golfer.setCharacter(g.golfer);
     this.club = clubById(this.club?.id);
     this.hud.renderClubs(this.club.id);
   }
@@ -252,6 +255,7 @@ export class Game {
       // one player: the game's own settings, as before
       if (gear.clubSet) { const set = setById(gear.clubSet); store.setSetting('bag', set.bag.slice()); store.setSetting('clubSet', gear.clubSet); }
       if (gear.ball) store.setSetting('ball', gear.ball);
+      if (gear.golfer) store.setSetting('golfer', gear.golfer);
     } else {
       if (gear.clubSet && !gear.bag) gear = { ...gear, bag: setById(gear.clubSet).bag.slice() };
       this.roster.setGear(playerId, gear);
@@ -278,6 +282,7 @@ export class Game {
     const m = this.mode;
     const prevPlayer = this.player;
     this.player = m.currentPlayer();
+    this.teeDropped = null; // each shot starts with the tee where golfers use one
     // a new player up: their own bag, ball and clubs
     if (this.roster.multi && prevPlayer?.id !== this.player?.id) this.refreshEquipment();
     this.setup = m.shotSetup ? m.shotSetup(this.player) : RANGE_SETUP;
@@ -462,14 +467,17 @@ export class Game {
     const course = w.sceneMode === 'course';
     // teed the way golfers tee it: on a course only from the tee box (driver and woods high, an iron on a par 3
     // just off the turf, never a putter); on the range only the driver, woods and hybrids, irons off the turf
-    const teed = !!s.teed && !s.putting && kind !== 'putter' && (course || kind === 'driver' || kind === 'wood' || kind === 'hybrid');
+    const auto = !!s.teed && !s.putting && kind !== 'putter' && (course || kind === 'driver' || kind === 'wood' || kind === 'hybrid');
+    // the player can tee it up (or take the tee away) themselves, any shot but a putt
+    const teed = s.putting ? false : this.teeDropped == null ? auto : this.teeDropped;
     this.ballTeed = teed;
+    this._syncTeeButton?.();
     w.ball.teeHeight = teed ? TEE_HEIGHT[kind] ?? 0.008 : 0;
     w.ball.placeAt(s.origin.x, s.origin.y, s.origin.z, teed);
     const x = s.origin.x, z = s.origin.z;
     const lie = s.teed ? (course ? 'tee' : 'fairway') : s.lie || 'fairway';
     w.ballBed.set({
-      x, z, ground: w.visualGround, lie, deep: s.lieDetail === 'deep', teed,
+      x, z, ground: w.visualGround, lie, deep: s.lieDetail === 'deep', teed, // (a tee dropped in the rough stands in the rough)
       teeTop: w.ball.mesh.position.y - BALL.radius,
       turf: course ? w.course.turfAt(x + 0.6, z + 0.6) : new THREE.Color(0.075, 0.17, 0.035),
       sand: course ? w.course.turfAt(x, z) : null,
@@ -488,12 +496,42 @@ export class Game {
     this._updateHelper();
   }
 
+  /** What stands at the ball: the golfer and his club, the club alone, or nothing but the ball. */
+  showMode() {
+    const st = store.settings;
+    return st.show || (st.showClub === false ? 'ball' : 'club');
+  }
+
+  /** Tee the ball up (or take the tee away) for this shot, wherever it lies. */
+  toggleTee(force) {
+    const s = this.setup;
+    if (this.state !== 'ready' || !s || s.putting) return;
+    this.teeDropped = force ?? !this.ballTeed; // flips what is showing (the automatic tee included)
+    audio.tick?.();
+    this._placeBall();
+    this._addressClub();
+    this._syncTeeButton();
+    if (this.teeDropped && !s.teed) toast('Teed up', { kind: 'info', sub: 'Plays from a perfect lie this shot', ms: 1800 });
+  }
+
+  _syncTeeButton() {
+    const b = document.getElementById('teeButton');
+    if (!b) return;
+    const s = this.setup;
+    b.hidden = !s || !!s.putting;
+    b.setAttribute('aria-pressed', String(!!this.ballTeed));
+    b.textContent = this.ballTeed ? 'Tee: on' : 'Tee it up';
+  }
+
   /** Stand the selected club behind the ball, square to the aim line. */
   _addressClub() {
     const s = this.setup;
     const w = this.world;
-    if (!s || s.putting || !this.club || store.settings.showClub === false) { w.club.hide(); return; }
+    const show = this.showMode();
+    if (!s || s.putting || !this.club || show === 'ball') { w.club.hide(); w.golfer.address(w.club, true, w.rig); return; }
     w.club.setAddress(s.origin, s.heading + this.aimDeg, this.club.id, w.groundFn(s.origin.x, s.origin.z));
+    w.golfer.address(w.club, show !== 'golfer', w.rig);
+    if (this.state === 'ready') w.rig.setAim(this.aimDeg); // (re-frame for the golfer)
   }
 
   /** Where the current mode wants the ball to finish (metres), if anywhere. */
@@ -638,8 +676,8 @@ export class Game {
         this.refreshEquipment();
         if (this.state === 'ready') this._addressClub();
         break;
-      case 'showClub':
-        if (value && this.state === 'ready') this._addressClub(); else if (!value) this.world.club.hide();
+      case 'show':
+        if (this.state === 'ready') { this._addressClub(); this.world.rig.setAim(this.aimDeg); }
         break;
       case 'r10Distance': {
         const el = document.getElementById('r10DistVal');
@@ -757,7 +795,7 @@ export class Game {
       this._play(res, { ...launch, putt: true }, source);
       return;
     }
-    const lie = this.mode.adjustLaunch ? this.mode.adjustLaunch(launch, s) : launch;
+    const lie = this.mode.adjustLaunch ? this.mode.adjustLaunch(launch, this.teeDropped && !s.teed ? { ...s, lie: 'tee', teed: true, lieDetail: null } : s) : launch;
     const result = simulateShot(lie, {
       terrain: this.world.terrainFn, wind: this.mode.wind(), origin: s.origin, heading: s.heading, cup: this.mode.cup?.(s) || null,
       trees: this.mode.course ? this.world.course.treeHit : null, wet: this.world.env.wet, ball: currentBall(),
@@ -1491,6 +1529,7 @@ export class Game {
         }
         case 'm': case 'M': openModePicker(this); break;
         case 'f': case 'F': this.toggleFullscreen(); break;
+        case 't': case 'T': this.toggleTee(); break;
         case 's': case 'S': if (this.mode.course) openScorecard(this); break;
         case 'p': case 'P': openPlayers(this); break;
         case 'o': case 'O': radio.toggle(); break;
@@ -1524,6 +1563,7 @@ export class Game {
     on('autoPuttButton', () => this.putt('auto'));
     on('skipPuttButton', () => this.skipPutt());
     on('manualButton', () => { audio.click(); openManual(this); });
+    on('teeButton', () => this.toggleTee());
     on('modeButton', () => { audio.click(); openModePicker(this); });
     on('sessionButton', () => { audio.click(); if (this.mode.course) openScorecard(this); else openSession(this); });
     on('settingsButton', () => { audio.click(); openSettings(this); });

@@ -14,6 +14,7 @@ import { audio } from '../audio/audio.js';
 import { panelIn } from './motion.js';
 import { CLUB_SETS } from '../scene/club.js';
 import { openProShop } from './proShop.js';
+import { GOLFERS } from '../scene/golfer.js';
 
 const panel = $('#panel');
 const body = $('#panelBody');
@@ -191,7 +192,8 @@ export function openSettings(game) {
     <div class="setting"><div><label>Ball on the course</label><div class="hint">Cover, compression and dimples change spin, speed, flight and how it stops on the green. With the R10 your real launch is kept and the ball's flight and bite are applied.</div></div></div>
     <button class="shop-door" data-shop="ball"><span class="shop-door-k">Pro shop</span><b>${esc(ballById(game.roster.gearOf(game.player).ball).name)}</b><small>See every ball in 3D</small></button>
     <div class="setting" style="margin-top:10px"><div><label>Ball on the range</label></div>${seg('rangeBall', BALLS.map((b) => [b.id, b.name]))}</div>
-    <div class="setting"><div><label>Show the club</label><div class="hint">The club at address and through the strike. Off: just the ball.</div></div>${tog('showClub')}</div>
+    <div class="setting"><div><label>At address</label><div class="hint">The club, just the ball, or a golfer swinging the club. <b class="beta-tag">Beta</b> The golfer is a test build: the hands don't grip the club yet.</div></div>${seg('show', [['club', 'Club'], ['ball', 'Ball only'], ['golfer', 'Golfer · beta']])}</div>
+    <div class="setting"${store.settings.show === 'golfer' ? '' : ' hidden'} id="golferPick"><div><label>Golfer <b class="beta-tag">Beta</b></label><div class="hint">${game.roster.multi ? `For ${esc(game.player?.name || 'this player')}: each player can have their own.` : 'Who swings for you.'}</div></div><div class="seg" data-golfer>${GOLFERS.map((g) => `<button data-v="${g.id}" aria-pressed="${game.roster.gearOf(game.player).golfer === g.id}">${g.name}</button>`).join('')}</div></div>
     <h3>Sound</h3>
     <div class="setting"><label>Master volume</label><input type="range" min="0" max="1" step="0.05" value="${s.volume}" data-range="volume" /></div>
     <div class="setting"><label>Night ambience</label><input type="range" min="0" max="1" step="0.05" value="${s.ambience}" data-range="ambience" /></div>
@@ -202,6 +204,7 @@ export function openSettings(game) {
   el.querySelectorAll('.seg[data-key]').forEach((g) => g.querySelectorAll('button').forEach((b) => b.addEventListener('click', () => {
     g.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
     audio.tick();
+    if (g.dataset.key === 'show') { const gp = el.querySelector('#golferPick'); if (gp) gp.hidden = b.dataset.v !== 'golfer'; }
     game.applySetting(g.dataset.key, b.dataset.v);
   })));
   el.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', () => {
@@ -232,6 +235,11 @@ export function openSettings(game) {
       game.applySetting('bag', set.bag.slice(), true);
     }
     game.applySetting('clubSet', b.dataset.set);
+  }));
+  el.querySelectorAll('[data-golfer] button').forEach((b) => b.addEventListener('click', () => {
+    el.querySelectorAll('[data-golfer] button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    audio.tick();
+    game.setPlayerGear(game.player?.id, { golfer: b.dataset.v });
   }));
   el.querySelectorAll('.shop-door').forEach((b) => b.addEventListener('click', () => { audio.tick(); openProShop(game, { tab: b.dataset.shop, then: () => setTimeout(() => openSettings(game), 0) }); }));
   el.querySelectorAll('[data-range]').forEach((r) => r.addEventListener('input', () => game.applySetting(r.dataset.range, Number(r.value))));

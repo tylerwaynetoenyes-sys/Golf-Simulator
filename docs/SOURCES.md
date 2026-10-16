@@ -496,3 +496,11 @@ sampled from USGS The National Map imagery (NAIP, public domain).
 `assets/textures/pbr/sand_01_*` — "Sand 01" from Poly Haven (CC0): colour,
 normal and roughness, laid on the bunkers with rake furrows drawn over it.
 
+
+## Golfers (beta, off by default)
+
+`assets/models/golfers/{james,marcus,sofia,mei}.glb`, built by `tools/blender/golfer.py`:
+- Bodies, skins, hair, eyes, teeth, clothes and shoes: MakeHuman system assets through MPFB (CC0).
+- Motion: CMU Graphics Lab Motion Capture Database, subject 64 (golf): swing 64_01, putt 64_11
+  (the CMU data carries no restrictions on use), as the cgspeed BVH conversions from
+  github.com/Shriinivas/cmubvh (Sequence-060-075/64). Retargeted onto MPFB's cmu_mb rig.

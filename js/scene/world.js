@@ -17,6 +17,7 @@ import { CourseWorld } from '../course/courseWorld.js';
 import { PlayerMarkers } from './markers.js';
 import { Divots } from './divots.js';
 import { BallBed } from './ballBed.js';
+import { Golfer } from './golfer.js';
 import { Environment } from './environment.js';
 import { Ambient } from './ambient.js';
 import { Rain } from './rain.js';
@@ -50,6 +51,7 @@ export class World {
     this.markers = new PlayerMarkers(scene);
     this.divots = new Divots(scene);
     this.ballBed = new BallBed(scene);
+    this.golfer = new Golfer(scene);
     this.ambient = new Ambient(scene);
     this.rain = new Rain(scene);
     this.ambient.setCenter(0, -160);
@@ -239,6 +241,7 @@ export class World {
     this.ballBed.update(dt, t, this.env.wind?.(0, { gust: false }));
     this.characters.update(dt);
     this.club.update(dt, t);
+    this.golfer.update(dt, this.club);
     if (this.sceneMode === 'course') { this.course.ballPos = ballPos; this.course.update(t, dt, this.camera); }
     this.markers.update(t);
     this.ambient.update(dt, t);

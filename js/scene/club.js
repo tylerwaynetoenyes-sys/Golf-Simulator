@@ -200,6 +200,13 @@ export class Club {
 
   hide() { this.root.visible = false; this.phase = 'hidden'; }
 
+  /** A point on the grip, k metres down from the butt, in world space (where the golfer's hands go). */
+  gripWorld(k = 0.1) {
+    if (!this.clubG || !this._butt) return null;
+    this.root.updateMatrixWorld(true);
+    return this.clubG.localToWorld(this._butt.clone().addScaledVector(this._shaftDir, -k));
+  }
+
   /** Change the bag (see CLUB_SETS); takes effect on the next address. */
   setSet(id) {
     if (id === this.setId) return;
@@ -283,6 +290,8 @@ export class Club {
     // two gloved hands on the grip (lead glove, trail hand) so the club reads as held
     for (const [k, m] of [[0.06, this.mats.glove], [0.14, this.mats.glove]]) {
       const hand = new THREE.Mesh(new THREE.SphereGeometry(0.034, 14, 10), m);
+      hand.userData.stubHand = true; // stand-in hands; the golfer's own hold the grip once he has loaded
+      hand.visible = !this.golferHands;
       hand.scale.set(1, 1.35, 1);
       hand.quaternion.copy(q);
       hand.position.copy(butt).addScaledVector(dir, -k);
@@ -301,6 +310,7 @@ export class Club {
     this.pivot.position.copy(P);
     this.pivot.add(club);
     this.clubG = club;
+    this._butt = butt.clone();
     this._P = P.clone();
     this._hosel = hosel.clone();
     this._shaftDir = dir.clone();
