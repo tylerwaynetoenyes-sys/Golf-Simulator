@@ -379,6 +379,8 @@ export const THEME_TREES = {
   alton: { broad: [6, 2, 3, 0], conifer: [4], density: 0.5, scatter: 0.45 },
   // TPC Sawgrass: live oaks, sabal palms and slash pine
   sawgrass: { broad: [0, 12, 12, 1], conifer: [8], density: 0.75, scatter: 0.6 },
+  // Whistling Straits: open dunes; the few trees (surveyed) are oaks, maples and spruce windbreaks inland
+  whistlingstraits: { broad: [0, 2, 3], conifer: [4, 5], density: 0.12, scatter: 0.08 },
 };
 
 /** The tree set for a hole: its course's own, else its theme's. */

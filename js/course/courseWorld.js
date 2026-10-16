@@ -62,7 +62,13 @@ const PALETTES = {
   // a links-style harbor course: wispy fescue beyond the short grass
   harbor: { grass: C(0.52, 0.53, 0.31), scrub: C(0.4, 0.45, 0.27), rock: C(0.56, 0.54, 0.5), rockSlope: 0.5,
     rough: C(0.3, 0.46, 0.2), deep: C(0.5, 0.52, 0.3), shore: C(0.58, 0.55, 0.47), fescue: C(0.6, 0.56, 0.36) },
+  // a course's `links: true` (Whistling Straits): fine fescue on sand dunes and
+  // clay bluffs over a freshwater beach; the rough runs straight into tawny fescue
+  links: { grass: C(0.56, 0.54, 0.33), scrub: C(0.42, 0.45, 0.27), rock: C(0.66, 0.6, 0.5), rockSlope: 0.55,
+    rough: C(0.36, 0.46, 0.22), deep: C(0.55, 0.53, 0.32), shore: C(0.82, 0.76, 0.62), fescue: C(0.62, 0.57, 0.37) },
 };
+/** The natural-ground palette for a hole: its course's links look, else its theme's. */
+const paletteFor = (hole) => PALETTES[hole.links ? 'links' : hole.theme] || PALETTES.parkland;
 
 /** Links fescue grows in drifts: 0..1, a low-frequency field over the ground. */
 const fescueDrift = (x, z) => 0.5 + 0.5 * Math.sin(x * 0.045 + Math.sin(z * 0.03) * 2.2) * Math.cos(z * 0.05 - x * 0.017);
@@ -718,8 +724,8 @@ export class CourseWorld {
 
     // ── long grass in the rough: tufts thicken away from the fairway ──
     this._buildRoughGrass(T, g, rand, b);
-    if (hole.theme === 'harbor') this._buildFescue(T, g, rand);
-    if (hole.theme === 'western' || hole.theme === 'coastal') this._buildShrubs(T, g, rand, hole.theme);
+    if (hole.theme === 'harbor' || hole.links) this._buildFescue(T, g, rand);
+    if ((hole.theme === 'western' || hole.theme === 'coastal') && !hole.links) this._buildShrubs(T, g, rand, hole.theme);
 
     // ── yardage stakes: 100 red, 150 white, 200 blue, 250 yellow (to the green) ──
     this._buildStakes(T, g);
@@ -1133,7 +1139,7 @@ diffuseColor.rgb *= stripes * turf;`)
 
   /** Colour of the natural ground (no golf) at a point: grass, scrub, or rock on steep faces. */
   _backColor(T, x, z, y, spacing, c) {
-    const P = PALETTES[T.hole.theme] || PALETTES.parkland;
+    const P = paletteFor(T.hole);
     const e = Math.max(2, spacing * 0.5);
     const gx = (T.baseGround(x + e, z) - T.baseGround(x - e, z)) / (2 * e);
     const gz = (T.baseGround(x, z + e) - T.baseGround(x, z - e)) / (2 * e);
@@ -1209,7 +1215,7 @@ diffuseColor.rgb *= stripes * turf;`)
       case 'tee': c.copy(COL.tee); break;
       case 'water': c.copy(COL.bed); break;
       default: {
-        const P = PALETTES[T.hole.theme] || PALETTES.parkland;
+        const P = paletteFor(T.hole);
         const deep = Math.min(1, Math.max(0, (Math.abs(pr.d) - Math.max(T.fwHalf, 12) - 8) / 30));
         c.copy(P.rough || COL.rough).lerp(P.deep || COL.deep, deep);
         // a first cut (about 2.5 m) along the fairway and round the green: the mown
@@ -1725,7 +1731,7 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
       this.tuftMat = grassMaterial(0x6a8a3a);
     }
     const N = Math.round(15000 * (this.treeDensity ?? 1));
-    const tint = { western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.theme];
+    const tint = { western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.links ? 'harbor' : T.hole.theme];
     if (tint && !this.tuftMats?.[tint]) {
       this.tuftMats ||= {};
       this.tuftMats[tint] = grassMaterial(tint);
@@ -2002,7 +2008,7 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
     // as thick as ever, but the cells behind and under the camera aren't drawn
     if (!this.nearGrass) {
       this.nearGrass = new THREE.Group();
-      this.nearGrass.userData.mat = this.tuftMats?.[{ western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.theme]] || this.tuftMat;
+      this.nearGrass.userData.mat = this.tuftMats?.[{ western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.links ? 'harbor' : T.hole.theme]] || this.tuftMat;
       this.holeGroup.add(this.nearGrass);
     }
     for (const im of [...this.nearGrass.children]) { this.nearGrass.remove(im); im.dispose(); }

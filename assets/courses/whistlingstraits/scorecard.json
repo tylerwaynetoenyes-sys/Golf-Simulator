@@ -1,0 +1,21 @@
+{
+  "course": "The Straits Course, Whistling Straits, N8501 County Road LS, Haven (Sheboygan), Wisconsin 53083",
+  "source": "The published Straits Course card as listed by GolfPass: https://www.golfpass.com/courses/14635-straits-golf-course-at-whistling-straits/scorecard-and-layout",
+  "retrieved": "2026-10-16",
+  "notes": "OpenGolfAPI's entry for Whistling Straits carries another course's card (par 4 at the 2nd, par 3 at the 6th), so it is not used. Black, Blue, Green, White and Red hole yardages sum to the printed totals; the White/Red holes sum to 5922, not the 6037 the tee table prints; the hole figures are used.",
+  "back": "black",
+  "par": [4, 5, 3, 4, 5, 4, 3, 4, 4, 4, 5, 3, 4, 4, 4, 5, 3, 4],
+  "handicap": [15, 7, 17, 1, 5, 13, 9, 3, 11, 12, 6, 18, 14, 16, 4, 10, 8, 2],
+  "tees": {
+    "black": [493, 597, 188, 494, 603, 409, 221, 506, 442, 391, 645, 163, 402, 396, 503, 568, 249, 520],
+    "blue": [405, 533, 180, 451, 563, 378, 205, 470, 412, 376, 563, 138, 389, 360, 464, 545, 223, 487],
+    "green": [370, 521, 166, 414, 543, 360, 185, 429, 384, 334, 544, 118, 364, 346, 429, 535, 197, 424],
+    "white": [361, 508, 154, 404, 527, 352, 172, 405, 371, 320, 519, 99, 336, 332, 402, 513, 165, 420],
+    "white/red": [361, 447, 154, 354, 459, 282, 132, 405, 371, 320, 479, 99, 336, 332, 367, 513, 131, 380],
+    "red": [325, 447, 111, 354, 459, 282, 132, 355, 347, 304, 479, 89, 319, 271, 367, 412, 131, 380]
+  },
+  "ratings": {
+    "men": { "black": "77.2/152", "blue": "74.2/145", "green": "71.9/141", "white": "70.4/137", "white/red": "68.9/133", "red": "66.4/129" },
+    "women": { "green": "79.4/143", "white": "76.9/137", "white/red": "75.3/134", "red": "72.9/129" }
+  }
+}

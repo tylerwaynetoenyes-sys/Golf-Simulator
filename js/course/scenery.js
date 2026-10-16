@@ -136,7 +136,8 @@ export function dressScenery(T, hole, rand, ground, buildLandmark) {
     // sea stacks and boulders along the shore
     // weathered stone (a photographed rock face on noise-shaped boulders), a
     // few shapes instanced
-    const rock = pbr('rock_face_03', { scale: 2.5, tint: hole.theme === 'coastal' ? 0xd8ccc0 : 0xc4c4c8 });
+    // (a links course's shore is a low riprap of grey boulders, not sea stacks)
+    const rock = pbr('rock_face_03', { scale: 2.5, tint: hole.theme === 'coastal' && !hole.links ? 0xd8ccc0 : 0xc4c4c8 });
     const rr = seeded(hole.n * 13 + 5), shapes = [0, 1, 2].map(() => boulderGeometry(1, rr, { detail: 3, flat: 1 }));
     const stacks = shapes.map(() => []);
     let n = 0;
@@ -148,8 +149,8 @@ export function dressScenery(T, hole, rand, ground, buildLandmark) {
       if (Math.abs(pr.d) < T.fwHalf + 30 && pr.s > -20 && pr.s < L + 30) continue;
       const h = T.drawnHeight(x, z);
       if (h > T.seaLevel + 0.6 || h < T.seaLevel - 3) continue; // the surf line
-      const r = 1.5 + rand() * (rand() < 0.2 ? 6 : 2.5);
-      const sy = r * (0.6 + rand() * (r > 4 ? 1.6 : 0.6));
+      const r = hole.links ? 0.9 + rand() * 1.6 : 1.5 + rand() * (rand() < 0.2 ? 6 : 2.5);
+      const sy = r * (hole.links ? 0.5 + rand() * 0.3 : 0.6 + rand() * (r > 4 ? 1.6 : 0.6));
       stacks[n % 3].push(new THREE.Matrix4().compose(new THREE.Vector3(x, T.seaLevel - 0.6 + sy * 0.25, z),
         new THREE.Quaternion().setFromEuler(new THREE.Euler((rand() - 0.5) * 0.4, rand() * 6, (rand() - 0.5) * 0.4)), new THREE.Vector3(r, sy, r * (0.8 + rand() * 0.4))));
       n++;

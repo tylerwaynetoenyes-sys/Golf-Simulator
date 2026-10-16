@@ -187,7 +187,7 @@ export function prepareDemHoles(course, d) {
     const loc = (p) => p.map(([X, Z]) => f.toLocal(X, Z));
     const withPoly = (o) => (o.poly ? { ...o, poly: loc(o.poly) } : o);
     return {
-      ...h, line, demFrame: f, course: course.id, theme: course.theme, far, buildings: course.buildings ?? null, cityPull: course.cityPull ?? null, enrich: !!course.enrich, quays: !!course.quays, noShore: !!course.noShore, bulkheads: !!course.bulkheads, life: course.life || 'club', sky: course.sky || null,
+      ...h, line, demFrame: f, course: course.id, theme: course.theme, far, buildings: course.buildings ?? null, cityPull: course.cityPull ?? null, enrich: !!course.enrich, quays: !!course.quays, noShore: !!course.noShore, bulkheads: !!course.bulkheads, links: !!course.links, life: course.life || 'club', sky: course.sky || null,
       green: withPoly(h.green),
       bunkers: (h.bunkers || []).map(withPoly),
       ...(h.fairways ? { fairways: h.fairways.map(loc) } : {}),

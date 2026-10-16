@@ -1,0 +1,25 @@
+{
+  "lat": 43.85013,
+  "lon": -87.73221,
+  "size": 3800.0,
+  "step": 2.0,
+  "n": 1901,
+  "min": 147.0,
+  "max": 207.57,
+  "lidar": true,
+  "source": "USGS 3DEP 1 m bare-earth DEM (WI_Oshkosh_3Rivers_2018_D19), public domain; 30.0% from Terrarium tiles, all of it open Lake Michigan 600 m+ east of the centre: (AWS Open Data); every hole is on LiDAR; Lake Michigan bed sloped in under the hydro-flattened lake (0.35 m at the shore, 1 m per 40 m out, to 30 m); along the shore, 3,655 cells that the bake filled at bluff-top height (strips 14-15 m above the beach, where the LiDAR has voids at the hydro breakline) brought down to the toe of the bluff",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 16 x43y486 WI_Oshkosh_3Rivers_2018_D19",
+      "project": "WI_Oshkosh_3Rivers_2018_D19",
+      "published": "2023-02-25",
+      "samples": 722670
+    },
+    {
+      "tile": "USGS 1 Meter 16 x44y486 WI_Oshkosh_3Rivers_2018_D19",
+      "project": "WI_Oshkosh_3Rivers_2018_D19",
+      "published": "2023-02-25",
+      "samples": 1806481
+    }
+  ]
+}
