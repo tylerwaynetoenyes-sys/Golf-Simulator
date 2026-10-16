@@ -16,6 +16,7 @@ import { CTP_GREEN, terrain as rangeTerrain, groundHeight as rangeGround } from 
 import { CourseWorld } from '../course/courseWorld.js';
 import { PlayerMarkers } from './markers.js';
 import { Divots } from './divots.js';
+import { BallBed } from './ballBed.js';
 import { Environment } from './environment.js';
 import { Ambient } from './ambient.js';
 import { Rain } from './rain.js';
@@ -48,6 +49,7 @@ export class World {
     this.course = new CourseWorld(scene);
     this.markers = new PlayerMarkers(scene);
     this.divots = new Divots(scene);
+    this.ballBed = new BallBed(scene);
     this.ambient = new Ambient(scene);
     this.rain = new Rain(scene);
     this.ambient.setCenter(0, -160);
@@ -173,20 +175,26 @@ export class World {
    * into a small offscreen target and read back (no per-frame cost). Returns
    * ImageData, or null.
    */
-  renderLieView(pos, headingDeg, size = 176) {
+  renderLieView(pos, headingDeg, size = 512) {
     const r = this.r.renderer;
-    if (!this._lieRT) {
-      this._lieRT = new THREE.WebGLRenderTarget(size, size, { samples: 4 });
+    if (!this._lieRT || this._lieRT.width !== size) {
+      this._lieRT?.dispose();
+      this._lieRT = new THREE.WebGLRenderTarget(size, size, { samples: 8 });
       this._lieRT.texture.colorSpace = THREE.SRGBColorSpace;
-      this._lieCam = new THREE.PerspectiveCamera(32, 1, 0.02, 400);
+      this._lieCam = new THREE.PerspectiveCamera(30, 1, 0.005, 400);
       this._liePx = new Uint8Array(size * size * 4);
     }
     const cam = this._lieCam;
     const a = (headingDeg * Math.PI) / 180;
-    const fx = Math.sin(a), fz = -Math.cos(a);
+    const fx = Math.sin(a), fz = -Math.cos(a), rx = -fz, rz = fx;
     const by = this.ball.mesh.position.y;
-    cam.position.set(pos.x - fx * 0.42 + fz * 0.12, by + 0.22, pos.z - fz * 0.42 - fx * 0.12);
-    cam.lookAt(pos.x + fx * 0.05, by, pos.z + fz * 0.05);
+    const gy = this.visualGround(pos.x, pos.z);
+    // down at the ball's level from just behind and to one side: the dimples, the tee under it, the blades
+    // round it (and how far down in them it sits), with the line ahead out of focus beyond
+    // in long grass, from higher, to see the ball down in it
+    const lift = Math.max(0.035, by - gy + 0.02) + (this.ballBed?.uFade.value.y > 3 ? 0.06 : 0);
+    cam.position.set(pos.x - fx * 0.24 + rx * 0.09, gy + lift + 0.035, pos.z - fz * 0.24 + rz * 0.09);
+    cam.lookAt(pos.x + fx * 0.04, (by + gy) / 2 + 0.006, pos.z + fz * 0.04);
     const clubVis = this.club.root.visible;
     this.club.root.visible = false;
     const prevTarget = r.getRenderTarget();
@@ -228,6 +236,7 @@ export class World {
     this.tracer.update(dt);
     this.effects.update(dt);
     this.divots.update(dt);
+    this.ballBed.update(dt, t, this.env.wind?.(0, { gust: false }));
     this.characters.update(dt);
     this.club.update(dt, t);
     if (this.sceneMode === 'course') { this.course.ballPos = ballPos; this.course.update(t, dt, this.camera); }

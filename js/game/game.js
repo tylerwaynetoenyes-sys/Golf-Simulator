@@ -9,6 +9,7 @@ import * as U from '../core/units.js';
 import { CLUBS, clubById, demoLaunch, rebuildClubs, currentBall } from '../data/clubs.js';
 import { CATALOGUE, setById } from '../data/equipment.js';
 import { divotFor } from '../scene/divots.js';
+import { TEE_HEIGHT } from '../scene/ballBed.js';
 import { partyCalls, partyRule } from './party.js';
 import { store } from '../data/store.js';
 import * as moments from '../ui/moments.js';
@@ -283,7 +284,7 @@ export class Game {
     const s = this.setup;
     const w = this.world;
     if (m.course) this.aimDeg = 0;
-    w.ball.placeAt(s.origin.x, s.origin.y, s.origin.z, s.teed);
+    this._placeBall();
     const pin = m.course ? m.T.pin : null;
     w.rig.setAddress(new THREE.Vector3(s.origin.x, w.ball.mesh.position.y, s.origin.z), s.heading,
       { putting: s.putting, lookAt: pin ? new THREE.Vector3(pin.x, w.groundFn(pin.x, pin.z) + 0.1, pin.z) : null });
@@ -450,8 +451,36 @@ export class Game {
     return { name: p.name, color: p.color, team: team ? `Team ${team.name}` : '', detail };
   }
 
+  /**
+   * Set the ball down for the shot: teed as high as this club wants it, or in its lie, and lay the
+   * ground round it at blade scale (the ball bed: the lie's grass, sand, the tee).
+   */
+  _placeBall() {
+    const s = this.setup, w = this.world;
+    if (!s) return;
+    const kind = this.club?.kind || 'iron';
+    const course = w.sceneMode === 'course';
+    // teed the way golfers tee it: on a course only from the tee box (driver and woods high, an iron on a par 3
+    // just off the turf, never a putter); on the range only the driver, woods and hybrids, irons off the turf
+    const teed = !!s.teed && !s.putting && kind !== 'putter' && (course || kind === 'driver' || kind === 'wood' || kind === 'hybrid');
+    this.ballTeed = teed;
+    w.ball.teeHeight = teed ? TEE_HEIGHT[kind] ?? 0.008 : 0;
+    w.ball.placeAt(s.origin.x, s.origin.y, s.origin.z, teed);
+    const x = s.origin.x, z = s.origin.z;
+    const lie = s.teed ? (course ? 'tee' : 'fairway') : s.lie || 'fairway';
+    w.ballBed.set({
+      x, z, ground: w.visualGround, lie, deep: s.lieDetail === 'deep', teed,
+      teeTop: w.ball.mesh.position.y - BALL.radius,
+      turf: course ? w.course.turfAt(x + 0.6, z + 0.6) : new THREE.Color(0.075, 0.17, 0.035),
+      sand: course ? w.course.turfAt(x, z) : null,
+    });
+  }
+
   selectClub(id, quiet = false) {
+    const prevKind = this.club?.kind;
     this.club = clubById(id);
+    // teed up: re-tee to this club's height (a driver high, an iron just off the turf), or off the tee on the range
+    if (this.state === 'ready' && this.setup?.teed && prevKind !== this.club.kind) this._placeBall();
     this.hud.setClub(this.club.id);
     this.hud.setLieClub(this.club.short);
     if (this.state === 'ready') this._addressClub();
@@ -621,6 +650,25 @@ export class Game {
       }
       default: break;
     }
+  }
+
+  /**
+   * Full screen: the whole page (the game and its HUD) fills the display. Safari on iPad uses the
+   * webkit-prefixed API; where the browser has none (iPhone Safari), say how: add it to the Home Screen,
+   * which opens full screen (manifest display: fullscreen).
+   */
+  toggleFullscreen() {
+    const d = document, el = d.documentElement;
+    const on = d.fullscreenElement || d.webkitFullscreenElement;
+    const req = el.requestFullscreen || el.webkitRequestFullscreen;
+    const exit = d.exitFullscreen || d.webkitExitFullscreen;
+    audio.tick?.();
+    if (on) { exit?.call(d); return; }
+    if (!req) { toast('Full screen', { kind: 'info', sub: 'In Safari: Share → Add to Home Screen, then open Fairway from there', ms: 4200 }); return; }
+    try {
+      const p = req.call(el, { navigationUI: 'hide' });
+      p?.catch?.(() => toast('Full screen was blocked', { kind: 'info', sub: 'Try the button again, or press F', ms: 2600 }));
+    } catch { /* older webkit: no promise */ }
   }
 
   /** Big-screen mode: larger UI, wider tracer, bigger ball glow. */
@@ -805,12 +853,17 @@ export class Game {
       }
       const expected = club.ballMph * MPH;
       const smash = launch.clubSpeed ? launch.ballSpeed / launch.clubSpeed : null;
+      // the tee goes with the clubhead
+      if (this.ballTeed) {
+        const p0 = result.samples?.find((q) => Math.hypot(q.x - o.x, q.z - o.z) > 1.5) || { x: o.x, z: o.z - 1 };
+        w.ballBed.popTee(p0.x - o.x, p0.z - o.z, launch.clubSpeed ? launch.clubSpeed / MPH : club.clubMph, w.visualGround);
+      }
       // a divot, if the strike went into the ground: decided by the measured attack angle, club speed and smash
       {
         const rnd = Math.random;
         const kind = (CATALOGUE.find((c) => c.id === club.id) || {}).kind || 'iron';
         const d = divotFor({ aoa: launch.attackAngle, clubMph: launch.clubSpeed ? launch.clubSpeed / MPH : club.clubMph, smash, smashRef: club.smash,
-          kind, lie: this.setup.lie, teed: this.setup.teed, rnd });
+          kind, lie: this.ballTeed ? 'tee' : this.setup.teed ? 'fairway' : this.setup.lie, teed: this.ballTeed, rnd });
         if (d) {
           // along the swing: the way the ball set off
           const p1 = result.samples?.find((q) => Math.hypot(q.x - o.x, q.z - o.z) > 1.5) || { x: o.x, z: o.z - 1 };
@@ -1437,6 +1490,7 @@ export class Game {
           break;
         }
         case 'm': case 'M': openModePicker(this); break;
+        case 'f': case 'F': this.toggleFullscreen(); break;
         case 's': case 'S': if (this.mode.course) openScorecard(this); break;
         case 'p': case 'P': openPlayers(this); break;
         case 'o': case 'O': radio.toggle(); break;
@@ -1473,6 +1527,10 @@ export class Game {
     on('modeButton', () => { audio.click(); openModePicker(this); });
     on('sessionButton', () => { audio.click(); if (this.mode.course) openScorecard(this); else openSession(this); });
     on('settingsButton', () => { audio.click(); openSettings(this); });
+    on('fullscreenButton', () => this.toggleFullscreen());
+    const fsSync = () => { const b = document.getElementById('fullscreenButton'); if (b) b.setAttribute('aria-pressed', String(!!(document.fullscreenElement || document.webkitFullscreenElement))); };
+    document.addEventListener('fullscreenchange', fsSync);
+    document.addEventListener('webkitfullscreenchange', fsSync);
     on('playersButton', () => { audio.click(); openPlayers(this); });
     on('helpButton', () => { audio.click(); openHelp(this, 'pairing'); });
     on('bridgeHelpButton', () => { audio.init(); openHelp(this, 'pairing'); });

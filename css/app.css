@@ -855,10 +855,11 @@ body.tv .pin-dist b { font-size: 28px; }
 .minimap.big ~ .wind-dial, body:has(.minimap.big) .wind-dial { bottom: calc(var(--gutter) + 460px); }
 @media (max-width: 760px) { .wind-dial { bottom: 210px; } }
 body.tv .wind-dial { transform: scale(1.3); transform-origin: bottom right; }
-.lie-panel { position: absolute; left: var(--gutter); bottom: calc(var(--gutter) + 92px); display: flex; align-items: center; gap: 10px; pointer-events: none; }
+.lie-panel { position: absolute; left: calc(var(--gutter) + 142px); bottom: calc(var(--gutter) + 92px); display: flex; align-items: center; gap: 10px; pointer-events: none; }
 .lie-panel[hidden] { display: none; }
-.lie-view { position: relative; width: 88px; height: 88px; flex: none; }
-.lie-view canvas { width: 88px; height: 88px; border-radius: 50%; border: 2.5px solid rgba(255, 255, 255, 0.92); box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.7); display: block; background: #20301c; }
+.lie-view { position: relative; width: 150px; height: 150px; flex: none; transition: width var(--dur-3) var(--ease-out), height var(--dur-3) var(--ease-out); }
+.lie-view.big { width: 300px; height: 300px; }
+.lie-view canvas { width: 100%; height: 100%; pointer-events: auto; cursor: zoom-in; border-radius: 50%; border: 2.5px solid rgba(255, 255, 255, 0.92); box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.7); display: block; background: #20301c; }
 .lie-name { position: absolute; left: 50%; top: -14px; transform: translateX(-50%); font-family: var(--display); font-size: 10.5px; letter-spacing: 0.2em; text-transform: uppercase; color: #fff; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); white-space: nowrap; }
 .lie-info { background: rgba(15, 17, 19, 0.8); border: 1px solid var(--hairline); border-radius: 12px; padding: 8px 12px; min-width: 104px; }
 .li-dist b { font-family: var(--display); font-weight: 500; font-size: 26px; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -976,3 +977,13 @@ body.tv .callout .co-text { font-size: 17px; } body.tv .callout .co-text b { fon
 /* the bag button under the club rail */
 .club-rail-bag { display: block; width: 100%; margin-top: 6px; padding: 8px 6px; border: 0; border-top: 1px solid var(--border); background: none; color: var(--text-3); font: 600 10px/1 var(--display); letter-spacing: 0.18em; text-transform: uppercase; cursor: pointer; }
 .club-rail-bag:hover { color: var(--accent); }
+
+/* the turn banner reads at the top, under the hole header, so the ball at address is never under it */
+.turn-wrap { position: absolute; left: 0; right: 0; top: calc(var(--gutter) + 62px); display: flex; justify-content: center; pointer-events: none; }
+.turn-wrap > * { pointer-events: auto; }
+body.tv .turn-wrap { top: calc(var(--gutter) + 84px); }
+body.flyover .turn-wrap { opacity: 0; }
+#fullscreenButton .fs-exit { display: none; }
+#fullscreenButton[aria-pressed="true"] .fs-exit { display: block; }
+#fullscreenButton[aria-pressed="true"] .fs-enter { display: none; }
+.lie-view.big canvas { cursor: zoom-out; }

@@ -162,8 +162,8 @@ export class Ball {
   /** Rest the ball at (x, z): on a tee peg, or sitting on the ground. */
   placeAt(x, y, z, teed = false) {
     const gy = this.ground(x, z);
-    // teed: ball bottom ~3.5 cm above the turf, a normal driver tee height
-    this.setPosition(x, (teed ? Math.max(gy, y - 0.04) + 0.035 : gy) + BALL.radius, z);
+    // teed: the ball's bottom at the tee's top, as high as the club wants it (game.js sets teeHeight)
+    this.setPosition(x, (teed ? Math.max(gy, y - 0.04) + (this.teeHeight ?? 0.03) : gy) + BALL.radius, z);
     this.spinRate = 0;
     this.mesh.rotation.set(0, 0, 0);
     this.setVisible(true);

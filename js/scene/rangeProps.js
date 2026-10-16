@@ -201,10 +201,7 @@ export function createRange(scene, river, quality) {
   const steel = pbr('painted_steel', { scale: 2, tint: 0x3c4046, metal: 0.6, rough: 0.8 });
   const dayHooks = [];
   const venue = buildVenue(group, { quality, updaters, dayHooks });
-  // tee peg in the player's bay
-  const tee = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.002, 0.04, 8), pbr('brown_planks_08', { scale: 0.3, tint: 0xf8e2b0, bright: 2 })); // a wooden tee
-  tee.position.set(0, 0.07, 0);
-  group.add(tee);
+  // (the tee in the player's bay is the modelled one the ball bed sets under the ball: js/scene/ballBed.js)
   const canopy = new THREE.Group(); // (kept for the authored-asset slot)
   group.add(canopy);
   // Under-canopy amber lights, one per bay (glow strips) + three real lights

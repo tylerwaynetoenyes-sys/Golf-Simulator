@@ -79,19 +79,33 @@ export class CameraRig {
     const a = ((this.heading + this.aimDeg) * Math.PI) / 180;
     const fx = Math.sin(a), fz = -Math.cos(a);
     const o = this.origin;
-    // standing behind the ball, at a golfer's eye height
-    const back = this.putting ? 2.4 : 3.8;
-    const up = this.putting ? 1.05 : 1.68;
-    const x = o.x - fx * back, z = o.z - fz * back;
-    const gy = this.ground(x, z);
-    this.desiredPos.set(x, Math.max(o.y + up, gy + 1.2), z);
-    if (this.putting && this.lookTarget) {
-      this.desiredLook.set(this.lookTarget.x, this.lookTarget.y, this.lookTarget.z);
-    } else {
-      const lx = o.x + fx * 60, lz = o.z + fz * 60;
-      const ly = Math.max(o.y + 1.1 - 1.5, Math.min(o.y + 1.1 + 8, this.ground(lx, lz) + 1.6));
-      this.desiredLook.set(lx, ly, lz);
+    if (this.putting) {
+      // standing behind the ball, at a golfer's eye height, reading the line
+      const x = o.x - fx * 2.4, z = o.z - fz * 2.4;
+      this.desiredPos.set(x, Math.max(o.y + 1.05, this.ground(x, z) + 1.2), z);
+      if (this.lookTarget) this.desiredLook.set(this.lookTarget.x, this.lookTarget.y, this.lookTarget.z);
+      else this.desiredLook.set(o.x + fx * 20, o.y, o.z + fz * 20);
+      return;
     }
+    // a little behind and to the side of the ball (off the clubhead, which sits behind it), low enough to
+    // see it on its tee or in its lie, and pitched so the ball sits in the lower third: clear of the
+    // prompts below it, the hole opening up above
+    const back = 2.5, side = 0.62, up = 1.3;
+    const rx = -fz, rz = fx; // to the right of the line
+    const x = o.x - fx * back + rx * side, z = o.z - fz * back + rz * side;
+    const cy = Math.max(o.y + up, this.ground(x, z) + 0.9);
+    this.desiredPos.set(x, cy, z);
+    const dist = Math.hypot(o.x - x, o.z - z);
+    const below = Math.atan2(cy - o.y, dist);                         // the ball's angle below level
+    const half = THREE.MathUtils.degToRad((this.baseFov || 44) / 2);
+    const pitch = below - Math.atan(0.42 * Math.tan(half));            // ball 0.42 of the half-frame below centre
+    // turn halfway between the ball and the line ahead: the ball just left of centre, the hole opening up right
+    const L = 60;
+    const ya = Math.atan2(o.x - x, o.z - z), yb = Math.atan2(o.x + fx * L - x, o.z + fz * L - z);
+    let dy = yb - ya; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    const yaw = ya + dy * 0.55;
+    const lx = x + Math.sin(yaw) * L, lz = z + Math.cos(yaw) * L;
+    this.desiredLook.set(lx, cy - Math.tan(pitch) * L, lz);
   }
 
   toAddress(immediate = false) {

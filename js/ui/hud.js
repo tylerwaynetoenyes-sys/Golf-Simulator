@@ -187,6 +187,8 @@ export class HUD {
     if (!info) { el.hidden = true; return; }
     el.hidden = false;
     if (info.image) $('#lieCanvas').getContext('2d').putImageData(info.image, 0, 0);
+    const lv = $('#lieCanvas').parentElement;
+    if (!lv.dataset.bound) { lv.dataset.bound = '1'; $('#lieCanvas').addEventListener('click', () => lv.classList.toggle('big')); }
     $('#lieName').textContent = info.name;
     $('#lieDist').textContent = info.dist;
     $('#lieUnit').textContent = info.unit;
