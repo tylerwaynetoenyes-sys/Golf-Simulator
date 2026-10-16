@@ -66,9 +66,23 @@ const PALETTES = {
   // clay bluffs over a freshwater beach; the rough runs straight into tawny fescue
   links: { grass: C(0.56, 0.54, 0.33), scrub: C(0.42, 0.45, 0.27), rock: C(0.66, 0.6, 0.5), rockSlope: 0.55,
     rough: C(0.36, 0.46, 0.22), deep: C(0.55, 0.53, 0.32), shore: C(0.82, 0.76, 0.62), fescue: C(0.62, 0.57, 0.37) },
+  // the North Carolina Sandhills (Pinehurst No. 2): no rough, a strip of bermuda, then pale sand
+  // in a mosaic of wiregrass clumps and pine straw; pine straw on the floor of the longleaf woods
+  sandhills: { grass: C(0.33, 0.35, 0.19), scrub: C(0.45, 0.34, 0.2), rock: C(0.8, 0.72, 0.56), rockSlope: 0.6,
+    rough: C(0.31, 0.46, 0.2), deep: C(0.74, 0.66, 0.5), shore: C(0.78, 0.7, 0.54), fescue: C(0.82, 0.75, 0.59), wiregrass: 0xd6c995 },
 };
 /** The natural-ground palette for a hole: its course's links look, else its theme's. */
 const paletteFor = (hole) => PALETTES[hole.links ? 'links' : hole.theme] || PALETTES.parkland;
+
+/**
+ * The Sandhills' native band: 1 over the sand along play, 0 out under the pines, an irregular
+ * edge 20-40 m off the fairway or green (the real course's sandscapes are strips, not the woods).
+ */
+function nativeBand(T, x, z) {
+  const pr = T.project(x, z);
+  const wob = 9 * Math.sin(x * 0.027 + z * 0.011) + 6 * Math.sin(z * 0.043 - x * 0.029);
+  return 1 - THREE.MathUtils.smoothstep(Math.min(Math.abs(pr.d) - Math.max(T.fwHalf, 12), T.greenEdge(x, z)) + wob, 18, 36);
+}
 
 /** Links fescue grows in drifts: 0..1, a low-frequency field over the ground. */
 const fescueDrift = (x, z) => 0.5 + 0.5 * Math.sin(x * 0.045 + Math.sin(z * 0.03) * 2.2) * Math.cos(z * 0.05 - x * 0.017);
@@ -724,7 +738,7 @@ export class CourseWorld {
 
     // ── long grass in the rough: tufts thicken away from the fairway ──
     this._buildRoughGrass(T, g, rand, b);
-    if (hole.theme === 'harbor' || hole.links) this._buildFescue(T, g, rand);
+    if (hole.theme === 'harbor' || hole.links || hole.theme === 'sandhills') this._buildFescue(T, g, rand);
     if ((hole.theme === 'western' || hole.theme === 'coastal') && !hole.links) this._buildShrubs(T, g, rand, hole.theme);
 
     // ── yardage stakes: 100 red, 150 white, 200 blue, 250 yellow (to the green) ──
@@ -1216,6 +1230,8 @@ diffuseColor.rgb *= stripes * turf;`)
       case 'water': c.copy(COL.bed); break;
       default: {
         const P = paletteFor(T.hole);
+        // the Sandhills' sand is only off the short grass: under a fairway the underlay stays turf
+        if (P.wiregrass && t.surface === 'fairway') { c.copy(COL.cut); break; }
         const deep = Math.min(1, Math.max(0, (Math.abs(pr.d) - Math.max(T.fwHalf, 12) - 8) / 30));
         c.copy(P.rough || COL.rough).lerp(P.deep || COL.deep, deep);
         // a first cut (about 2.5 m) along the fairway and round the green: the mown
@@ -1233,16 +1249,18 @@ diffuseColor.rgb *= stripes * turf;`)
           const n = 0.5 + 0.5 * Math.sin(x * 0.09 + Math.sin(z * 0.07) * 2.3) * Math.cos(z * 0.11 - x * 0.05);
           c.lerp(P.bare, THREE.MathUtils.smoothstep(n, 0.62, 0.86) * deep * 0.85);
         }
+        // the Sandhills: pale sand showing between the wiregrass, in a band along play
+        if (P.wiregrass) c.lerp(P.fescue, nativeBand(T, x, z) * (0.55 + 0.4 * fescueDrift(x, z)) * THREE.MathUtils.smoothstep(T.roughGrade(x, z), 0, 0.6));
         if (T.F) {
           // real-ground courses: the maintained rough gives way to the land
-          // itself (an irregular edge, not a ruler line)
+          // itself (an irregular edge, not a ruler line); the Sandhills' sand gives way to the woods
           const gd = T.greenEdge(x, z);
           const wob = 14 * Math.sin(x * 0.021 + z * 0.013) + 8 * Math.sin(z * 0.047 - x * 0.031);
-          const w = THREE.MathUtils.smoothstep(Math.min(Math.abs(pr.d) - Math.max(T.fwHalf, 12), gd) + wob, 10, 46);
+          const w = P.wiregrass ? 1 - nativeBand(T, x, z) : THREE.MathUtils.smoothstep(Math.min(Math.abs(pr.d) - Math.max(T.fwHalf, 12), gd) + wob, 10, 46);
           if (w > 0) c.lerp(this._backColor(T, x, z, T.baseGround(x, z), 4, this._c3 || (this._c3 = new THREE.Color())), w);
         }
         // links: straw ground showing through the fescue drifts
-        if (P.fescue) c.lerp(P.fescue, fescueDepth(T, x, z) * (0.3 + 0.6 * fescueDrift(x, z)));
+        if (P.fescue && !P.wiregrass) c.lerp(P.fescue, fescueDepth(T, x, z) * (0.3 + 0.6 * fescueDrift(x, z)));
       }
     }
     const n = 0.92 + 0.12 * Math.sin(x * 0.21 + z * 0.13) * Math.cos(z * 0.17);
@@ -1752,7 +1770,8 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
     }
     // a links course's fescue drifts cover the deep rough: fewer tufts under them
     const N = Math.round(15000 * (this.treeDensity ?? 1) * (T.hole.links ? 0.7 : 1));
-    const tint = { western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.links ? 'harbor' : T.hole.theme];
+    const tint = { western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865, sandhills: 0x9a9a5a }[T.hole.links ? 'harbor' : T.hole.theme];
+    const sandy = !!PALETTES[T.hole.theme]?.wiregrass;
     if (tint && !this.tuftMats?.[tint]) {
       this.tuftMats ||= {};
       this.tuftMats[tint] = grassMaterial(tint);
@@ -1775,6 +1794,7 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
       if (this.landmark?.clear?.(x, z)) continue; // the landmark's paving (a street, a plaza)
       if ((this.farLms || []).some((l) => l.occupies?.(x, z))) continue; // a vineyard's rows
       const deep = T.roughDepth(x, z) === 'deep';
+      if (deep && sandy && rand() > 0.1) continue; // the Sandhills: sand, not rough, past the first cut
       const h = (deep ? 0.2 : 0.1) + rand() * (deep ? 0.2 : 0.07);
       q.setFromAxisAngle(up, rand() * 6.28);
       const spread = 0.8 + rand() * 0.7;
@@ -1797,7 +1817,9 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
       geo.userData.shared = lo.userData.shared = true;
       this.fescue = { geo, lo, mat: grassMaterial(0xd9c58e) };
     }
-    const { geo, lo, mat } = this.fescue;
+    const tint = PALETTES[T.hole.theme]?.wiregrass; // Sandhills wiregrass: olive-straw clumps, shin-high
+    if (tint && !this.fescue[tint]) this.fescue[tint] = grassMaterial(tint);
+    const { geo, lo } = this.fescue, mat = tint ? this.fescue[tint] : this.fescue.mat, hk = tint ? 0.7 : 1;
     const b = T.bounds(70);
     // links (Whistling Straits): fescue over whole holes of dunes, so fewer and sooner to the low tufts
     const N = Math.round(14000 * (this.treeDensity ?? 1) * (T.hole.links ? 0.55 : 1));
@@ -1810,12 +1832,12 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
       if (sf !== 'rough' && sf !== 'oob') continue;
       if (sf === 'rough' && T.roughDepth(x, z) !== 'deep') continue;
       // thin at the edge of the deep rough, full drifts out in the dunes
-      const k = fescueDepth(T, x, z), f = fescueDrift(x, z);
-      if (rand() > (0.12 + 0.88 * k) * (0.2 + 0.8 * f)) continue;
+      const k = tint ? nativeBand(T, x, z) : fescueDepth(T, x, z), f = fescueDrift(x, z);
+      if (rand() > (0.12 + 0.88 * k) * (0.2 + 0.8 * f) * (tint ? 0.3 : 1)) continue; // wiregrass: clumps apart, sand between
       if (T.greenEdge(x, z) < 8 || Math.hypot(x, z) < 14 || this._mownCarry(x, z)) continue;
       const y = this._coarseH(x, z);
       if (T.seaLevel != null && y < T.seaLevel + 0.8) continue;
-      const h = 0.45 + rand() * 0.35 + f * 0.2;
+      const h = (0.45 + rand() * 0.35 + f * 0.2) * hk;
       const spread = 1.5 + rand() * 1.1;
       q.setFromAxisAngle(up, rand() * 6.28);
       placed.push(m4.compose(p.set(x, y - 0.03, z), q, sc.set(spread, h, spread)).clone());
@@ -2030,7 +2052,7 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
     // as thick as ever, but the cells behind and under the camera aren't drawn
     if (!this.nearGrass) {
       this.nearGrass = new THREE.Group();
-      this.nearGrass.userData.mat = this.tuftMats?.[{ western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.links ? 'harbor' : T.hole.theme]] || this.tuftMat;
+      this.nearGrass.userData.mat = this.tuftMats?.[{ western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865, sandhills: 0x9a9a5a }[T.hole.links ? 'harbor' : T.hole.theme]] || this.tuftMat;
       this.holeGroup.add(this.nearGrass);
     }
     for (const im of [...this.nearGrass.children]) { this.nearGrass.remove(im); im.dispose(); }
@@ -2047,6 +2069,7 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
       if (T.greenEdge(px, pz) < 2.5) continue;
       if (this._mownCarry(px, pz)) continue;
       const deep = T.roughDepth(px, pz) === 'deep';
+      if (deep && PALETTES[T.hole.theme]?.wiregrass && rand() > 0.1) continue; // the Sandhills' sand
       // the first-cut edge of the rough stays short
       const h = (deep ? 0.18 : 0.08) + rand() * (deep ? 0.18 : 0.06);
       q.setFromAxisAngle(up, rand() * 6.28);

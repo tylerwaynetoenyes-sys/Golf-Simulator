@@ -388,6 +388,10 @@ export const THEME_TREES = {
   whistlingstraits: { broad: [0, 2, 3], conifer: [4, 5], density: 0.12, scatter: 0.08 },
   // Torrey Pines: the Torrey pine itself (open, wind-bent crowns on the bluffs, taller inland), the odd eucalyptus
   torreypines: { broad: [9, 9, 8, 3], conifer: [8, 9], density: 0.45, conifersFirst: true, scatter: 0.6 },
+  // the Sandhills: longleaf pine over everything, turkey oak in the understorey (Pinehurst's
+  // trees.json comes from a canopy-height raster, which can't tell a pine's crown from an oak's,
+  // so even "broad" crowns are mostly pines)
+  sandhills: { broad: [8, 8, 1], conifer: [8], density: 0.7, conifersFirst: true, scatter: 0.5 },
 };
 
 /** The tree set for a hole: its course's own, else its theme's. */

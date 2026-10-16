@@ -41,6 +41,7 @@ const STYLE = {
   florida: { roof: 'hip', house: true, lamp: '#ffe0b0' },
   midwest: { roof: 'hip', house: true, lamp: '#ffd090' },
   straits: { roof: 'hip', house: true, lamp: '#ffd090' },
+  carolina: { roof: 'hip', house: true, lamp: '#ffd8a8' },
   paris: {
     bay: 3.4, floor: 3.25, roof: 'mansard',
     facade: (g, w, h) => {
@@ -121,6 +122,19 @@ const REAL = {
     glass: null,
     roof: ['clay_roof_tiles_02', { scale: 2, tint: 0xe0ae8c }],
     cap: ['clay_roof_tiles_02', { scale: 2, tint: 0xd8a888 }],
+  },
+  // Pinehurst village (the resort clubhouse behind No. 2's 18th: long, low, cream walls and white
+  // colonnades under red-brown roofs; white clapboard cottages under grey and brown shingle)
+  carolina: {
+    walls: [
+      ['white_plaster_02', { scale: 3, tint: 0xf1e9d8 }, { bay: 4.2, floor: 3.2, win: [0.3, 0.7, 0.3, 0.8], frame: 0xf6f4ee, lit: 0.35 }],
+      ['wood_planks_grey', { scale: 1.6, tint: 0xf2eee4 }, { bay: 4.2, floor: 3.0, win: [0.3, 0.7, 0.3, 0.8], frame: 0xf6f4ee, lit: 0.35 }],
+      ['wood_planks_grey', { scale: 1.6, tint: 0xe8dfc8 }, { bay: 4.2, floor: 3.0, win: [0.3, 0.7, 0.3, 0.8], frame: 0xf6f4ee, lit: 0.35 }],
+    ],
+    roofs: [['roof_slates_02', { scale: 1.4, tint: 0x9a5444 }], ['roof_slates_02', { scale: 1.4, tint: 0x5e5a56 }], ['roof_slates_02', { scale: 1.4, tint: 0x6e5a48 }]],
+    glass: null,
+    roof: ['roof_slates_02', { scale: 1.4, tint: 0x9a5444 }],
+    cap: ['roof_slates_02', { scale: 1.4, tint: 0x9a5444 }],
   },
   // Godfrey, Illinois (the Rolling Hills clubhouse is a low ranch): tan brick and beige siding under brown shingles
   midwest: {
