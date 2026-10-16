@@ -321,7 +321,7 @@ export class CourseWorld {
     if (T.ponds.length && !hole.noShore) {
       const rings = T.ponds.map((p) => ({ pts: p.poly ? p.poly.pts : ellipseRing(p), level: p.level }));
       const skip = (x, z) => T.greenEdge(x, z) < 6 || Math.hypot(x, z) < 12;
-      g.add(shoreLife(rings, { skip, budget: this.r?.quality?.pixelRatio < 1.5 ? 500 : 900 }));
+      g.add(shoreLife(rings, { skip, budget: this.r?.quality?.pixelRatio < 1.5 ? 500 : 900, chunked: this._chunked.bind(this) }));
     }
     // Pete Dye's railroad-tie bulkheads where the water meets a green
     if (hole.bulkheads) {
