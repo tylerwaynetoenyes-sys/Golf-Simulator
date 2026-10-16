@@ -383,6 +383,8 @@ export const THEME_TREES = {
   augusta: { broad: [0, 1, 2], conifer: [8], density: 0.9, conifersFirst: true, scatter: 0.4 },
   // Whistling Straits: open dunes; the few trees (surveyed) are oaks, maples and spruce windbreaks inland
   whistlingstraits: { broad: [0, 2, 3], conifer: [4, 5], density: 0.12, scatter: 0.08 },
+  // Torrey Pines: the Torrey pine itself (open, wind-bent crowns on the bluffs, taller inland), the odd eucalyptus
+  torreypines: { broad: [9, 9, 8, 3], conifer: [8, 9], density: 0.45, conifersFirst: true, scatter: 0.6 },
 };
 
 /** The tree set for a hole: its course's own, else its theme's. */

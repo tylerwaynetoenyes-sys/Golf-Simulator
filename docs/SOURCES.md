@@ -577,3 +577,27 @@ logo, trademark, tournament name or photograph of the course ships with it.
   clubhouse found through image search (wisconsingolftrips.com,
   kohlerwisconsin.com, golf.com and others); nothing from them is copied
   into the game.
+## Torrey Pines (South Course)
+
+- Holes, greens, fairways (multipolygon relations), bunkers and the pond at the
+  18th: © OpenStreetMap contributors (ODbL 1.0), inside the OSM boundary
+  "Torrey Pines South Course" (the North Course next door is left out).
+- Scorecard (par, stroke index, black-tee yardages): OpenGolfAPI (ODbL 1.0),
+  course "Torrey Pines South Course", retrieved 2026-10-16.
+- Elevation: USGS 3DEP 1 m bare-earth DEM, CA_SanDiegoCo_D24 with
+  San_Diego_CA_2014_LiDAR (public domain); the sea offshore from the Terrarium
+  tiles (AWS Open Data).
+- Trees: USGS 3DEP point cloud CA_SanDiegoQL2_2014 (public domain), read from the
+  `usgs-lidar-public` Entwine bucket. The flight has no vegetation class, so
+  unclassified returns more than 1.5 m above the ground count as canopy, with
+  OSM building footprints and the cliff faces masked out.
+- Building heights and roofs: the same CA_SanDiegoQL2_2014 flight
+  (tools/fetch-building-shapes.py) over OSM footprints.
+- Ground colour: EOxCloudless 2024 (EOX IT Services GmbH, contains modified
+  Copernicus Sentinel data 2024), CC BY-NC-SA 4.0.
+- The Gliderport (`js/course/lm/torreypines.js`): position from the OSM
+  aerodrome "Torrey Pines Gliderport"; the flight park, windsock and
+  paragliders are modelled, not surveyed.
+- Hole notes: the 2021 U.S. Open hole-by-hole guide (NBC Sports / Golf
+  Channel), PGA.com's spotlight on the 3rd, and Links Magazine on the 12th
+  (the hardest hole of the 2008 U.S. Open, scoring average 4.58).
