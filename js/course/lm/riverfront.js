@@ -1820,7 +1820,7 @@ export default function build() {
         const w = new THREE.Vector3();
         const L = holder.matrix.clone();
         const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
-        const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
+        const gy = (x, z) => { toW(x, z); return (T.drawnHeight(w.x, w.z) - holder.position.y) / holder.scale.y; };
         // how far outside the field of play (fairway or green, and the short rough at its edge) a point lies
         const beyond = (x, z) => { toW(x, z); const pr = T.project(w.x, w.z); if (pr.s < -25 || pr.s > T.length + 30) return 1e9; return Math.abs(pr.d) - Math.max(T.fwHalf || 0, 14) - 6; };
         const inPlay = (x, z) => beyond(x, z) < 0;

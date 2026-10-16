@@ -225,7 +225,7 @@ function vignoble() {
       holder.updateMatrix();
       const L = holder.matrix.clone(), Li = L.clone().invert(), w = new THREE.Vector3();
       const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
-      const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
+      const gy = (x, z) => { toW(x, z); return (T.drawnHeight(w.x, w.z) - holder.position.y) / holder.scale.y; };
       const prj = (x, z) => { toW(x, z); return T.project(w.x, w.z); };
       const wl = T.seaLevel != null ? (T.seaLevel - holder.position.y) / holder.scale.y : -1e9;
       const corridor = Math.max(T.fwHalf || 0, 14) + 22;

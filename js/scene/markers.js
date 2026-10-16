@@ -2,6 +2,9 @@
 // so everyone can see where they lie. Names are drawn by the HUD.
 import * as THREE from 'three';
 import { BALL } from '../core/physics.js';
+import { loadEquipment } from './models.js';
+
+const MODEL_R = 0.021335; // the modelled balls are 1.68" across
 
 export class PlayerMarkers {
   constructor(scene) {
@@ -22,6 +25,14 @@ export class PlayerMarkers {
       const obj = new THREE.Group();
       const b = new THREE.Mesh(this.ballGeo, this.ballMat);
       b.position.y = BALL.radius;
+      // the same modelled ball as in play (dimples, print, finish), the sphere only until it loads
+      loadEquipment(`balls/${m.ball || 'tour'}.glb`).then((scn) => {
+        const src = scn?.getObjectByName('ball');
+        if (!src) return;
+        b.geometry = src.geometry; b.material = src.material;
+        b.scale.setScalar(BALL.radius / MODEL_R);
+        b.rotation.set(m.x * 7.1, m.z * 3.3, 0); // each one lying its own way up
+      });
       const ring = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({
         color: new THREE.Color(m.color).multiplyScalar(1.5), transparent: true, opacity: 0.85, depthWrite: false,
       }));

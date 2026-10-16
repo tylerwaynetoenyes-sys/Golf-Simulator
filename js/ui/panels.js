@@ -7,12 +7,13 @@ import { CourseMode, fmtToPar, PUTT_RINGS, MULLIGANS, GIMMES } from '../game/cou
 import { PLAYER_COLORS, TEAMS, MAX_PLAYERS } from '../game/roster.js';
 import { store } from '../data/store.js';
 import { CLUBS, clubById } from '../data/clubs.js';
-import { CATALOGUE, HEADS, BALLS, BAG_LIMIT } from '../data/equipment.js';
+import { CATALOGUE, HEADS, BALLS, BAG_LIMIT, setById, ballById } from '../data/equipment.js';
 import * as U from '../core/units.js';
 import { MPH } from '../core/physics.js';
 import { audio } from '../audio/audio.js';
 import { panelIn } from './motion.js';
 import { CLUB_SETS } from '../scene/club.js';
+import { openProShop } from './proShop.js';
 
 const panel = $('#panel');
 const body = $('#panelBody');
@@ -184,11 +185,11 @@ export function openSettings(game) {
     <div class="setting"><div><label>Party mode</label><div class="hint">Drinking-game prompts: water, OB and three-putts drink, birdies hand them out, and every Zoo hole has its own rule. Any drink counts, water too; drink responsibly, and only if you're of age.</div></div>${tog('partyMode')}</div>
     <h3>Equipment</h3>
     <div class="setting"><div><label>Club set</label><div class="hint">Pick a set the way you'd buy one: each plays as its kind of club does (head design, lofts, forgiveness) and comes with its own bag.</div></div></div>
-    <div class="club-sets">${CLUB_SETS.map((c) => `<button class="club-set" data-set="${c.id}" aria-pressed="${(s.clubSet || 'cavity') === c.id}"><b>${esc(c.name)}</b><small>${esc(c.blurb)}</small><small class="set-spec">${esc(c.spec)}</small></button>`).join('')}</div>
+    <button class="shop-door" data-shop="clubs"><span class="shop-door-k">Pro shop</span><b>${esc((CLUB_SETS.find((c) => c.id === game.roster.gearOf(game.player).clubSet) || CLUB_SETS[0]).name)}</b><small>See every set in 3D</small></button>
     <div class="setting" style="margin-top:10px"><div><label>Your bag</label><div class="hint">Up to ${BAG_LIMIT} clubs for the course. On the range every club is out.</div></div></div>
     <div class="bag-picks">${CATALOGUE.map((c) => `<button class="bag-pick" data-bag="${c.id}" aria-pressed="${(s.bag || []).includes(c.id)}"><b>${esc(c.short)}</b><small>${c.loft}°</small></button>`).join('')}</div>
     <div class="setting"><div><label>Ball on the course</label><div class="hint">Cover, compression and dimples change spin, speed, flight and how it stops on the green. With the R10 your real launch is kept and the ball's flight and bite are applied.</div></div></div>
-    <div class="club-sets">${BALLS.map((b) => `<button class="club-set ball-pick" data-ball="${b.id}" aria-pressed="${(s.ball || 'tour') === b.id}"><b>${esc(b.name)}</b><small>${esc(b.sub)}</small></button>`).join('')}</div>
+    <button class="shop-door" data-shop="ball"><span class="shop-door-k">Pro shop</span><b>${esc(ballById(game.roster.gearOf(game.player).ball).name)}</b><small>See every ball in 3D</small></button>
     <div class="setting" style="margin-top:10px"><div><label>Ball on the range</label></div>${seg('rangeBall', BALLS.map((b) => [b.id, b.name]))}</div>
     <div class="setting"><div><label>Show the club</label><div class="hint">The club at address and through the strike. Off: just the ball.</div></div>${tog('showClub')}</div>
     <h3>Sound</h3>
@@ -232,6 +233,7 @@ export function openSettings(game) {
     }
     game.applySetting('clubSet', b.dataset.set);
   }));
+  el.querySelectorAll('.shop-door').forEach((b) => b.addEventListener('click', () => { audio.tick(); openProShop(game, { tab: b.dataset.shop, then: () => setTimeout(() => openSettings(game), 0) }); }));
   el.querySelectorAll('[data-range]').forEach((r) => r.addEventListener('input', () => game.applySetting(r.dataset.range, Number(r.value))));
   el.querySelectorAll('[data-text]').forEach((i) => i.addEventListener('change', () => game.applySetting(i.dataset.text, i.value.trim())));
 }
@@ -723,6 +725,7 @@ export function openPlayers(game, { then } = {}) {
           <button class="swatch" data-color title="Change colour"></button>
           <input value="${esc(p.name)}" maxlength="18" data-name aria-label="Player name" />
           ${teams ? `<div class="team-pick">${TEAMS.map((t, i) => `<button data-team="${i}" style="--tc:${t.color}" aria-pressed="${p.team === i}">${t.name}</button>`).join('')}</div>` : '<span></span>'}
+          <button class="pl-bag" data-bag title="Choose ${esc(p.name)}'s clubs and ball">${esc(setById(r.gearOf(p).clubSet).brand)}<small>${esc(ballById(r.gearOf(p).ball).name)}</small></button>
           <button class="remove" data-remove title="Remove" ${r.players.length <= 1 ? 'disabled' : ''}>×</button>
         </li>`).join('')}
       </ol>
@@ -762,6 +765,12 @@ export function openPlayers(game, { then } = {}) {
         r.save(); audio.tick(); redraw();
       });
       li.querySelector('[data-remove]').addEventListener('click', () => { r.remove(id); audio.tick(); redraw(); });
+      li.querySelector('[data-bag]').addEventListener('click', () => {
+        // their bag in the pro shop, then back here (keeping any name being typed)
+        el.querySelectorAll('.players li').forEach((x) => { const v = x.querySelector('[data-name]').value; if (v) r.rename(x.dataset.id, v); });
+        audio.tick();
+        openProShop(game, { player: r.byId(id), then: () => setTimeout(() => openPlayers(game, { then }), 0) });
+      });
       li.querySelectorAll('[data-team]').forEach((b) => b.addEventListener('click', () => { r.setTeam(id, Number(b.dataset.team)); audio.tick(); redraw(); }));
     });
     el.querySelector('#plAdd').addEventListener('click', () => {

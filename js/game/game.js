@@ -7,6 +7,8 @@ import { bus } from '../core/events.js';
 import { units } from '../core/units.js';
 import * as U from '../core/units.js';
 import { CLUBS, clubById, demoLaunch, rebuildClubs, currentBall } from '../data/clubs.js';
+import { CATALOGUE, setById } from '../data/equipment.js';
+import { divotFor } from '../scene/divots.js';
 import { partyCalls, partyRule } from './party.js';
 import { store } from '../data/store.js';
 import * as moments from '../ui/moments.js';
@@ -74,6 +76,7 @@ export class Game {
     this._bindRadio();
     this.applySetting('camera', store.settings.camera, false);
     this.world.club.setSet(store.settings.clubSet);
+    this._shownSet = store.settings.clubSet;
     units.system = store.settings.units;
     const day = store.settings.timeOfDay === 'day';
     world.env.setTime(day ? 'day' : 'night', true);
@@ -233,10 +236,29 @@ export class Game {
   /** The bag and ball for this mode: the whole catalogue and the range ball on the range, the player's bag on a course. */
   refreshEquipment() {
     const st = store.settings, course = this.mode?.id === 'course';
-    rebuildClubs({ set: st.clubSet, bag: st.bag, all: !course, ball: course ? st.ball : st.rangeBall });
+    // each player plays their own bag and ball (roster gear), falling back to the settings
+    const g = this.roster.gearOf(this.player || this.roster.players[0]);
+    rebuildClubs({ set: g.clubSet, bag: g.bag, all: !course, ball: course ? g.ball : st.rangeBall });
     this.world.ball.setModel(currentBall().id);
+    if (this._shownSet !== g.clubSet) { this._shownSet = g.clubSet; this.world.club.setSet(g.clubSet); }
     this.club = clubById(this.club?.id);
     this.hud.renderClubs(this.club.id);
+  }
+
+  /** Change a player's bag or ball (the pro shop, the players panel); their next turn, or now if it's theirs. */
+  setPlayerGear(playerId, gear) {
+    if (!this.roster.multi) {
+      // one player: the game's own settings, as before
+      if (gear.clubSet) { const set = setById(gear.clubSet); store.setSetting('bag', set.bag.slice()); store.setSetting('clubSet', gear.clubSet); }
+      if (gear.ball) store.setSetting('ball', gear.ball);
+    } else {
+      if (gear.clubSet && !gear.bag) gear = { ...gear, bag: setById(gear.clubSet).bag.slice() };
+      this.roster.setGear(playerId, gear);
+    }
+    if (!this.player || this.player.id === playerId || !this.roster.multi) {
+      this.refreshEquipment();
+      if (this.state === 'ready') this._addressClub();
+    }
   }
 
   restartMode() {
@@ -255,6 +277,8 @@ export class Game {
     const m = this.mode;
     const prevPlayer = this.player;
     this.player = m.currentPlayer();
+    // a new player up: their own bag, ball and clubs
+    if (this.roster.multi && prevPlayer?.id !== this.player?.id) this.refreshEquipment();
     this.setup = m.shotSetup ? m.shotSetup(this.player) : RANGE_SETUP;
     const s = this.setup;
     const w = this.world;
@@ -583,7 +607,6 @@ export class Game {
       case 'weather': this.setWeather(value); break;
       case 'clubSet':
         this.refreshEquipment();
-        this.world.club.setSet(value);
         if (this.state === 'ready') this._addressClub();
         break;
       case 'showClub':
@@ -782,6 +805,20 @@ export class Game {
       }
       const expected = club.ballMph * MPH;
       const smash = launch.clubSpeed ? launch.ballSpeed / launch.clubSpeed : null;
+      // a divot, if the strike went into the ground: decided by the measured attack angle, club speed and smash
+      {
+        const rnd = Math.random;
+        const kind = (CATALOGUE.find((c) => c.id === club.id) || {}).kind || 'iron';
+        const d = divotFor({ aoa: launch.attackAngle, clubMph: launch.clubSpeed ? launch.clubSpeed / MPH : club.clubMph, smash, smashRef: club.smash,
+          kind, lie: this.setup.lie, teed: this.setup.teed, rnd });
+        if (d) {
+          // along the swing: the way the ball set off
+          const p1 = result.samples?.find((q) => Math.hypot(q.x - o.x, q.z - o.z) > 1.5) || { x: o.x, z: o.z - 1 };
+          w.divots.cut({ x: o.x, z: o.z, dx: p1.x - o.x, dz: p1.z - o.z, ground: w.visualGround, d, rnd, effects: w.effects,
+            clubMph: launch.clubSpeed ? launch.clubSpeed / MPH : club.clubMph,
+            turf: w.sceneMode === 'course' ? w.course.turfAt(o.x, o.z) : new THREE.Color(0.17, 0.3, 0.08) });
+        }
+      }
       const quality = smash ? Math.min(1, Math.max(0, (smash - (club.smash - 0.2)) / 0.2)) : Math.min(1, launch.ballSpeed / expected);
       audio.impact(club.id, launch.launchAngle < 4 ? 0.3 : quality, launch.ballSpeed);
       audio.flight(result.flightTime, launch.ballSpeed);
@@ -1121,6 +1158,8 @@ export class Game {
             const surf = e.surface === 'cup' ? 'green' : e.surface;
             w.effects.land({ ...e, surface: surf });
             audio.land(surf, e.speed, d);
+            // a ball dropping onto the green dents it: its pitch mark, along the line it came in on
+            if (surf === 'green' && e.speed > 6 && w.sceneMode === 'course') w.course.marks?.add(e.x, e.z, e.x - o.x, e.z - o.z, 'fresh');
           }
           w.ball.spinRate *= 0.3;
         } else if (e.type === 'tree') {

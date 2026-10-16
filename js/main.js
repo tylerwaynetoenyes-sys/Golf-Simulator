@@ -62,7 +62,7 @@ async function boot() {
     fallbacks.length ? [store.settings.bridgeUrl] : []);
   let game;
   const pairing = new PairingUI(client, { onEnterGame: (how) => game.start(how) });
-  const hud = new HUD({ onClub: (id) => game.selectClub(id) });
+  const hud = new HUD({ onClub: (id) => game.selectClub(id), onBag: () => import('./ui/proShop.js').then((m) => m.openProShop(game)) });
   const piasa = new PiasaMascot($('#piasaMascot'));
   game = new Game(world, hud, client, pairing, piasa);
   window.__game = game;

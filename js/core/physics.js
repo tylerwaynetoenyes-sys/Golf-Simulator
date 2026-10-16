@@ -65,7 +65,9 @@ export const PUTT = { decel: 0.42, drag: 0.06, cupRadius: 0.054, capture: 1.35 }
 // ≈ 1.6 m/s, matching measured values (Holmes, 1991); off-centre the chord
 // is shorter, so the ball needs to be slower, and a fast or glancing ball
 // catches the far lip and spins out.
-export const CUP = { radius: 0.054, depth: 0.102, pole: 0.0125 };
+// a 4.25 in hole; the liner (4.1 in inside) sunk 1 in, 4 in deep, so its floor is 5 in down, with the
+// flagstick socket in a low 33 mm boss in the middle: a holed ball lies against the wall and the boss
+export const CUP = { radius: 0.054, depth: 0.127, pole: 0.0125, liner: 0.0521, boss: 0.0165, bossH: 0.006 };
 const FALL_T = Math.sqrt((2 * BALL.radius) / G);
 
 /**
@@ -120,7 +122,7 @@ function cupDrop({ cup, t0, px, pz, vx, vz, vy = 0, rimY, samples, events, flags
     x += vx * dt; z += vz * dt; yb += vy * dt;
     t += dt;
     // liner wall (once the ball is below the rim it's fully inside)
-    const wallR = yb > -r ? R : R - r;
+    const wallR = yb > -r ? R : CUP.liner - r;
     const d = Math.hypot(x, z);
     if (d > wallR) {
       const nx = x / d, nz = z / d;
@@ -144,6 +146,16 @@ function cupDrop({ cup, t0, px, pz, vx, vz, vy = 0, rimY, samples, events, flags
           if (-vn > 0.25 && t - lastRattle > 0.05) { events.push({ type: 'rattle', t, x: cup.x + x, y: rimY + yb, z: cup.z + z, speed: -vn, pole: true }); lastRattle = t; }
         }
         x = nx * pr; z = nz * pr;
+      }
+    }
+    // the socket boss in the middle of the floor: a ball down there rolls off it to the side
+    if (yb < -CUP.depth + CUP.bossH) {
+      const db = Math.hypot(x, z), rb = Math.min(CUP.boss + r * 0.75, CUP.liner - r - 0.0005);
+      if (db < rb) {
+        const nx = db > 1e-6 ? x / db : 1, nz = db > 1e-6 ? z / db : 0;
+        const vn = vx * nx + vz * nz;
+        if (vn < 0) { vx -= 1.3 * vn * nx; vz -= 1.3 * vn * nz; }
+        x = nx * rb; z = nz * rb;
       }
     }
     // bottom

@@ -74,7 +74,7 @@ export default function build() {
       holder.updateMatrix();
       const L = holder.matrix.clone(), w = new THREE.Vector3();
       const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
-      const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
+      const gy = (x, z) => { toW(x, z); return (T.drawnHeight(w.x, w.z) - holder.position.y) / holder.scale.y; };
       // the field of play itself: fairway, green and a little either side
       const onField = (x, z, pad = 0) => { toW(x, z); const pr = T.project(w.x, w.z); return Math.abs(pr.d) < Math.max(T.fwHalf || 0, 14) + 10 + pad && pr.s > -20 && pr.s < T.length + 30; };
       // hole terms (arc length s, lateral d) to this frame, for the exhibit and the gallery beside the hole

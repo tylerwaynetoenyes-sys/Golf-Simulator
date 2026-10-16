@@ -3,7 +3,8 @@
 // and the featured Closest-to-Pin green.
 import * as THREE from 'three';
 import { CUP } from '../core/physics.js';
-import { buildCup } from './cup.js';
+import { buildCup, ferrule } from './cup.js';
+import { loadEquipment } from './models.js';
 import { YD } from '../core/physics.js';
 import { LAYOUT, GREENS, CTP_GREEN, groundHeight } from './layout.js';
 import { buildVenue } from './venue.js';
@@ -64,6 +65,9 @@ export function lightConeMaterial(color, strength) {
   });
 }
 
+const BLANK_NUM = new THREE.DataTexture(new Uint8Array(4), 1, 1);
+BLANK_NUM.needsUpdate = true;
+
 export function makeFlag(color, poleHeight = 2.4, emissive = 1.2) {
   const g = new THREE.Group();
   // a real flagstick: 13 mm fibreglass (half an inch), painted, with a little sheen
@@ -82,19 +86,34 @@ export function makeFlag(color, poleHeight = 2.4, emissive = 1.2) {
   pole.position.y = poleHeight / 2;
   pole.castShadow = true;
   g.add(pole);
-  const flagGeo = new THREE.PlaneGeometry(0.55, 0.38, 12, 4);
-  flagGeo.translate(0.275, 0, 0);
+  const flagGeo = new THREE.PlaneGeometry(0.508, 0.356, 12, 4); // stands in until the modelled flag loads
+  flagGeo.translate(0.254, 0, 0);
   const flagMat = new THREE.MeshStandardMaterial({
     color, emissive: color, emissiveIntensity: emissive, side: THREE.DoubleSide, roughness: 0.8,
   });
+  // the hole number, printed through so it reads the right way round from either side
+  const uNum = { value: BLANK_NUM };
   flagMat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = { value: 0 };
     sh.uniforms.uWind = { value: 0.3 };
+    sh.uniforms.uNum = uNum;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uNum;')
+      .replace('#include <map_fragment>', `#include <map_fragment>
+  #ifdef USE_MAP
+    vec2 nuv = gl_FrontFacing ? vMapUv : vec2(1.12 - vMapUv.x, vMapUv.y);
+    float ink = texture2D(uNum, nuv).a * step(0.0, nuv.x) * step(nuv.x, 1.0);
+    diffuseColor.rgb *= 1.0 - 0.88 * ink;
+  #endif`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+  #ifdef USE_MAP
+    totalEmissiveRadiance *= 1.0 - 0.9 * ink;
+  #endif`);
     flagMat.userData.shader = sh;
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWind;')
       .replace('#include <begin_vertex>', `#include <begin_vertex>
-        float k = position.x / 0.55;
+        float k = clamp(position.x / 0.508, 0.0, 1.0);
         float amp = 0.02 + 0.09 * uWind;
         float spd = 3.0 + 9.0 * uWind;
         transformed.z += sin(position.x * 9.0 - uTime * spd) * amp * k;
@@ -105,6 +124,42 @@ export function makeFlag(color, poleHeight = 2.4, emissive = 1.2) {
   g.add(flag);
   g.userData.flagMat = flagMat;
   g.userData.pole = pole;
+  // its foot: the chrome ferrule that seats in the cup's socket
+  ferrule((f) => { f.castShadow = true; g.add(f); });
+  // the modelled pin (tools/blender/green_details.py): a 20 x 14 in flag with its sleeve round the stick,
+  // hemmed and double-stitched, the cloth's weave; the stick's moulded top cap; the swivel clip at the flag's head
+  loadEquipment('pin.glb').then((scn) => {
+    if (!scn) return;
+    const f = scn.getObjectByName('flag');
+    if (f) {
+      flag.geometry = f.geometry;
+      flag.position.set(0, poleHeight - 0.215, 0);
+      flagMat.normalMap = f.material.normalMap;
+      flagMat.normalScale = new THREE.Vector2(0.8, 0.8);
+      if (!flagMat.map) { flagMat.map = f.material.map; flagMat.emissiveMap = f.material.map; }
+      flagMat.needsUpdate = true;
+    }
+    const cap = scn.getObjectByName('topcap');
+    if (cap) { const c = cap.clone(); c.position.y = poleHeight; c.castShadow = true; g.add(c); }
+    const clip = scn.getObjectByName('clip');
+    if (clip) { const c = clip.clone(); c.position.y = poleHeight - 0.035; g.add(c); }
+  });
+  // print a hole number on the flag: screen-printed ink, a little in from the fly
+  g.userData.setNumber = (n) => {
+    if (g.userData.dressed) return; // a dressed flag (the Stars and Stripes) keeps its own cloth
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 360;
+    const x = c.getContext('2d');
+    x.fillStyle = '#000';
+    x.font = `600 ${Math.round(c.height * 0.62)}px Jost, Futura, "Avenir Next", sans-serif`;
+    x.textAlign = 'center'; x.textBaseline = 'middle';
+    x.fillText(String(n), c.width * 0.56, c.height * 0.53);
+    const t = new THREE.CanvasTexture(c);
+    t.anisotropy = 8;
+    t.flipY = false; // the modelled flag's UVs are glTF's (v down the image)
+    uNum.value = t;
+  };
+  g.userData.clearNumber = () => { uNum.value = BLANK_NUM; };
   g.userData.baseEmissive = emissive;
   return g;
 }

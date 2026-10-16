@@ -73,7 +73,7 @@ export function dressScenery(T, hole, rand, ground, buildLandmark) {
       const pr = T.project(x, z);
       if (Math.abs(pr.d) < T.oobLateral + 6 && pr.s > -40 && pr.s < L + 60) continue;
       if (T.greenEdge(x, z) < 50) continue;
-      const h = T.meshHeight(x, z);
+      const h = T.drawnHeight(x, z);
       const wet = T.seaLevel != null && h < T.seaLevel - 0.5;
       if (sea !== wet) continue;
       if (!sea && T.terrain(x, z).surface === 'water') continue;
@@ -146,7 +146,7 @@ export function dressScenery(T, hole, rand, ground, buildLandmark) {
       const x = p.x + p.rx * d * side, z = p.z + p.rz * d * side;
       const pr = T.project(x, z);
       if (Math.abs(pr.d) < T.fwHalf + 30 && pr.s > -20 && pr.s < L + 30) continue;
-      const h = T.meshHeight(x, z);
+      const h = T.drawnHeight(x, z);
       if (h > T.seaLevel + 0.6 || h < T.seaLevel - 3) continue; // the surf line
       const r = 1.5 + rand() * (rand() < 0.2 ? 6 : 2.5);
       const sy = r * (0.6 + rand() * (r > 4 ? 1.6 : 0.6));

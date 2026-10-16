@@ -380,7 +380,7 @@ function trail() {
       holder.updateMatrix();
       const L = holder.matrix.clone(), w = new THREE.Vector3();
       const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
-      const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
+      const gy = (x, z) => { toW(x, z); return (T.drawnHeight(w.x, w.z) - holder.position.y) / holder.scale.y; };
       const prj = (x, z) => { toW(x, z); return T.project(w.x, w.z); };
       const onField = (x, z) => { const pr = prj(x, z); return Math.abs(pr.d) < Math.max(T.fwHalf || 0, 14) + 16 && pr.s > -30 && pr.s < T.length + 40; };
       // the ruts: two bare tracks a wagon's width apart, in a band of trampled grass, resampled to follow the ground

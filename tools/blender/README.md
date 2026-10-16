@@ -73,3 +73,17 @@ roughness/metalness (emission passes of the vertex finish with the stamps'
 paint) and ambient occlusion (folded into the base colour). The GLB node
 `head` carries `faceCenter`, `axis`, `shaftStart`, `loft` and `lie` as
 extras for `js/scene/club.js`.
+
+## Modelled from scratch (no source assets)
+
+| Script | Output |
+|---|---|
+| `cup.py` | `assets/models/cup.glb`: the hole to the Rules (4.25 in, liner sunk 1 in, 4 in deep): painted soil wall, liner with socket boss, ribs and drain holes, gravel, edge grass, the flagstick's ferrule |
+| `green_details.py` | `assets/models/pin.glb` (20 x 14 in flag with sleeve, hems and stitching; top cap; swivel clip), `assets/models/teemarker.glb` (turned walnut, painted band, brass top, spike), `assets/textures/pitchmark_{fresh,repaired}[_nor].png` (Cycles renders of modelled marks) |
+| `divots.py` | `assets/models/divots.glb` (seven turf chunks: strip, dollar, fat chunk, short, curl, torn pair), `assets/textures/scar_{scrape,clean,deep,long}[_nor].png` (Cycles renders of modelled scars) |
+
+```
+blender -b --factory-startup --python tools/blender/cup.py -- assets/models/cup.glb assets/textures/pbr/brown_mud_dry_diff.jpg
+blender -b --factory-startup --python tools/blender/green_details.py -- . [pin] [marker] [marks]
+blender -b --factory-startup --python tools/blender/divots.py -- . [chunks] [scars]
+```

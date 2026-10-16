@@ -15,6 +15,7 @@ import { Characters, ASSET_MANIFEST, loadSlot } from './assets.js';
 import { CTP_GREEN, terrain as rangeTerrain, groundHeight as rangeGround } from './layout.js';
 import { CourseWorld } from '../course/courseWorld.js';
 import { PlayerMarkers } from './markers.js';
+import { Divots } from './divots.js';
 import { Environment } from './environment.js';
 import { Ambient } from './ambient.js';
 import { Rain } from './rain.js';
@@ -46,6 +47,7 @@ export class World {
     this.club = new Club(scene);
     this.course = new CourseWorld(scene);
     this.markers = new PlayerMarkers(scene);
+    this.divots = new Divots(scene);
     this.ambient = new Ambient(scene);
     this.rain = new Rain(scene);
     this.ambient.setCenter(0, -160);
@@ -106,6 +108,7 @@ export class World {
       this.rig.nearPole = null;
       this.rig.setAddress(new THREE.Vector3(0, 0.1, 0), 0);
       this.markers.set([]);
+      this.divots.clear();
       this.ambient.setCenter(0, -160);
       this.fogScale = 1;
       this.theme = 'parkland';
@@ -135,6 +138,7 @@ export class World {
     // ...or move it nearer: the Riverboat hole stands directly across the river from the Arch
     this.skyline.group.position.set(...(hole.skylineShift ? [hole.skylineShift[0], 0, hole.skylineShift[1]] : [0, 0, 0]));
     const T = this.course.load(hole);
+    this.divots.clear();
     // trees, shrubs and long grass fade where they'd hide the ball
     patchOccluders(this.course.root);
     // real rock on the steep faces: bluffs, cliffs, badlands
@@ -223,6 +227,7 @@ export class World {
     this.ball.update(dt, this.camera);
     this.tracer.update(dt);
     this.effects.update(dt);
+    this.divots.update(dt);
     this.characters.update(dt);
     this.club.update(dt, t);
     if (this.sceneMode === 'course') { this.course.ballPos = ballPos; this.course.update(t, dt, this.camera); }

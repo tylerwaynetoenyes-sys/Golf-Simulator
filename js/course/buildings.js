@@ -211,7 +211,7 @@ function clipRect(poly, x0, z0, x1, z1) {
  * are), and the roof itself from the height map, in tile, slate or a pale
  * flat roof chosen and tinted from the aerial photograph.
  */
-function surveyed(b, pts, h0, W, C, F, step, wallStep = 1.5) {
+function surveyed(b, pts, h0, base, W, C, F, step, wallStep = 1.5, gAt = () => base) {
   const r = b.roof, rows = r.d.length / r.w;
   // roof height (m above the ground) at a hole-local point, bilinear between cell centres
   const H = (x, z) => {
@@ -232,12 +232,12 @@ function surveyed(b, pts, h0, W, C, F, step, wallStep = 1.5) {
     let nx = -(z2 - z1) / L, nz = (x2 - x1) / L;
     if (!inside(pts, (x1 + x2) / 2 + nx * 0.4, (z1 + z2) / 2 + nz * 0.4)) { nx = -nx; nz = -nz; }
     const m = Math.max(1, Math.ceil(L / wallStep));
-    const top = (t) => { const x = x1 + (x2 - x1) * t, z = z1 + (z2 - z1) * t; return [x, z, h0 + Math.max(2.2, H(x + nx * 0.6, z + nz * 0.6))]; };
+    const top = (t) => { const x = x1 + (x2 - x1) * t, z = z1 + (z2 - z1) * t; return [x, z, base + Math.max(2.2, H(x + nx * 0.6, z + nz * 0.6)), gAt(x, z)]; };
     let a = top(0);
     for (let k = 1; k <= m; k++) {
       const bb = top(k / m);
       const u0 = off + run + (L * (k - 1)) / m, u1 = off + run + (L * k) / m;
-      W.push([a[0], h0, a[1], u0, 0], [bb[0], h0, bb[1], u1, 0], [bb[0], bb[2], bb[1], u1, bb[2] - h0], [a[0], h0, a[1], u0, 0], [bb[0], bb[2], bb[1], u1, bb[2] - h0], [a[0], a[2], a[1], u0, a[2] - h0]);
+      W.push([a[0], h0, a[1], u0, h0 - a[3]], [bb[0], h0, bb[1], u1, h0 - bb[3]], [bb[0], bb[2], bb[1], u1, bb[2] - bb[3]], [a[0], h0, a[1], u0, h0 - a[3]], [bb[0], bb[2], bb[1], u1, bb[2] - bb[3]], [a[0], a[2], a[1], u0, a[2] - a[3]]);
       a = bb;
     }
     run += L;
@@ -245,7 +245,7 @@ function surveyed(b, pts, h0, W, C, F, step, wallStep = 1.5) {
   // the roof: the footprint cut into step-sized cells, each lifted to the surveyed heights
   const { kind, tint } = roofKind(b.c || '#8a8278', (b.h ?? 0) - (b.e ?? 0) > 1.0);
   const list = C.mroof[kind];
-  const put = (x, z) => list.push([x, h0 + H(x, z) + 0.05, z, 0, 0, tint[0], tint[1], tint[2]]);
+  const put = (x, z) => list.push([x, base + Math.max(2.2, H(x, z)) + 0.05, z, 0, 0, tint[0], tint[1], tint[2]]);
   let bx0 = Infinity, bz0 = Infinity, bx1 = -Infinity, bz1 = -Infinity;
   for (const [x, z] of pts) { bx0 = Math.min(bx0, x); bz0 = Math.min(bz0, z); bx1 = Math.max(bx1, x); bz1 = Math.max(bz1, z); }
   for (let z = bz0; z < bz1; z += step) {
@@ -364,6 +364,7 @@ export function buildCity(data, T, style = 'paris', pull = null) {
     if (!tagMats.has(key)) tagMats.set(key, make());
     return key;
   };
+  const seats = []; // [x, z, base]: where each building stands (for the ground check)
   const cells = new Map();
   const cell = (x, z) => {
     const k = `${Math.floor(x / CELL)},${Math.floor(z / CELL)}`;
@@ -404,13 +405,23 @@ export function buildCity(data, T, style = 'paris', pull = null) {
       ? (x, z) => { const pr = T.project(x, z); return Math.abs(pr.d) < T.oobLateral * 0.7 && pr.s > -6 && pr.s < T.length + 15; }
       : (x, z) => { const pr = T.project(x, z); return Math.abs(pr.d) < T.oobLateral + 4 && pr.s > -40 && pr.s < T.length + 60; };
     if (inPlay(cx, cz) || pts.some(([x, z], i) => { const [x2, z2] = pts[(i + 1) % n]; return inPlay(x, z) || inPlay((x + x2) / 2, (z + z2) / 2); })) continue;
-    const h0 = Math.min(...pts.map(([x, z]) => T.baseGround(x, z))) - 0.4;
+    // seated on its own ground: walls reach below the lowest corner (no gap on a slope), and the
+    // building stands from the footprint's average ground, eaves clear of the highest corner
+    const gs = pts.map(([x, z]) => T.drawnHeight(x, z));
+    gs.push(T.drawnHeight(cx, cz));
+    const gMin = Math.min(...gs), gMax = Math.max(...gs), gMean = gs.reduce((a, v) => a + v, 0) / gs.length;
+    const h0 = gMin - 0.6;
+    // a gentle lot is built from its high side, foundation showing downhill, so no floor is ever
+    // buried; a steep one is terraced into the slope from its average ground
+    const seat = gMax - gMin < 1.8 ? gMax : gMean;
+    seats.push([cx, cz, seat]);
     // houses: one or two storeys, a clubhouse or lodge two or three (OSM rarely says)
     const A = Math.abs(area);
     let h = b.h || (S.house ? (A < 120 ? 3.6 : A < 350 ? (rnd() < 0.45 ? 6.2 : 3.6) + rnd() * 0.6 : A < 1500 ? 7 + rnd() * 1.5 : 9.5 + rnd() * 2) : style === 'paris' ? 18.5 + rnd() * 3.5 : 14 + rnd() * 8);
     const tall = S.glassOver ? h > S.glassOver || (h > 70 && rnd() < 0.18) : h > 45;
     const mansard = S.roof === 'mansard' && h > 11 && h < 45 && Math.abs(area) > 60;
-    const wallTop = h0 + (mansard ? h - 3.6 : h);
+    const base = Math.max(seat, gMax + 2.4 - (mansard ? h - 3.6 : h));
+    const wallTop = base + (mansard ? h - 3.6 : h);
     const C = cell(cx, cz);
     let W = tall && mats.glass ? C.glass : C.wall[Math.floor(rnd() * walls.length)];
     const tk = b.m ? tagWall(b.m) : null;
@@ -422,7 +433,7 @@ export function buildCity(data, T, style = 'paris', pull = null) {
       const pr = T.project(cx, cz);
       const far = Math.max(0, Math.abs(pr.d) - 30, -pr.s, pr.s - T.length);
       const step = far < 150 ? 1.5 : far < 450 ? 3 : 5;
-      surveyed(b, pts, h0, W, C, F, step, far < 150 ? 1.5 : far < 450 ? 3 : 6);
+      surveyed(b, pts, h0, Math.max(seat, gMax + 2.2 - (b.e ?? 2.2)), W, C, F, step, far < 150 ? 1.5 : far < 450 ? 3 : 6, (x, z) => T.drawnHeight(x, z));
       continue;
     }
     // walls: u in bays round the perimeter, v in floors
@@ -432,10 +443,11 @@ export function buildCity(data, T, style = 'paris', pull = null) {
       const [x1, z1] = pts[i], [x2, z2] = pts[(i + 1) % n];
       const L = Math.hypot(x2 - x1, z2 - z1);
       // facade coordinates in metres: along the wall (from a random whole bay, so
-      // neighbours' lit windows differ) and up from the foot
+      // neighbours' lit windows differ) and up from the ground at that corner (on a slope
+      // the floors stay level with the street, not buried on the uphill side)
       const u0 = off + run, u1 = off + run + L;
-      const v0 = 0, v1 = wallTop - h0;
-      W.push([x1, h0, z1, u0, v0], [x2, h0, z2, u1, v0], [x2, wallTop, z2, u1, v1], [x1, h0, z1, u0, v0], [x2, wallTop, z2, u1, v1], [x1, wallTop, z1, u0, v1]);
+      const g1 = T.drawnHeight(x1, z1), g2 = T.drawnHeight(x2, z2);
+      W.push([x1, h0, z1, u0, h0 - g1], [x2, h0, z2, u1, h0 - g2], [x2, wallTop, z2, u1, wallTop - g2], [x1, h0, z1, u0, h0 - g1], [x2, wallTop, z2, u1, wallTop - g2], [x1, wallTop, z1, u0, wallTop - g1]);
       run += L;
     }
     // houses: a hipped roof over the footprint's best-fit rectangle, when the footprint fills it
@@ -515,5 +527,6 @@ export function buildCity(data, T, style = 'paris', pull = null) {
     }
   }
   const all = [...walls, ...tagMats.values(), ...roofMats, ...Object.values(MROOF), ...Object.values(mats).filter((m) => m && !walls.includes(m))];
+  group.userData.seats = seats;
   return { group, glow: [...walls, ...tagMats.values(), mats.glass].filter(Boolean), haze: [...new Set(all)] };
 }

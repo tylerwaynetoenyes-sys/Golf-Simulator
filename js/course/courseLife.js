@@ -44,7 +44,7 @@ export function courseLife(T, hole, { style = 'club', rnd = Math.random } = {}) 
   if (style === 'none') return group;
   const spots = [];
   const at = (s, d) => { const p = T.pointAt(Math.max(0, Math.min(T.length, s))); return [p.x + p.rx * d, p.z + p.rz * d, p]; };
-  const yGround = (x, z) => T.meshHeight(x, z);
+  const yGround = (x, z) => T.drawnHeight(x, z);
   const surf = (x, z) => T.terrain(x, z).surface;
   // the side with fewer hazards (bunkers and ponds) gets the path
   let score = 0;
@@ -84,9 +84,15 @@ export function courseLife(T, hole, { style = 'club', rnd = Math.random } = {}) 
       if (!M) return;
       const [x, z, p] = at(s, side * (Math.max(T.fwHalf || 0, 12) + 14) + dOff);
       if (surf(x, z) === 'water') return;
-      M.position.set(x, yGround(x, z), z);
       // the model's length runs along +x; line it up with the hole, facing on toward the green
-      M.rotation.y = Math.atan2(-p.dz, p.dx) + (rnd() - 0.5) * 0.15;
+      const yaw = Math.atan2(-p.dz, p.dx) + (rnd() - 0.5) * 0.15;
+      // all four wheels on the ground: sit it on the slope under its wheelbase and track
+      const fx = Math.cos(yaw), fz = -Math.sin(yaw), lx = -fz, lz = fx, wb = 0.85, tr = 0.5;
+      const w = [[wb, tr], [wb, -tr], [-wb, tr], [-wb, -tr]].map(([a, b]) => yGround(x + fx * a + lx * b, z + fz * a + lz * b));
+      const pitch = Math.atan2((w[0] + w[1]) - (w[2] + w[3]), 4 * wb), roll = Math.atan2((w[0] + w[2]) - (w[1] + w[3]), 4 * tr);
+      M.position.set(x, (w[0] + w[1] + w[2] + w[3]) / 4, z);
+      M.rotation.set(0, yaw, 0, 'YXZ');
+      M.rotateZ(pitch); M.rotateX(-roll);
       M.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       group.add(M);
     };
@@ -112,6 +118,13 @@ export function courseLife(T, hole, { style = 'club', rnd = Math.random } = {}) 
       for (const bx of [-2.0, -0.8]) sg.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.4).translate(bx, 0.22, 0), green));
       sg.position.set(x, yGround(x, z), z);
       sg.rotation.y = Math.atan2(p.dx, p.dz) + Math.PI; // the sign faces back up the tee
+      // each piece stands on the ground where it is (the bench, sign and washer span three metres of slope)
+      sg.updateMatrixWorld(true);
+      const bb = new THREE.Box3(), ctr = new THREE.Vector3();
+      for (const c of sg.children) {
+        bb.setFromObject(c).getCenter(ctr);
+        c.position.y += yGround(ctr.x, ctr.z) - sg.position.y;
+      }
       sg.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       group.add(sg);
     }

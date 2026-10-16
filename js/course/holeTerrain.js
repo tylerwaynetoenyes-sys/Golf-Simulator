@@ -381,6 +381,8 @@ export class HoleTerrain {
 
   /** The bare ground with no shaping (DEM courses only): what the backdrop meets. */
   baseGround(x, z) { return this.F ? this.F.height(x, z) : null; }
+  /** The ground as drawn (the course world replaces this once its meshes are built); objects stand on it. */
+  drawnHeight(x, z) { return this.F ? this.F.height(x, z) : this.meshHeight(x, z); }
 
   _land(x, z, pr) {
     const t = Math.min(1.15, Math.max(-0.1, pr.s / this.length));

@@ -4,6 +4,7 @@
 // green from couch distance.
 import * as THREE from 'three';
 import { CUP } from '../core/physics.js';
+import { loadEquipment } from './models.js';
 
 /**
  * Patch a ground material so it shows holes: `circles` is a uniform array of
@@ -75,7 +76,49 @@ export function buildCup() {
     new THREE.MeshStandardMaterial({ color: 0x3a2c1c, side: THREE.BackSide, roughness: 1 }),
   );
   g.add(soil);
+  // the modelled hole (tools/blender/cup.py): the cut soil wall with its paint, the liner with its
+  // socket, ribs and drain holes, the gravel under them, grass leaning over the edge. The simple
+  // cup above stands in until it loads.
+  loadEquipment('cup.glb').then((scn) => {
+    if (!scn) return;
+    g.clear();
+    for (const name of ['soil', 'liner', 'gravel', 'fringe']) {
+      const src = scn.getObjectByName(name);
+      if (!src) continue;
+      const m = src.clone();
+      m.castShadow = name === 'fringe';
+      m.receiveShadow = true;
+      if (name === 'soil') m.material.side = THREE.DoubleSide;
+      if (name === 'fringe') {
+        // millimetre blades lit like the turf they grow from (normals up); their colours were authored as
+        // sRGB bytes and arrive linearised (~7x darker), hence the lift
+        // (each blade drawn both ways round with front faces, so its back isn't lit as facing down)
+        const geo = src.geometry.clone();
+        const n = geo.attributes.normal;
+        for (let i = 0; i < n.count; i++) n.setXYZ(i, 0, 1, 0);
+        const ix = Array.from(geo.index.array);
+        for (let i = 0, L = ix.length; i < L; i += 3) ix.push(ix[i], ix[i + 2], ix[i + 1]);
+        geo.setIndex(ix);
+        m.geometry = geo;
+        m.material = new THREE.MeshStandardMaterial({ vertexColors: true, color: new THREE.Color(6.5, 6.0, 5.2), roughness: 0.8 });
+        m.castShadow = false;
+        m.receiveShadow = false; // millimetre blades on the turf plane only catch shadow acne
+      }
+      g.add(m);
+    }
+  });
   return g;
+}
+
+/** The chrome ferrule at the foot of a flagstick (origin at its tip), or null until the model loads. */
+export function ferrule(onReady) {
+  loadEquipment('cup.glb').then((scn) => {
+    const src = scn?.getObjectByName('ferrule');
+    if (!src) return;
+    const f = src.clone();
+    f.material = new THREE.MeshStandardMaterial({ color: 0xd8d8d4, metalness: 0.7, roughness: 0.3 }); // brushed chrome
+    onReady(f);
+  });
 }
 
 /** Glowing ring around the cup, pulsed while putting. */

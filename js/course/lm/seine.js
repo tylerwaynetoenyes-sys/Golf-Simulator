@@ -137,7 +137,7 @@ export function seine() {
       holder.updateMatrix();
       const Lm = holder.matrix.clone(), w = new THREE.Vector3();
       const toW = (x, z) => w.set(x, 0, z).applyMatrix4(Lm);
-      const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
+      const gy = (x, z) => { toW(x, z); return (T.drawnHeight(w.x, w.z) - holder.position.y) / holder.scale.y; };
       const onField = (x, z, pad = 0) => { toW(x, z); const pr = T.project(w.x, w.z); return Math.abs(pr.d) < Math.max(T.fwHalf || 0, 14) + 10 + pad && pr.s > -20 && pr.s < T.length + 30; };
       const near = (x, z, R) => { toW(x, z); const pr = T.project(w.x, w.z); return Math.abs(pr.d) < R && pr.s > -R && pr.s < T.length + R; };
       const wl = T.seaLevel != null ? (T.seaLevel - holder.position.y) / holder.scale.y : null;

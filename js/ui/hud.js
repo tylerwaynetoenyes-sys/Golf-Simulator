@@ -11,8 +11,9 @@ import { esc as escape } from './dom.js';
 
 
 export class HUD {
-  constructor({ onClub }) {
+  constructor({ onClub, onBag }) {
     this.onClub = onClub;
+    this.onBag = onBag;
     this.rail = $('#clubRail');
     this.card = $('#shotCard');
     this.commentEl = $('#commentary');
@@ -38,10 +39,11 @@ export class HUD {
       <button class="club" data-club="${c.id}" aria-pressed="${c.id === activeId}" title="${esc(c.name)} (${i + 1})">
         <span class="c-id">${c.short}</span>
         <span class="c-dist">${U.isMetric() ? Math.round(c.carry * YD) : c.carry}${U.distUnit()}</span>
-      </button>`).join('');
+      </button>`).join('') + (this.onBag ? '<button class="club-rail-bag" data-bagbtn title="Change clubs or ball (pro shop)">Bag</button>' : '');
     for (const b of this.rail.querySelectorAll('.club')) {
       b.addEventListener('click', () => this.onClub(b.dataset.club));
     }
+    this.rail.querySelector('[data-bagbtn]')?.addEventListener('click', () => this.onBag());
   }
 
   setClub(id) {

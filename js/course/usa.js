@@ -32,6 +32,8 @@ export function usFlagTexture() {
 /** Dress a pin flag (from makeFlag) as the US flag. */
 export function dressPinFlag(flagGroup) {
   const m = flagGroup.userData.flagMat;
+  flagGroup.userData.dressed = true;
+  flagGroup.userData.clearNumber?.();
   m.map = usFlagTexture();
   m.color.set(0xffffff);
   m.emissive.set(0x222222);

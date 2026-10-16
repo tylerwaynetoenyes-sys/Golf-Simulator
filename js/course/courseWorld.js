@@ -14,6 +14,8 @@ import { courseLife } from './courseLife.js';
 import { makeFlag, lightConeMaterial } from '../scene/rangeProps.js';
 import { CUP } from '../core/physics.js';
 import { buildCup, cupRing, cutHoles } from '../scene/cup.js';
+import { greenMarks } from '../scene/greenMarks.js';
+import { loadEquipment } from '../scene/models.js';
 import { plantTrees, updateTrees, THEME_TREES, treesFor, slotHasModel } from '../scene/trees.js';
 import { tuftGeometry, grassMaterial, GRASS } from './grass.js';
 
@@ -167,6 +169,7 @@ export class CourseWorld {
     this._ringKey = null;
     this.ringTarget = 0;
     const T = (this.T = new HoleTerrain(hole));
+    this.groundAt = (x, z) => T.drawnHeight(x, z); // the survey until the meshes exist, then the ground as drawn
     // the landmark is placed first so the ground under it can be levelled (pads)
     const lmPre = this._placeLandmark(hole, T);
     this._nearAt = null;
@@ -286,6 +289,13 @@ export class CourseWorld {
     const coarseCol = (x, z, out) => coarseAttr(col, x, z, out);
     const coarseNrm = (x, z, out) => coarseAttr(nrm, x, z, out);
     this._coarseH = coarseH;
+    // the ground as drawn, everywhere: the hole mesh, then the backdrop rings out to the horizon. Anything
+    // stood on the land (buildings, trees, people, carts, landmarks) is seated on this, not on the survey
+    // beneath it, so nothing sinks into or floats over the triangles the player actually sees
+    T.drawnHeight = (x, z) => {
+      if (x >= b.minx && x <= bx1 && z >= bz0 && z <= b.maxz) return coarseH(x, z);
+      return this._backH?.(x, z) ?? T.meshHeight(x, z);
+    };
     this._buildGreen(T, g, coarseH, groundMat);
     this._buildBunkers(T, g, coarseH, coarseCol, coarseNrm);
     this._buildSlopeGrid(T, g);
@@ -342,20 +352,43 @@ export class CourseWorld {
 
     // ── tee markers + pin ──
     const teeY = T.teeHeight;
-    const markerMat = painted(0xf2f2f2, { roughness: 0.4 }); // painted tee markers
+    const markerMat = painted(0xf2f2f2, { roughness: 0.4 }); // stands in until the modelled marker loads
     // tee markers a few yards ahead of the ball, out of the address camera's face
+    const markers = [];
     for (const sx of [-3.2, 3.2]) {
       const mk = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), markerMat);
       mk.position.set(sx, teeY + 0.08, -3.4);
       mk.castShadow = true;
       g.add(mk);
+      markers.push(mk);
     }
+    // the modelled marker (tools/blender/green_details.py): turned walnut, a band in the tees' colour (blue,
+    // the regular men's tees), a brass top, pushed into the turf on its spike, each turned its own way
+    loadEquipment('teemarker.glb').then((scn) => {
+      const src = scn?.getObjectByName('marker');
+      if (!src || this.hole !== hole) return;
+      for (const [i, mk] of markers.entries()) {
+        const m = src.clone();
+        m.traverse((o) => {
+          if (!o.isMesh) return;
+          o.castShadow = o.receiveShadow = true;
+          const mats = Array.isArray(o.material) ? o.material : [o.material];
+          o.material = mats.map((x) => { if (x.name !== 'band') return x; const b = x.clone(); b.color.set(0x1f4a9c); return b; });
+          if (o.material.length === 1) o.material = o.material[0];
+        });
+        m.position.set(mk.position.x, this.groundAt(mk.position.x, mk.position.z) - 0.004, mk.position.z);
+        m.rotation.y = i * 2.1 + 0.4;
+        g.remove(mk);
+        g.add(m);
+      }
+    });
     const pinY = T.groundHeight(T.pin.x, T.pin.z);
     this.cupY = pinY;
     // flagstick stands in the cup (its foot sits on the cup bottom)
     this.flag = makeFlag(0xffd54a, 2.4 + CUP.depth, 0.9);
     this.flag.position.set(T.pin.x, pinY - CUP.depth, T.pin.z);
     this.flag.userData.baseY = pinY - CUP.depth;
+    this.flag.userData.setNumber?.(hole.n || 1);
     this.flag.userData.out = 0;
     this.flag.userData.outTarget = 0;
     const beacon = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -378,7 +411,7 @@ export class CourseWorld {
       spots.push(gb);
       for (const [x, z] of spots) {
         const fp = flagpole(x === gb[0] ? 14 : 11);
-        fp.position.set(x, T.meshHeight(x, z), z);
+        fp.position.set(x, this.groundAt(x, z), z);
         fp.rotation.y = ((this.windFrom + 90) * Math.PI) / 180;
         g.add(fp);
         this.flagpoles.push(fp);
@@ -395,6 +428,21 @@ export class CourseWorld {
     const cup = buildCup();
     cup.position.set(T.pin.x, pinY, T.pin.z);
     g.add(cup);
+    // ball marks: a fresh one wherever a ball lands on the green (game.js), and a few old ones the
+    // players before you repaired, mostly where approaches land, short of and round the pin
+    this.marks = greenMarks((x, z) => this.visualHeight(x, z), COL.green);
+    g.add(this.marks.group);
+    if (T.green) {
+      const rm = seeded((hole.n || 1) * 977 + 13);
+      const back = T.pointAt(Math.max(0, T.length - 1)), fx = T.pin.x - back.x, fz = T.pin.z - back.z, fl = Math.hypot(fx, fz) || 1;
+      for (let k = 0, tries = 0; k < 5 + Math.floor(rm() * 4) && tries < 60; tries++) {
+        const a = rm() * Math.PI * 2, r = (0.15 + rm() * 0.75) * T.greenR;
+        const x = T.green.x + Math.cos(a) * r, z = T.green.z + Math.sin(a) * r;
+        if (T.greenEdge(x, z) > -1.2 || Math.hypot(x - T.pin.x, z - T.pin.z) < 1.5) continue; // (greenEdge is negative inside)
+        this.marks.add(x, z, fx / fl + (rm() - 0.5) * 0.6, fz / fl + (rm() - 0.5) * 0.6, 'repaired');
+        k++;
+      }
+    }
     this.ring = cupRing();
     this.ring.position.set(T.pin.x, pinY + 0.004, T.pin.z);
     g.add(this.ring);
@@ -436,7 +484,7 @@ export class CourseWorld {
         x *= D / d; z *= D / d;
         const h = new THREE.Group();
         h.add(lm.group);
-        h.position.set(x, T.baseGround(x, z) + (f.dy || 0), z);
+        h.position.set(x, this.groundAt(x, z) + (f.dy || 0), z);
         // far landmarks are modelled in map axes (+x east, +z south): turn them
         // into the hole's frame, plus any extra turn the course asks for
         h.rotation.y = T.F.bearing + (f.rot || 0);
@@ -479,7 +527,7 @@ export class CourseWorld {
     };
     const plant = (x, z, variant, big = 1) => {
       treeSpots.push({
-        x, z, y: T.meshHeight(x, z) - 0.25, variant, rot: rand() * 6.28,
+        x, z, y: this.groundAt(x, z) - 0.25, variant, rot: rand() * 6.28,
         scale: (0.78 + rand() * 0.5) * big, squash: 0.85 + rand() * 0.3,
         hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(),
       });
@@ -529,7 +577,7 @@ export class CourseWorld {
           const sf = T.terrain(x, z).surface;
           if (sf === 'water' || sf === 'sand' || sf === 'green' || sf === 'fairway' || sf === 'tee') continue;
           if (Math.hypot(x, z) < 8 || T.greenEdge(x, z) < 3) continue;
-          treeSpots.push(spot(x, z, T.meshHeight(x, z) - 0.25, h, crown, conifer, false));
+          treeSpots.push(spot(x, z, this.groundAt(x, z) - 0.25, h, crown, conifer, false));
         } else {
           const k = out < 150 ? cell : cell * 2.6;
           const key = `${k},${Math.floor(x / k)},${Math.floor(z / k)}`;
@@ -539,7 +587,7 @@ export class CourseWorld {
       }
       for (const c of clumps.values()) {
         if (T.seaLevel != null && T.baseGround(c.x, c.z) < T.seaLevel + 1.5) continue;
-        treeSpots.push(spot(c.x, c.z, T.baseGround(c.x, c.z) - 0.25, c.h, c.crown, c.conifer, true));
+        treeSpots.push(spot(c.x, c.z, this.groundAt(c.x, c.z) - 0.25, c.h, c.crown, c.conifer, true));
       }
     } else {
       // stands along both sides: species-grouped clusters at varying depth
@@ -611,7 +659,7 @@ export class CourseWorld {
         far.push({ x, z });
       }
       for (const p of far) {
-        treeSpots.push({ x: p.x, z: p.z, y: T.baseGround(p.x, p.z) - 0.25, variant: bySite(p.x, p.z), rot: rand() * 6.28,
+        treeSpots.push({ x: p.x, z: p.z, y: this.groundAt(p.x, p.z) - 0.25, variant: bySite(p.x, p.z), rot: rand() * 6.28,
           scale: 0.75 + rand() * 0.5, squash: 0.85 + rand() * 0.3, hue: 0.23 + rand() * 0.07, sat: rand(), light: rand(), far: true });
       }
     }
@@ -649,15 +697,15 @@ export class CourseWorld {
         return T.terrain(x, z).surface === 'water';
       };
       // static: fences, poles, containers and warehouses draw one call per material
-      const decay = mergeByMaterial(buildDecay(T, rand, (x, z) => T.meshHeight(x, z), clear));
+      const decay = mergeByMaterial(buildDecay(T, rand, this.groundAt, clear));
       g.add(decay);
       // the wrecks, the lowriders and the people round them, in the lots
-      this.streetLife = dressLots(decay.userData.lots || [], rand, (x, z) => T.meshHeight(x, z));
+      this.streetLife = dressLots(decay.userData.lots || [], rand, this.groundAt);
       g.add(this.streetLife.group);
     }
 
     // ── scenery beyond play: herds and wagons, boats and sea stacks, crowds ──
-    this.scenery = dressScenery(T, hole, rand, (x, z) => T.meshHeight(x, z), buildLandmark);
+    this.scenery = dressScenery(T, hole, rand, this.groundAt, buildLandmark);
     // surf on a rocky coast: the wash at the rocks and the breakers rolling in
     this.surf = null;
     if (hole.theme === 'coastal' && T.seaLevel != null) {
@@ -691,7 +739,7 @@ export class CourseWorld {
       let x = pt.x + pt.rx * off * side, z = pt.z + pt.rz * off * side;
       if (inLandmark(x, z)) { x = pt.x - pt.rx * off * side; z = pt.z - pt.rz * off * side; }
       if (T.terrain(x, z).surface === 'water') return; // no masts standing in a river
-      const y0 = T.meshHeight(x, z);
+      const y0 = this.groundAt(x, z);
       this.poles.push({ x, z });
       const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.35, 20, 8), poleMat);
       mast.position.set(x, y0 + 10, z);
@@ -739,7 +787,7 @@ export class CourseWorld {
     } else {
       lx = T.green.x + T.finalRight.x * lmSpec.at[0] - T.finalDir.x * lmSpec.at[1];
       lz = T.green.z + T.finalRight.z * lmSpec.at[0] - T.finalDir.z * lmSpec.at[1];
-      holder.position.set(lx, T.meshHeight(lx, lz) - 0.3, lz);
+      holder.position.set(lx, T.drawnHeight(lx, lz) - 0.3, lz);
     }
     holder.rotation.y = Math.atan2(-T.finalDir.x, -T.finalDir.z) + (lmSpec.rot || 0);
     holder.scale.setScalar(lmSpec.scale || 1);
@@ -840,6 +888,50 @@ export class CourseWorld {
     if (sat) { geo.setAttribute('satUv', new THREE.BufferAttribute(su, 2)); geo.setAttribute('satK', new THREE.BufferAttribute(sk, 1)); }
     geo.setIndex(idx);
     geo.computeVertexNormals();
+    // the backdrop exactly as drawn: each ring is the hole's border rectangle grown by ds[r], so a point
+    // maps straight back to its ring (by how far out it is) and its segment (by where it falls round the loop)
+    {
+      // where a point on the ring rectangle (half sizes ax, az) falls round the loop, 0..1. Rings scale the
+      // border, so the normalised position (u, w) is the same on every ring: measure it in the border's sizes
+      const tOf = (x, z, ax, az) => {
+        const u = (x - cx) / ax, w = (z - cz) / az * Math.sign(z1 - cz);
+        let t;
+        if (Math.abs(w) >= Math.abs(u)) t = w > 0 ? (u + 1) * hw : 2 * hw + 2 * hd + (1 - u) * hw;
+        else t = u > 0 ? 2 * hw + (1 - w) * hd : 4 * hw + 2 * hd + (w + 1) * hd;
+        return t / (4 * hw + 4 * hd);
+      };
+      const tk = new Float64Array(L);
+      for (let k = 0; k < L; k++) { const [px, , pz] = P(loop[k]); tk[k] = tOf(px, pz, hw, hd); }
+      for (let k = 1; k < L; k++) if (tk[k] < tk[k - 1]) tk[k] += 1; // unwrap
+      const V = (i) => [vp[i * 3], vp[i * 3 + 1], vp[i * 3 + 2]];
+      const inTri = (x, z, a, b, c) => {
+        const d = (b[2] - c[2]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[2] - c[2]);
+        if (Math.abs(d) < 1e-9) return null;
+        const l1 = ((b[2] - c[2]) * (x - c[0]) + (c[0] - b[0]) * (z - c[2])) / d;
+        const l2 = ((c[2] - a[2]) * (x - c[0]) + (a[0] - c[0]) * (z - c[2])) / d;
+        const l3 = 1 - l1 - l2;
+        return l1 > -1e-4 && l2 > -1e-4 && l3 > -1e-4 ? l1 * a[1] + l2 * b[1] + l3 * c[1] : null;
+      };
+      this._backH = (x, z) => {
+        const d = Math.max(Math.abs(x - cx) - hw, Math.abs(z - cz) - hd);
+        if (d < 0 || d >= ds[R - 1]) return null;
+        let r = 0; while (r < R - 2 && ds[r + 1] <= d) r++;
+        let t = tOf(x, z, hw + d, hd + d);
+        if (t < tk[0]) t += 1;
+        let lo = 0, hi = L - 1;
+        while (lo < hi) { const m = (lo + hi + 1) >> 1; if (tk[m] <= t) lo = m; else hi = m - 1; }
+        for (const rr of [r, r - 1, r + 1]) {
+          if (rr < 0 || rr >= R - 1) continue;
+          for (const kk of [lo, lo - 1, lo + 1, lo - 2, lo + 2]) {
+            const k = ((kk % L) + L) % L;
+            const a = rr * L + k, bq = rr * L + ((k + 1) % L), a2 = a + L, b2 = bq + L;
+            const h = inTri(x, z, V(a), V(a2), V(bq)) ?? inTri(x, z, V(bq), V(a2), V(b2));
+            if (h != null) return h;
+          }
+        }
+        return null;
+      };
+    }
     // the natural ground carries the same aerial-scan detail as the rough
     const bmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0, map: this.detail });
     let satTex = null;
@@ -1586,6 +1678,9 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
     return ht + (hc + 0.012 - ht) * u * u * (3 - 2 * u);
   };
 
+  /** The ground's drawn colour at (x, z) (linear), for things laid on it to match. */
+  turfAt = (x, z) => { const c = new THREE.Color(); if (this.T) this._colorAt(this.T, x, z, c); return c; };
+
   /** Is a floodlight mast within r metres of (x, z)? (keeps cameras from parking behind one) */
   nearPole = (x, z, r = 4) => (this.poles || []).some((p) => Math.hypot(p.x - x, p.z - z) < r);
 
@@ -1828,7 +1923,7 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
         const x = p.x + p.rx * off * side, z = p.z + p.rz * off * side;
         if (T.terrain(x, z).surface === 'water') continue;
         const m = new THREE.Mesh(post, mat);
-        m.position.set(x, T.meshHeight(x, z), z);
+        m.position.set(x, this.groundAt(x, z), z);
         m.castShadow = true;
         g.add(m);
         // number plate, always facing the camera, sized to read from the tee
@@ -1847,7 +1942,7 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
         tex.colorSpace = THREE.SRGBColorSpace;
         const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false }));
         sp.scale.set(1.6, 0.8, 1);
-        sp.position.set(x, T.meshHeight(x, z) + 1.65, z);
+        sp.position.set(x, this.groundAt(x, z) + 1.65, z);
         g.add(sp);
       }
     }

@@ -74,7 +74,7 @@ export default function build() {
       holder.updateMatrix();
       const L = holder.matrix.clone(), w = new THREE.Vector3();
       const toW = (x, z) => w.set(x, 0, z).applyMatrix4(L);
-      const gy = (x, z) => { toW(x, z); return (T.baseGround(w.x, w.z) - holder.position.y) / holder.scale.y; };
+      const gy = (x, z) => { toW(x, z); return (T.drawnHeight(w.x, w.z) - holder.position.y) / holder.scale.y; };
       const inPlay = (x, z) => { toW(x, z); const pr = T.project(w.x, w.z); return Math.abs(pr.d) < T.oobLateral + 6 && pr.s > -40 && pr.s < T.length + 60; };
       const go = (D) => lay(D, gy, inPlay);
       if (DATA) go(DATA); else ready.then((d) => d && go(d));
