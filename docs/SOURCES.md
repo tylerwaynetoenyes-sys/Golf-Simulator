@@ -15,6 +15,7 @@ Government work); credit given anyway: "Elevation: U.S. Geological Survey,
 | Course | Files | Projects |
 |---|---|---|
 | Rolling Hills (Godfrey, IL) | `assets/courses/rollinghills/dem.*` (1 m over 1.8 km), `far.*` (32 m over 16 km) | Playing area: tile `x74y432` of **IL_10CountyNRCS_D23** (published April 2026). Surround: the same project, then IL_SouthCentral_2021_D21, IL_19County_D24, MO_WestCentral_2018_D19 and others, with Terrarium tiles only where no LiDAR covers. Each file's JSON lists the tiles used. |
+| Rock Spring (Alton, IL) | `assets/courses/rockspring/dem.*` (1 m over 1.5 km), `far.*` (32 m over 16 km) | Playing area: tiles `x74y432` and `x74y431` of **IL_10CountyNRCS_D23**. Surround: the same project, then MO_WestCentral_2018_D19, IL_MadisonCo_2014, MO_SaintLouis_2017; Terrarium for 88 samples. |
 
 The script ignores any LiDAR sample more than 15 m from the coarse Terrarium
 surface. Tile `x74y431` of IL_10CountyNRCS_D23 has a strip that reads a
@@ -306,6 +307,32 @@ water, by a search over that map. The landmarks (Bethesda Terrace and the
 Angel of the Waters, Bow Bridge, Belvedere Castle, Cleopatra's Needle) are
 modelled in `js/course/lm/centralpark.js` from published descriptions.
 
+## Rock Spring
+
+`assets/courses/rockspring/`: the nine holes of Rock Spring Golf Course in
+Alton's Rock Spring Park (Tom Bendelow, 1912), imported by
+`tools/import-course.mjs --lidar --outlines --course "Rock Spring Golf Course"`:
+hole lines and green outlines from OpenStreetMap (© OpenStreetMap
+contributors, ODbL 1.0). OSM maps no fairways, bunkers or water there: the
+fairways (the mown bands along each hole; hole 1's by hand) and the three
+greenside bunkers (holes 3, 6, 9) are traced from the USGS NAIP aerial
+(`USGSNAIPImagery` ImageServer, about 0.6 m, public domain), checked against
+the 1 m LiDAR hillshade. `dem.*`/`far.*` from USGS 3DEP
+1 m LiDAR (above); `sat.*` (EOxCloudless) as above; `buildings.json` by
+`tools/fetch-buildings.mjs` (OSM footprints) measured by
+`tools/fetch-building-shapes.py` from IL_10CoNRCS_3_D23 (below); the pro
+shop's walls and roof and the greenhouse range's white, translucent and
+rust-red roof runs set from the user's own Apple Maps views (a visual check
+only, not traced or shipped) and NAIP. `trees.json` by `tools/fetch-trees.py
+--ept IL_10CoNRCS_3_D23` (the same 2023 flight read from the public
+usgs-lidar-public Entwine bucket): 9,687 trees, median 16.5 m, tallest 32.6 m.
+The scorecard (par 35; pars, handicaps, blue and red tees) is typed into
+`scorecard.json` from the GolfPass listing,
+https://www.golfpass.com/courses/5007-rock-spring-golf-course/scorecard-and-layout/scorecard-and-layout,
+retrieved 16 October 2026 (the club publishes no card online; OpenGolfAPI has
+none). Its totals, 3,015 and 2,501 yards, match illinoisgolf.com and Rivers
+and Routes.
+
 ## The Seine (Paris)
 
 `assets/landmarks/paris/seine.json`: the Seine's outline, the bridges' OSM
@@ -487,7 +514,7 @@ stereotypes, not Cahokia.
 these courses from the USGS 3DEP aerial LiDAR (public domain), read from the
 public `usgs-lidar-public` Entwine bucket: CA_FEMA_Z4_B1_2018 (Pebble Beach),
 FL_Peninsular_FDEM_StJohns_2018 (TPC Sawgrass), IL_10CoNRCS_3_D23 (Rolling
-Hills). Ground, eave and ridge heights and a 0.75 m roof height map per
+Hills, Rock Spring). Ground, eave and ridge heights and a 0.75 m roof height map per
 building go into `assets/courses/<id>/buildings.json`. Roof colours are
 sampled from USGS The National Map imagery (NAIP, public domain).
 

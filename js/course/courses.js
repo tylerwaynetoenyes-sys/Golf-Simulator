@@ -5,6 +5,7 @@
 import { HOLES } from './holes.js';
 import { loadDem, prepareDemHoles } from './dem.js';
 import oregon from './courses/oregon.js';
+import rockspring from './courses/rockspring.js';
 import forestpark from './courses/forestpark.js';
 import confluencepoint from './courses/confluencepoint.js';
 import gatewayarch from './courses/gatewayarch.js';
@@ -31,7 +32,7 @@ const CONFLUENCE = {
 };
 
 /** Every course, in picker order (holes may still need loading: see loadCourse). */
-export const COURSES = [CONFLUENCE, alton, eaststl, oregon, paris, cassis, centralpark, liberty, pebble, sawgrass, rollinghills, forestpark, confluencepoint, gatewayarch, cahokia, stlzoo];
+export const COURSES = [CONFLUENCE, alton, eaststl, oregon, paris, cassis, centralpark, liberty, pebble, sawgrass, rollinghills, forestpark, confluencepoint, gatewayarch, cahokia, stlzoo, rockspring];
 
 export const courseById = (id) => COURSES.find((c) => c.id === id) || CONFLUENCE;
 

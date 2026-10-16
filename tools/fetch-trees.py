@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Plant a course's real trees from the USGS 3DEP LiDAR point cloud (public domain).
 
-    python tools/fetch-trees.py <courseId> [--project IL_10CountyNRCS_D23]
+    python tools/fetch-trees.py <courseId> [--project IL_10CountyNRCS_D23 | --ept IL_10CoNRCS_3_D23]
                                 [--cache ~/.cache/fairway/lpc] [--cell 0.5]
                                 [--min-height 4] [--crs EPSG:3436]
 
@@ -31,10 +31,12 @@ Runs with numpy + scipy + laspy[lazrs] + pyproj:
     uv venv /tmp/lidarenv && uv pip install -p /tmp/lidarenv numpy scipy "laspy[lazrs]" pyproj
 """
 import argparse
+import io
 import json
 import math
 import os
 import sys
+import time
 import urllib.parse
 import urllib.request
 
@@ -55,6 +57,7 @@ ap.add_argument('--cache', default=os.path.expanduser('~/.cache/fairway/lpc'))
 ap.add_argument('--cell', type=float, default=0.5, help='CHM cell size, metres')
 ap.add_argument('--min-height', type=float, default=4.0, help='shortest tree kept, metres')
 ap.add_argument('--fresh', action='store_true', help='re-read the tiles even if gridded returns are cached')
+ap.add_argument('--ept', default=None, help='read the flight from this usgs-lidar-public EPT work unit (e.g. IL_10CoNRCS_3_D23) instead of the LAZ tiles')
 ap.add_argument('--crs', default=None, help='override the tiles\' horizontal CRS (if a header lacks it)')
 args = ap.parse_args()
 
@@ -69,14 +72,15 @@ M_LON = M_LAT * math.cos(math.radians(LAT))
 
 def get(url, timeout=60):
     req = urllib.request.Request(url, headers={'User-Agent': UA})
-    for i in range(4):
+    for i in range(8):
         try:
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 return r.read()
-        except Exception as e:  # noqa: BLE001 (network: retry anything)
-            if i == 3:
+        except Exception as e:  # noqa: BLE001 (network: retry anything, backing off up to a minute)
+            if i == 7:
                 raise
             print(f'  retry {url[:80]}… ({e})', file=sys.stderr)
+            time.sleep(min(60, 2 ** i))
     return None
 
 
@@ -130,6 +134,23 @@ n_first = np.zeros((N, N), np.uint16)     # pulses
 n_high = np.zeros((N, N), np.uint16)      # pulses stopped above 2 m
 
 
+def grid(x, z, y, cls, first):
+    """Add returns (game-frame x, z; NAVD88 height y in metres) to the grids; returns first returns kept."""
+    inside = (np.abs(x) < HALF - 1) & (np.abs(z) < HALF - 1)
+    x, z, cls, first = x[inside], z[inside], cls[inside], first[inside]
+    hag = y[inside] - ground(x, z)
+    ci = ((x + HALF) / CELL).astype(np.int64)
+    cj = ((z + HALF) / CELL).astype(np.int64)
+    k = cj * N + ci
+    veg = (cls == 4) | (cls == 5)
+    np.maximum.at(chm.ravel(), k[veg], np.clip(hag[veg], 0, 60).astype(np.float32))
+    for g_, m in ((n_first, first), (n_high, first & (hag > 2))):
+        g = np.bincount(k[m], minlength=N * N).reshape(N, N)
+        np.minimum(g_.astype(np.int64) + g, 65535, out=g)
+        g_[:] = g
+    return int(first.sum())
+
+
 def accumulate(path):
     with laspy.open(path, laz_backend=laspy.LazBackend.LazrsParallel) as r:
         crs = CRS.from_user_input(args.crs) if args.crs else r.header.parse_crs()
@@ -145,33 +166,76 @@ def accumulate(path):
             first = np.asarray(pts.return_number) == 1
             use = (first | (cls == 4) | (cls == 5)) & (cls != 7) & (cls != 18)
             lon, lat = tr.transform(np.asarray(pts.x[use]), np.asarray(pts.y[use]))
-            x = (lon - LON) * M_LON
-            z = -(lat - LAT) * M_LAT
-            inside = (np.abs(x) < HALF - 1) & (np.abs(z) < HALF - 1)
-            x, z = x[inside], z[inside]
-            hag = np.asarray(pts.z[use], np.float64)[inside] * vunit - ground(x, z)
-            cls, first = cls[use][inside], first[use][inside]
-            ci = ((x + HALF) / CELL).astype(np.int64)
-            cj = ((z + HALF) / CELL).astype(np.int64)
-            k = cj * N + ci
-            veg = (cls == 4) | (cls == 5)
-            np.maximum.at(chm.ravel(), k[veg], np.clip(hag[veg], 0, 60).astype(np.float32))
-            for grid, m in ((n_first, first), (n_high, first & (hag > 2))):
-                g = np.bincount(k[m], minlength=N * N).reshape(N, N)
-                np.minimum(grid.astype(np.int64) + g, 65535, out=g)
-                grid[:] = g
-            kept += int(first.sum())
+            kept += grid((lon - LON) * M_LON, -(lat - LAT) * M_LAT, np.asarray(pts.z[use], np.float64) * vunit, cls[use], first[use])
         return kept, crs.name, unit
+
+
+# --ept: the same flight from the public usgs-lidar-public Entwine bucket
+# (EPSG:3857, metres), read node by node over the grid: no tiles on disk, and
+# quick when rockyweb.usgs.gov is slow
+EPT = 'https://s3-us-west-2.amazonaws.com/usgs-lidar-public'
+
+
+def ept_nodes(work):
+    meta_ = json.loads(get(f'{EPT}/{work}/ept.json'))
+    b = meta_['bounds']
+    to_merc = Transformer.from_crs('EPSG:4326', 'EPSG:3857', always_xy=True)
+    xs, ys = to_merc.transform([LON - HALF / M_LON, LON + HALF / M_LON], [LAT - HALF / M_LAT, LAT + HALF / M_LAT])
+    mx0, mx1, my0, my1 = min(xs), max(xs), min(ys), max(ys)
+    out = []
+
+    def walk(hier, key):
+        d, x, y, zz = map(int, key.split('-'))
+        size = (b[3] - b[0]) / (1 << d)
+        nx0, ny0 = b[0] + x * size, b[1] + y * size
+        if nx0 > mx1 or nx0 + size < mx0 or ny0 > my1 or ny0 + size < my0:
+            return
+        n = hier.get(key)
+        if n is None:
+            return
+        if n == -1:
+            hier = json.loads(get(f'{EPT}/{work}/ept-hierarchy/{key}.json'))
+            n = hier.get(key, 0)
+        if n > 0:
+            out.append(key)
+        for dx in (0, 1):
+            for dy in (0, 1):
+                for dz in (0, 1):
+                    walk(hier, f'{d + 1}-{2 * x + dx}-{2 * y + dy}-{2 * zz + dz}')
+
+    walk(json.loads(get(f'{EPT}/{work}/ept-hierarchy/0-0-0-0.json')), '0-0-0-0')
+    return out
+
+
+def ept_read(work, key):
+    las = laspy.read(io.BytesIO(get(f'{EPT}/{work}/ept-data/{key}.laz', timeout=120)), laz_backend=laspy.LazBackend.LazrsParallel)
+    cls = np.asarray(las.classification)
+    first = np.asarray(las.return_number) == 1
+    use = (first | (cls == 4) | (cls == 5)) & (cls != 7) & (cls != 18)
+    return np.asarray(las.x)[use], np.asarray(las.y)[use], np.asarray(las.z, np.float64)[use], cls[use], first[use]
 
 
 # the gridded returns are kept beside the tiles, so tuning the steps below
 # doesn't mean reading 2-3 GB of LAZ again
-grids = os.path.join(args.cache, f'{args.id}-{args.project}-{CELL:g}.npz')
+grids = os.path.join(args.cache, f'{args.id}-{args.ept or args.project}-{CELL:g}.npz')
 if os.path.exists(grids) and not args.fresh:
     g = np.load(grids, allow_pickle=False)
     chm, n_first, n_high = g['chm'], g['n_first'], g['n_high']
     used = json.loads(str(g['used']))
     print(f'{args.id}: gridded returns from {grids}')
+elif args.ept:
+    from concurrent.futures import ThreadPoolExecutor
+    keys = ept_nodes(args.ept)
+    print(f'{args.id}: {len(keys)} EPT nodes of {args.ept} over {2 * HALF:g} m')
+    from_merc = Transformer.from_crs('EPSG:3857', 'EPSG:4326', always_xy=True)
+    kept = 0
+    with ThreadPoolExecutor(8) as ex:
+        for done, (mx, my, y, cls, first) in enumerate(ex.map(lambda k: ept_read(args.ept, k), keys)):
+            lon, lat = from_merc.transform(mx, my)
+            kept += grid((lon - LON) * M_LON, -(lat - LAT) * M_LAT, y, cls, first)
+            if done % 200 == 0:
+                print(f'    {done}/{len(keys)} nodes, {kept} first returns so far')
+    used = [{'ept': args.ept, 'nodes': len(keys), 'firstReturns': kept}]
 else:
     src = tiles()
     print(f'{args.id}: {len(src)} {args.project} tiles over {2 * HALF:g} m')
@@ -182,6 +246,7 @@ else:
         print(f'  {t["title"]}: {kept} first returns in the course grid ({crs_name})')
         if kept:
             used.append({'tile': t['title'], 'published': t['date'], 'firstReturns': kept})
+if not os.path.exists(grids) or args.fresh:
     np.savez_compressed(grids, chm=chm, n_first=n_first, n_high=n_high, used=json.dumps(used))
 
 # tree tops: maxima of the smoothed CHM, in a window that grows with height
@@ -220,7 +285,7 @@ z = -HALF + (tj + 0.5) * CELL
 order = np.lexsort((x, z))
 trees = [[round(float(x[i]), 1), round(float(z[i]), 1), round(float(h[i]), 1), round(float(crown[i]), 1), int(conifer[i])] for i in order]
 out = {
-    'source': f'USGS 3DEP LiDAR point cloud ({args.project}), public domain: vegetation returns over the 1 m bare-earth DEM',
+    'source': f'USGS 3DEP LiDAR point cloud ({args.ept or args.project}), public domain: vegetation returns over the 1 m bare-earth DEM',
     'tiles': used, 'cell': CELL, 'minHeight': args.min_height, 'count': len(trees),
     'heights': {p: round(float(np.percentile(h, q)), 1) for p, q in (('p10', 10), ('median', 50), ('p90', 90), ('max', 100))},
     'conifers': int(conifer.sum()),
