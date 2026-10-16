@@ -52,3 +52,24 @@ albentan2012's "A Pile Of Concrete Debris" scan, CC BY) went through the same
 export after its parts were joined and their split vertices welded (Merge by
 Distance, 0.5 mm), then decimated from 48.7 k to 4.5 k triangles with the
 4K colour map cut to 1K. Without the weld the decimation shatters the scan.
+
+## Golf clubs and balls (built here, not imported)
+
+`equipment.py` bakes the club heads and balls that `tools/equipment/build.py`
+models as signed-distance fields (high-poly mesh, finish and stamps per head)
+down to game meshes, and `shafts.py` lathes each set's shafts and grip. The
+whole run, every set and ball, is `tools/equipment/build-all.sh`; one head:
+
+```
+python tools/equipment/build.py /tmp/fw tour --clubs 7I
+blender -b --factory-startup --python tools/blender/equipment.py -- /tmp/fw/tour assets/models/clubs/tour 7I
+node tools/equipment-check.mjs --base http://localhost:8765 tour
+```
+
+Per head: collapse-decimate to 4.5–8k triangles, Smart UV, then Cycles bakes
+(selected to active, 1024 px) of tangent normals (geometry plus the stamps'
+engravings, grooves and scorelines as bump), base colour and
+roughness/metalness (emission passes of the vertex finish with the stamps'
+paint) and ambient occlusion (folded into the base colour). The GLB node
+`head` carries `faceCenter`, `axis`, `shaftStart`, `loft` and `lie` as
+extras for `js/scene/club.js`.

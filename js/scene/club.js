@@ -3,7 +3,9 @@
 // through the ball. The demo meter drives the backswing; the downswing takes
 // the measured ~0.25 s of a tour swing and fires `onImpact` on the exact
 // frame the face reaches the ball, so the launch, the strike sound, ball
-// squash and turf spray all land together.
+// squash and turf spray all land together. Each set's heads, shafts and grip
+// are models built in Blender (assets/models/clubs, tools/equipment); a
+// procedural club stands in while they load.
 //
 // With a launch monitor the shot has already happened, so the club replays it,
 // shaped by what the R10 measured (see strike()):
@@ -18,6 +20,8 @@
 // (a right-handed player stands on -X, facing +X), +Y up.
 import * as THREE from 'three';
 import { SETS } from '../data/equipment.js';
+import { BALL } from '../core/physics.js';
+import { loadEquipment, equipment } from './models.js';
 
 // Club length (in), lie (°) and loft (°): typical modern specs
 const SPEC = {
@@ -57,6 +61,12 @@ const ease = (t) => t * t * (3 - 2 * t);
 // the look of each branded set (js/data/equipment.js SETS)
 export const CLUB_SETS = SETS.map((x) => ({ ...x, name: `${x.brand} ${x.model}` }));
 export const clubSet = (id) => CLUB_SETS.find((x) => x.id === id) || CLUB_SETS[0];
+
+// the set's modelled heads, shafts and grip (assets/models/clubs; see models.js)
+const headPath = (set, id) => (set.hockey ? 'clubs/hockey/HOCKEY.glb' : `clubs/${set.id}/${id}.glb`);
+const shaftsPath = (set) => `clubs/${set.hockey ? 'hockey' : set.id}/shafts.glb`;
+const UP = new THREE.Vector3(0, 1, 0);
+const SPIN = new THREE.Quaternion().setFromAxisAngle(UP, Math.PI / 2); // turns the shaft's label toward the camera
 
 function headMesh(spec, mats, set) {
   const g = new THREE.Group();
@@ -220,20 +230,56 @@ export class Club {
     const butt = hosel.clone().addScaledVector(dir, L);
     const club = new THREE.Group();
     const wood = spec.kind === 'driver' || spec.kind === 'wood';
-    const shaftMat = set.hockey ? m.hockeyWood : set.finish === 'black' ? m.graphite : set.wood === 'persimmon' ? m.shaft : wood ? m.graphite : m.shaft;
-    const shaft = set.hockey
-      ? new THREE.Mesh(new THREE.BoxGeometry(0.028, L - 0.27, 0.018), shaftMat)
-      : new THREE.Mesh(new THREE.CylinderGeometry(0.0062, 0.0042, L - 0.27, 10), shaftMat);
-    const grip = set.hockey
-      ? new THREE.Mesh(new THREE.BoxGeometry(0.031, 0.27, 0.021), m.tape)
-      : new THREE.Mesh(new THREE.CylinderGeometry(0.0115, 0.0088, 0.27, 14), set.wood === 'persimmon' ? m.leather : m.grip);
-    const up = new THREE.Vector3(0, 1, 0);
-    const q = new THREE.Quaternion().setFromUnitVectors(up, dir);
-    shaft.quaternion.copy(q);
-    shaft.position.copy(hosel).addScaledVector(dir, (L - 0.27) / 2);
-    grip.quaternion.copy(q);
-    grip.position.copy(hosel).addScaledVector(dir, L - 0.135);
-    club.add(shaft, grip);
+    const q = new THREE.Quaternion().setFromUnitVectors(UP, dir);
+    const hp = headPath(set, id), sp = shaftsPath(set);
+    const H = equipment(hp), Sh = equipment(sp);
+    let head = null;
+    if (H && Sh) {
+      // the modelled club: the head at its true loft and lie, its face centre
+      // square behind the ball, the shaft running up its axis to the butt
+      const src = H.getObjectByName('head');
+      head = src.clone();
+      const ud = src.userData;
+      const fc = new THREE.Vector3().fromArray(ud.faceCenter);
+      const ax = new THREE.Vector3().fromArray(ud.axis);
+      const O = new THREE.Vector3(-fc.x, 0, BALL.radius + 0.003 - fc.z);
+      head.position.copy(O);
+      club.add(head);
+      // the shaft follows the head's own axis (its lie), soled flat
+      dir.copy(ax);
+      q.setFromUnitVectors(UP, dir);
+      const s0 = O.clone().addScaledVector(dir, ud.shaftStart);
+      butt.copy(O).addScaledVector(dir, L);
+      if (set.hockey) {
+        // the stick's shaft sits 9.5 mm behind the blade's face line (tools/equipment/heads.py)
+        s0.z += 0.0095;
+        butt.z += 0.0095;
+      }
+      const shaft = Sh.getObjectByName(set.hockey ? 'hshaft' : wood ? 'shaft_wood' : 'shaft_iron').clone();
+      // round shafts turn their label to the camera; the stick's flat sides stay square to the blade
+      shaft.quaternion.copy(q);
+      if (!set.hockey) shaft.quaternion.multiply(SPIN);
+      shaft.position.copy(s0);
+      shaft.scale.set(1, butt.distanceTo(s0), 1);
+      const grip = Sh.getObjectByName(set.hockey ? 'hgrip' : 'grip').clone();
+      grip.quaternion.copy(shaft.quaternion);
+      grip.position.copy(butt).addScaledVector(dir, set.hockey ? -0.2716 : -0.2702);
+      club.add(shaft, grip);
+    } else {
+      if (H === undefined || Sh === undefined) this._fetch(set, id, hp, sp);
+      const shaftMat = set.hockey ? m.hockeyWood : set.finish === 'black' ? m.graphite : set.wood === 'persimmon' ? m.shaft : wood ? m.graphite : m.shaft;
+      const shaft = set.hockey
+        ? new THREE.Mesh(new THREE.BoxGeometry(0.028, L - 0.27, 0.018), shaftMat)
+        : new THREE.Mesh(new THREE.CylinderGeometry(0.0062, 0.0042, L - 0.27, 10), shaftMat);
+      const grip = set.hockey
+        ? new THREE.Mesh(new THREE.BoxGeometry(0.031, 0.27, 0.021), m.tape)
+        : new THREE.Mesh(new THREE.CylinderGeometry(0.0115, 0.0088, 0.27, 14), set.wood === 'persimmon' ? m.leather : m.grip);
+      shaft.quaternion.copy(q);
+      shaft.position.copy(hosel).addScaledVector(dir, (L - 0.27) / 2);
+      grip.quaternion.copy(q);
+      grip.position.copy(hosel).addScaledVector(dir, L - 0.135);
+      club.add(shaft, grip);
+    }
     // two gloved hands on the grip (lead glove, trail hand) so the club reads as held
     for (const [k, m] of [[0.06, this.mats.glove], [0.14, this.mats.glove]]) {
       const hand = new THREE.Mesh(new THREE.SphereGeometry(0.034, 14, 10), m);
@@ -242,10 +288,13 @@ export class Club {
       hand.position.copy(butt).addScaledVector(dir, -k);
       club.add(hand);
     }
-    const head = headMesh(spec, this.mats, set);
-    // orient the head: toe out (+X), face to the target (-Z), hosel at the shaft
-    head.position.copy(hosel);
-    club.add(head);
+    if (!head) {
+      // the procedural stand-in while the model loads
+      head = headMesh(spec, this.mats, set);
+      // orient the head: toe out (+X), face to the target (-Z), hosel at the shaft
+      head.position.copy(hosel);
+      club.add(head);
+    }
     club.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
     // everything hangs off the pivot so the swing is one rotation in the plane
     club.position.sub(P);
@@ -265,6 +314,31 @@ export class Club {
     const n = new THREE.Vector3(0, 0, -1).applyAxisAngle(dir, 0.1);
     this._openSign = n.x > 0 ? 1 : -1;
     this.spec = spec;
+  }
+
+  /** Load this club's head and the set's shafts, then rebuild it if it is still the one in hand. */
+  _fetch(set, id, hp, sp) {
+    Promise.all([loadEquipment(hp), loadEquipment(sp)]).then(([h, s]) => {
+      if (h && s && this.setId === set.id && this.id === id) {
+        this.id = null;
+        this._build(id);
+        this._pose();
+      }
+      this._prefetch(set);
+    });
+  }
+
+  /** Fetch the rest of the set in the background, a head at a time. */
+  _prefetch(set) {
+    if (this._prefetched === set.id || typeof window === 'undefined') return;
+    this._prefetched = set.id;
+    const ids = set.hockey ? [] : [...set.bag, ...Object.keys(SPEC).filter((k) => !set.bag.includes(k))];
+    const next = () => {
+      if (this._prefetched !== set.id) return;
+      const id = ids.shift();
+      if (id) loadEquipment(headPath(set, id)).then(() => setTimeout(next, 120));
+    };
+    setTimeout(next, 600);
   }
 
   /** Demo meter: 0 = address … 1 = a full backswing (club about parallel at the top). */

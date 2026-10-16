@@ -145,6 +145,57 @@ and in the in-game course card.
   GoldFire Studios.
 - **R10 bridge protocol**: a port of 10over (see `bridge/README.md`).
 
+## Golf clubs and balls
+
+`assets/models/clubs/<set>/<club>.glb`, `clubs/<set>/shafts.glb` and
+`assets/models/balls/<ball>.glb` were made for Fairway, not imported. Library
+searches (Sketchfab, Poly Haven) turned up only low-poly props (116 to 3,400
+faces, no real head shapes), so every head, shaft, grip and ball is built from
+published dimensions:
+
+- `tools/equipment/` (Python: numpy, scipy, scikit-image, Pillow) models each
+  head as a signed-distance field at its own loft and lie and meshes it with
+  marching cubes (0.24–0.32 mm voxels, 0.5–1 M triangles), with the finish
+  per region and the stamps (wordmarks, numbers, grooves, scorelines, milling,
+  whipping) as images. `build.py` writes the heads and balls, `shafts.py`
+  the shaft and grip profiles and textures.
+- `tools/blender/equipment.py` (Blender 4.3, headless) decimates each head
+  to 4.5–8k triangles, Smart-UVs it and bakes 1024 px normal, base colour,
+  roughness/metalness and ambient occlusion from the high-poly with Cycles;
+  balls bake onto a 1.7k-triangle cube sphere. `tools/blender/shafts.py`
+  lathes the shafts and grips. Both export WebP-Draco GLBs.
+- `tools/equipment-check.mjs` is the headless check that every set's clubs
+  and every ball load and line up in the game.
+
+Text is set in Jost (SIL OFL, `assets/fonts`). The brands are parodies (see
+`js/data/equipment.js`); no maker's logo or wordmark is reproduced.
+
+Dimensions and rules used (not redistributed):
+
+- USGA / R&A Equipment Rules: driver head volume at most 460 cc (+10 cc
+  tolerance); ball diameter at least 1.680 in; groove width at most 0.035 in
+  (0.889 mm), depth at most 0.020 in (0.508 mm), separation at least three
+  times the width, edge radius at least 0.010 in (Rules of Golf Equipment
+  Standards, Part 2 and Appendix II groove specification).
+- Driver heads: ~4.8 in heel to toe, ~4.6 in face to back, ~2.4 in face
+  height, ~17 mm face progression, 12 in bulge and 10–11 in roll (makers'
+  published specifications for 460 cc heads).
+- Fairway woods 170–190 cc with 34–40 mm faces; hybrids 100–120 cc;
+  persimmon drivers ~190–200 cc with ~46 mm faces, brass sole plates,
+  insert faces and whipped necks (vintage catalogue specifications).
+- Irons: blade lengths 75–83 mm, toe heights 47–60 mm, top lines 5–9 mm,
+  soles 14–28 mm, offset 0–7 mm, hosel 0.54 in at the ferrule; wedge bounce
+  6–12° (makers' published specifications for muscle-back, cavity-back,
+  game-improvement irons and specialty wedges).
+- Lofts, lies and lengths: `js/scene/club.js` SPEC (typical modern specs).
+- Shafts: stepped steel after the True Temper Dynamic Gold pattern (0.355 /
+  0.370 in iron tip, 0.335 in wood tip, 0.600 in butt); graphite tapers to
+  the same diameters. Grips: 10.5 in, ~0.90 in over the cap.
+- Balls: 1.68 in; dimple layouts are geodesic subdivisions of an
+  icosahedron (362 and 252 dimples) or an octahedron (326), each with a
+  dimple-free parting line; dimples 0.17–0.28 mm deep.
+- A hockey stick blade: ~12.5 in long, ~3 in tall, a mid curve.
+
 ## References used for facts and dimensions
 
 Not redistributed; listed so figures can be checked.
