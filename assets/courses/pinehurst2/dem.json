@@ -1,0 +1,109 @@
+{
+  "lat": 35.19149,
+  "lon": -79.46053,
+  "size": 2300.0,
+  "step": 1,
+  "n": 2301,
+  "min": 116.92,
+  "max": 165.69,
+  "lidar": true,
+  "source": "NOAA Digital Coast lidar DEM (NC_phase3_2024_15636)",
+  "tiles": [
+    {
+      "tile": "D03_37_10855208_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 152621
+    },
+    {
+      "tile": "D03_37_10855212_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 317003
+    },
+    {
+      "tile": "D03_37_10855216_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 319763
+    },
+    {
+      "tile": "D03_37_10855220_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 168405
+    },
+    {
+      "tile": "D03_37_10856205_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 280017
+    },
+    {
+      "tile": "D03_37_10856206_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 277320
+    },
+    {
+      "tile": "D03_37_10856207_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 132515
+    },
+    {
+      "tile": "D03_37_10856209_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 582167
+    },
+    {
+      "tile": "D03_37_10856210_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 582134
+    },
+    {
+      "tile": "D03_37_10856211_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 278291
+    },
+    {
+      "tile": "D03_37_10856213_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 582081
+    },
+    {
+      "tile": "D03_37_10856214_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 582073
+    },
+    {
+      "tile": "D03_37_10856215_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 275596
+    },
+    {
+      "tile": "D03_37_10856217_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 306688
+    },
+    {
+      "tile": "D03_37_10856218_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 309399
+    },
+    {
+      "tile": "D03_37_10856219_20251031",
+      "project": "NC_phase3_2024_15636",
+      "published": "2024-02-02",
+      "samples": 146335
+    }
+  ]
+}

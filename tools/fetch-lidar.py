@@ -4,6 +4,7 @@
     python tools/fetch-lidar.py <courseId> <lat> <lon> [--size 1800] [--step 1]
                                 [--far 16000] [--far-step 32]
                                 [--prefer IL_10CountyNRCS_D23,IL_SouthCentral_2021_D21]
+                                [--noaa NC_phase3_2024_15636/MooreCoNC]
 
 Asks the USGS TNM Access API for "Digital Elevation Model (DEM) 1 meter"
 tiles over the course, ranks them (the --prefer projects first, in order, then
@@ -12,6 +13,12 @@ GeoTIFF over HTTP (the backdrop reads the tiles' own overviews, so nothing is
 downloaded whole). Each sample takes the best-ranked project that has data
 there; anything no LiDAR covers falls back to the Terrarium tiles that
 tools/fetch-dem.mjs uses.
+
+Where 3DEP has no 1 m DEM but NOAA's Digital Coast does (state LiDAR such as
+North Carolina's 2024 Phase 3), --noaa <dataset>/<subfolder> reads that
+dataset's Cloud-Optimized GeoTIFFs from the public noaa-nos-coastal-lidar-pds
+bucket instead, finding the tiles through its per-tile STAC items (indexed
+once into ~/.cache/fairway/noaa/). Heights in US survey feet are converted.
 
 Writes the same two grids as tools/fetch-dem.mjs, in the same frame
 (centred on lat/lon, +x east, +z south, metres; js/course/dem.js reads them):
@@ -54,6 +61,7 @@ ap.add_argument('--step', type=float, default=1)
 ap.add_argument('--far', type=float, default=16000)
 ap.add_argument('--far-step', type=float, default=32)
 ap.add_argument('--prefer', default=PREFER, help='comma-separated 3DEP project names, best first')
+ap.add_argument('--noaa', default='', help='NOAA Digital Coast DEM folder, e.g. NC_phase3_2024_15636/MooreCoNC')
 args = ap.parse_args()
 LAT, LON = args.lat, args.lon
 PREF = [p for p in args.prefer.split(',') if p]
@@ -80,9 +88,56 @@ def get(url, timeout=60):
     return None
 
 
+NOAA = 'https://noaa-nos-coastal-lidar-pds.s3.amazonaws.com'
+
+
+def noaa_index(folder):
+    """[{url, bbox, date, ft}] for every tile of a NOAA DEM folder (cached)."""
+    cache = os.path.join(os.path.expanduser('~/.cache/fairway/noaa'), folder.replace('/', '__') + '.json')
+    if os.path.exists(cache):
+        with open(cache) as f:
+            return json.load(f)
+    import re
+    from concurrent.futures import ThreadPoolExecutor
+    dataset, sub = (folder.split('/', 1) + [''])[:2]
+    keys, tok = [], None
+    while True:
+        q = {'list-type': '2', 'prefix': f'dem/{dataset}/stac/{sub}', 'max-keys': '1000'}
+        if tok:
+            q['continuation-token'] = tok
+        t = get(f'{NOAA}/?{urllib.parse.urlencode(q)}').decode()
+        keys += [k for k in re.findall('<Key>(.*?)</Key>', t) if k.endswith('.json')]
+        m = re.search('<NextContinuationToken>(.*?)</NextContinuationToken>', t)
+        if not m:
+            break
+        tok = m.group(1)
+    print(f'  indexing {len(keys)} NOAA tiles of {folder}…')
+
+    def item(k):
+        j = json.loads(get(f'{NOAA}/{k}'))
+        a = next(iter(j['assets'].values()))
+        # heights in US survey feet: a compound CRS says so ("… + NAVD88 height
+        # (ftUS)"); a bare state-plane (ftUS) CRS has them in feet too (as the
+        # NC Phase 3 metadata states; a wrong guess fails the Terrarium check)
+        ft = 'ftUS' in (a.get('proj:wkt2') or '').split('\n')[0]
+        return {'url': a['href'], 'bbox': j['bbox'], 'date': j['properties'].get('datetime', '')[:10], 'ft': ft}
+
+    with ThreadPoolExecutor(8) as ex:
+        out = list(ex.map(item, keys))
+    os.makedirs(os.path.dirname(cache), exist_ok=True)
+    with open(cache, 'w') as f:
+        json.dump(out, f)
+    return out
+
+
 def tiles_over(bounds_ll):
-    """3DEP 1 m tiles intersecting a lon/lat box, best first."""
+    """1 m tiles intersecting a lon/lat box, best first."""
     w, s, e, n = bounds_ll
+    if args.noaa:
+        project = args.noaa.split('/')[0]
+        return [{'url': t['url'], 'project': project, 'date': t['date'], 'title': t['url'].rsplit('/', 1)[1][:-4], 'ft': t['ft']}
+                for t in noaa_index(args.noaa)
+                if t['bbox'][0] < e and t['bbox'][2] > w and t['bbox'][1] < n and t['bbox'][3] > s]
     q = urllib.parse.urlencode({'datasets': DATASET, 'bbox': f'{w},{s},{e},{n}', 'max': 500, 'outputFormat': 'JSON'})
     items = json.loads(get(f'{TNM}?{q}'))['items']
     out = []
@@ -139,6 +194,9 @@ def lidar_grid(size, step, ref):
             arr = src.read(1, window=win, out_shape=shape, masked=True,
                            resampling=Resampling.average if dec > 1 else Resampling.nearest).astype(np.float32)
             arr = arr.filled(np.nan)
+            # state-plane products can carry NAVD88 heights in US survey feet
+            if t.get('ft'):
+                arr[arr > -1000] *= 1200 / 3937
             # the outermost valid pixels of a tile (and its overviews) mix in the
             # nodata ring: drop them, so seams come from the neighbouring tile
             bad = np.isnan(arr) | (arr < -1000)
@@ -156,6 +214,17 @@ def lidar_grid(size, step, ref):
                 dst[fill] = tmp[fill]
                 used.append({'tile': t['title'], 'project': t['project'], 'published': t['date'], 'samples': int(fill.sum())})
                 print(f'  {t["title"]}: {fill.sum()} samples ({100 * fill.sum() / dst.size:.1f}%)')
+    # tiles that abut exactly (NOAA's) leave a sample-wide seam where neither
+    # tile's pixel centres reach: fill it from the LiDAR either side
+    for _ in range(2):
+        miss = np.isnan(dst)
+        if not miss.any():
+            break
+        pad = np.pad(dst, 1, constant_values=np.nan)
+        nb = np.stack([pad[:-2, 1:-1], pad[2:, 1:-1], pad[1:-1, :-2], pad[1:-1, 2:]])
+        cnt = (~np.isnan(nb)).sum(0)
+        fill = miss & (cnt > 0)
+        dst[fill] = np.nansum(nb, 0)[fill] / cnt[fill]
     return dst, used
 
 
@@ -214,7 +283,11 @@ def bake(name, size, step):
     n = int(round(size / step)) + 1
     ref = np.full((n, n), np.nan, dtype=np.float32)
     terrarium_fill(ref, size, step)
-    h, used = lidar_grid(size, step, ref)
+    if args.noaa and step > 4:
+        # NOAA's tiles have no overviews: the surround would read them whole
+        h, used = np.full_like(ref, np.nan), []
+    else:
+        h, used = lidar_grid(size, step, ref)
     miss = np.isnan(h)
     h[miss] = ref[miss]
     filled = int(miss.sum())
@@ -235,7 +308,8 @@ def bake(name, size, step):
         'lat': LAT, 'lon': LON, 'size': size, 'step': step, 'n': n,
         'min': round(lo, 2), 'max': round(hi, 2),
         'lidar': bool(used) and filled == 0,
-        'source': f'USGS 3DEP 1 m bare-earth DEM ({", ".join(projects)}), public domain'
+        'source': (f'NOAA Digital Coast lidar DEM ({", ".join(projects)})' if args.noaa
+                   else f'USGS 3DEP 1 m bare-earth DEM ({", ".join(projects)}), public domain')
                   + (f'; {100 * filled / h.size:.1f}% from Terrarium tiles (AWS Open Data)' if filled else ''),
         'tiles': used,
     }

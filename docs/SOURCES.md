@@ -20,6 +20,40 @@ The script ignores any LiDAR sample more than 15 m from the coarse Terrarium
 surface. Tile `x74y431` of IL_10CountyNRCS_D23 has a strip that reads a
 constant 92.3 m along its north edge, on ground near 170 m.
 
+## Pinehurst No. 2 (Pinehurst, NC)
+
+- **Elevation:** the **2024 NC CGIA Lidar DEM: Phase 3, North Carolina
+  Statewide** (NOAA InPort 79627; 3.125 ft / 0.95 m hydro-flattened bare
+  earth from Sanborn's February 2024 leaf-off flight, funded by the North
+  Carolina Center for Geographic Information and Analysis), read as
+  Cloud-Optimized GeoTIFFs from NOAA Digital Coast's public
+  `noaa-nos-coastal-lidar-pds` bucket (`dem/NC_phase3_2024_15636/MooreCoNC/`)
+  by `tools/fetch-lidar.py --noaa`. 16 tiles cover the 2.3 km playing area
+  (`assets/courses/pinehurst2/dem.*`, 1 m); heights converted from US survey
+  feet. The surround (`far.*`) is Terrarium tiles (the NOAA tiles have no
+  overviews). USGS 3DEP has no 1 m DEM here and only a 2001 point cloud;
+  the state's point cloud is behind a login at sdd.nc.gov and was not used.
+  Credit: "NC CGIA / NOAA Office for Coastal Management".
+- **Trees:** the **Meta and World Resources Institute Global Canopy Height
+  Map** (1 m, CC BY 4.0, https://registry.opendata.aws/dataforgood-fb-forests/;
+  Tolan et al. 2024), tile `032003130`, through `tools/fetch-trees.py
+  --chm-raster meta`: 5,336 tree tops with height and crown. Heights come
+  from satellite imagery, a few metres less exact than LiDAR, and the
+  crowns can't separate pine from oak, so the course draws mostly longleaf
+  pine (`THEME_TREES.sandhills`). Credit: "Canopy height © Meta and WRI,
+  CC BY 4.0".
+- **Holes:** OpenStreetMap (ODbL), all 18 holes inside the OSM boundary of
+  "Pinehurst No. 2" (hole refs "1 - #2" … "18 - #2"), with real outlines of
+  greens, fairways (multipolygons), bunkers and the one pond; buildings from
+  OSM footprints (`tools/fetch-buildings.mjs`), the resort clubhouse among
+  them. The 4th and 5th share one mapped fairway, given to both by hand.
+- **Scorecard:** OpenGolfAPI (ODbL), "Pinehurst No. 2": par 72 by hole,
+  stroke indexes, yardages from the longest listed tees (7,551 yd).
+- **Ground colour:** EOxCloudless 2024 (CC BY-NC-SA 4.0), as for the other courses.
+- **Look:** checked against published photographs of the course (USGA,
+  Golf Digest and LINKS coverage of the 2010-11 restoration's sandscapes and
+  the clubhouse); no photographs are copied into the game.
+
 ## Elevation: Terrarium tiles (the other real-terrain courses)
 
 Baked by `tools/fetch-dem.mjs` from the AWS Terrain Tiles (Terrarium format),

@@ -97,7 +97,7 @@ const query = `[out:json][timeout:90];
   way["leisure"="golf_course"](${bbox});
   relation["leisure"="golf_course"](${bbox});
 );
-out tags geom;`;
+out geom;`; // (not "out tags": multipolygon fairways need their members)
 let osm = null;
 for (const ep of ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter', 'https://maps.mail.ru/osm/tools/overpass/api/interpreter']) {
   try {
