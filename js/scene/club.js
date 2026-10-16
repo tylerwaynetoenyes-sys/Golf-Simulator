@@ -235,12 +235,19 @@ export class Club {
       q.setFromUnitVectors(UP, dir);
       const s0 = O.clone().addScaledVector(dir, ud.shaftStart);
       butt.copy(O).addScaledVector(dir, L);
+      if (set.hockey) {
+        // the stick's shaft sits 9.5 mm behind the blade's face line (tools/equipment/heads.py)
+        s0.z += 0.0095;
+        butt.z += 0.0095;
+      }
       const shaft = Sh.getObjectByName(set.hockey ? 'hshaft' : wood ? 'shaft_wood' : 'shaft_iron').clone();
-      shaft.quaternion.copy(q).multiply(SPIN);
+      // round shafts turn their label to the camera; the stick's flat sides stay square to the blade
+      shaft.quaternion.copy(q);
+      if (!set.hockey) shaft.quaternion.multiply(SPIN);
       shaft.position.copy(s0);
       shaft.scale.set(1, butt.distanceTo(s0), 1);
       const grip = Sh.getObjectByName(set.hockey ? 'hgrip' : 'grip').clone();
-      grip.quaternion.copy(q).multiply(SPIN);
+      grip.quaternion.copy(shaft.quaternion);
       grip.position.copy(butt).addScaledVector(dir, set.hockey ? -0.2716 : -0.2702);
       club.add(shaft, grip);
     } else {
