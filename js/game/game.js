@@ -696,7 +696,10 @@ export class Game {
     if (club.root.visible && club.phase !== 'hidden') {
       this.state = 'swinging';
       this.hud.setPrompt('');
-      club.strike(() => { this.state = 'ready'; this._play(result, lie, source); }, { fromTop: source !== 'demo' });
+      // the replay is shaped by the measured numbers, relative to the aim line
+      const rel = (v) => (v == null ? null : v - this.aimDeg);
+      const shape = { clubSpeed: launch.clubSpeed, clubPath: rel(launch.clubPath), faceAngle: rel(launch.faceAngle), attackAngle: launch.attackAngle, backswingMs: launch.backswingMs, downswingMs: launch.downswingMs };
+      club.strike(() => { this.state = 'ready'; this._play(result, lie, source); }, { fromTop: source !== 'demo', launch: shape, fullMps: this.club?.clubMph ? this.club.clubMph * 0.44704 : null });
     } else {
       this._play(result, lie, source);
     }

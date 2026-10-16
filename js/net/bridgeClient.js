@@ -33,6 +33,8 @@ export function normalizeShot(msg) {
     attackAngle: c.attackAngle ?? null,
     spinCalc: b.spinCalc,
     tempo: s.swing?.tempo ?? null,
+    backswingMs: s.swing?.backswingMs ?? null, // the R10's own swing timestamps
+    downswingMs: s.swing?.downswingMs ?? null,
     receivedAt: msg.receivedAt || Date.now(),
   };
 }

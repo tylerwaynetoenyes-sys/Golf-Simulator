@@ -3,8 +3,16 @@
 // through the ball. The demo meter drives the backswing; the downswing takes
 // the measured ~0.25 s of a tour swing and fires `onImpact` on the exact
 // frame the face reaches the ball, so the launch, the strike sound, ball
-// squash and turf spray all land together. With a launch monitor the shot has
-// already happened, so the club plays a quick downswing from the top first.
+// squash and turf spray all land together.
+//
+// With a launch monitor the shot has already happened, so the club replays it,
+// shaped by what the R10 measured (see strike()):
+//   backswing and downswing time   the R10's own swing timestamps (real tempo)
+//   backswing length, finish        club speed against the club's full-swing speed
+//   path                            the swing plane turns in-to-out or out-to-in
+//   face                            the head twists open or closed to the path
+//   attack angle                    the low point moves ahead of (down) or behind (up) the ball
+// The demo meter's shots carry the same numbers, so they are shaped the same way.
 //
 // Frame (local to the ball): -Z toward the target, +X away from the golfer
 // (a right-handed player stands on -X, facing +X), +Y up.
@@ -36,6 +44,8 @@ const SPEC = {
 const IN = 0.0254;
 const DOWNSWING = 0.26; // s from the top to impact (tour tempo is ~3:1, ~0.25 s down)
 const FOLLOW = 0.55; // s from impact to the finish
+const SHAPE_GAIN = 1.5; // path and face are a few degrees; drawn 1.5x so they read
+const D2R = Math.PI / 180;
 
 const ease = (t) => t * t * (3 - 2 * t);
 
@@ -131,8 +141,10 @@ export class Club {
     this.root = new THREE.Group(); // at the ball, facing the target
     this.root.visible = false;
     scene.add(this.root);
+    this.plane = new THREE.Group(); // turns for the path, slides for the attack angle
+    this.root.add(this.plane);
     this.pivot = new THREE.Group(); // the swing centre (sternum)
-    this.root.add(this.pivot);
+    this.plane.add(this.pivot);
     this.mats = {
       steel: new THREE.MeshStandardMaterial({ color: 0xc9ccd1, metalness: 1, roughness: 0.28 }),
       crown: new THREE.MeshStandardMaterial({ color: 0x15171a, metalness: 0.4, roughness: 0.25 }),
@@ -157,6 +169,7 @@ export class Club {
     this.back = 0;
     this._axis = new THREE.Vector3();
     this.onImpact = null;
+    this.shape = null;
   }
 
   /** Build the club for `clubId` and stand it behind the ball at (origin), aimed along headingDeg. */
@@ -167,6 +180,9 @@ export class Club {
     this.phase = 'address';
     this.theta = 0;
     this.back = 0;
+    this.shape = null;
+    this._shapeW = 0;
+    this._applyShape(0);
     this.root.visible = true;
     this._fade = 1;
     this._pose();
@@ -235,12 +251,19 @@ export class Club {
     club.position.sub(P);
     this.pivot.position.copy(P);
     this.pivot.add(club);
+    this.clubG = club;
+    this._P = P.clone();
+    this._hosel = hosel.clone();
+    this._shaftDir = dir.clone();
     // swing plane: through the pivot, the ball and the target line
     const toBall = new THREE.Vector3().sub(P).normalize();
     this._axis.crossVectors(toBall, new THREE.Vector3(0, 0, -1)).normalize();
     // the club must go back away from the target (+Z) first: check the sign
     const test = new THREE.Vector3().sub(P).applyAxisAngle(this._axis, 0.05).add(P);
     if (test.z < 0) this._axis.negate();
+    // which way a twist about the shaft opens the face (turns it toward +X, right of target)
+    const n = new THREE.Vector3(0, 0, -1).applyAxisAngle(dir, 0.1);
+    this._openSign = n.x > 0 ? 1 : -1;
     this.spec = spec;
   }
 
@@ -252,18 +275,73 @@ export class Club {
   }
 
   /**
-   * Swing down through the ball. `fromTop`: start at the top (launch-monitor
-   * shots, where the real swing has already happened). Calls onImpact at contact.
+   * Swing through the ball and call onImpact at contact.
+   * fromTop: a launch-monitor shot. The swing has already happened, so it is
+   * replayed from address: back and down at the R10's measured times when it
+   * sent them, as long as the club speed says, along the measured path.
+   * launch: { clubSpeed, clubPath, faceAngle, attackAngle, backswingMs, downswingMs },
+   * angles relative to the aim line. fullMps: this club's full-swing head speed.
    */
-  strike(onImpact, { fromTop = false } = {}) {
+  strike(onImpact, { fromTop = false, launch = null, fullMps = null } = {}) {
     if (!this.root.visible || this.phase === 'hidden') { onImpact?.(); return; }
-    if (fromTop || this.back < 0.25) this.back = Math.max(this.back, 0.85);
+    const L = launch || {};
+    // how full the swing was: measured head speed against this club's full swing
+    const r = L.clubSpeed && fullMps ? Math.max(0.15, Math.min(1.2, L.clubSpeed / fullMps)) : 1;
+    const num = (v) => (Number.isFinite(v) ? v : 0);
+    const path = num(L.clubPath), face = num(L.faceAngle), aoa = num(L.attackAngle);
+    const impact = Math.max(-12, Math.min(8, aoa)) * D2R; // contact before (down) or after (up) the low point
+    this.shape = {
+      // +path (in-to-out) sends the head right of target (+X); an inclined plane already travels a little
+      // in-to-out before its low point (out-to-in after it), so turn only by the difference
+      yaw: this._naturalPath(impact) - path * SHAPE_GAIN * D2R,
+      twist: (face - path) * SHAPE_GAIN * D2R * this._openSign,  // face to path, about the shaft
+      impact,
+      finish: THREE.MathUtils.degToRad(250) * Math.min(1, 0.4 + 0.65 * r),
+    };
+    this.onImpact = onImpact;
+    if (fromTop) {
+      // the replay: from address, at the player's own tempo
+      this.back = Math.min(1.08, Math.max(0.28, 0.25 + 0.8 * r ** 1.4));
+      const bs = L.backswingMs > 0 ? L.backswingMs / 1000 : 0.78 * (0.6 + 0.4 * this.back);
+      const ds = L.downswingMs > 0 ? L.downswingMs / 1000 : DOWNSWING;
+      this.backTime = Math.min(1.3, Math.max(0.35, bs));
+      this.downTime = Math.min(0.45, Math.max(0.17, ds));
+      this.topTheta = this._backTheta(this.back);
+      this.phase = 'replay';
+      this.t = 0;
+      return;
+    }
+    if (this.back < 0.25) this.back = Math.max(this.back, 0.85);
     this.topTheta = this._backTheta(this.back);
     this.phase = 'down';
     this.t = 0;
-    this.onImpact = onImpact;
     // shorter backswings come down a little quicker
     this.downTime = DOWNSWING * (0.7 + 0.3 * Math.min(1, this.back));
+  }
+
+  /** The head's own direction of travel (radians, + toward +X) at swing angle theta on the unturned plane. */
+  _naturalPath(theta) {
+    const P = this._P;
+    if (!P) return 0;
+    const at = (t) => new THREE.Vector3().sub(P).applyAxisAngle(this._axis, -t);
+    const d = at(theta + 0.01).sub(at(theta));
+    return Math.atan2(d.x, -d.z) - Math.atan2(at(0.01).sub(at(0)).x, -at(0.01).sub(at(0)).z);
+  }
+
+  /** Path, face and low point, eased in by w (0 at address, 1 from the top on). */
+  _applyShape(w) {
+    const sh = this.shape;
+    const P = this._P;
+    if (!this.clubG || !P) return;
+    const yaw = sh ? sh.yaw * w : 0, twist = sh ? sh.twist * w : 0, imp = sh ? sh.impact * w : 0;
+    // slide the arc so the head meets the ball at the impact angle, not at the low point
+    const head = new THREE.Vector3().sub(P).applyAxisAngle(this._axis, -imp).add(P);
+    this.plane.position.set(-head.x, -head.y, -head.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    this.plane.rotation.y = yaw;
+    // twist the club about its shaft, keeping the hosel where it is
+    const q = new THREE.Quaternion().setFromAxisAngle(this._shaftDir, twist);
+    this.clubG.quaternion.copy(q);
+    this.clubG.position.copy(this._hosel).sub(this._hosel.clone().applyQuaternion(q)).sub(P);
   }
 
   _backTheta(p) { return -THREE.MathUtils.degToRad(255) * Math.min(1.1, p); }
@@ -280,13 +358,24 @@ export class Club {
     } else if (this.phase === 'back') {
       const want = this._backTheta(this.back);
       this.theta += (want - this.theta) * (1 - Math.exp(-14 * dt));
+    } else if (this.phase === 'replay') {
+      // the backswing, at the player's measured time, with the shape coming in
+      this.t += dt;
+      const u = Math.min(1, this.t / this.backTime);
+      this.theta = this.topTheta * ease(u);
+      this._shapeW = ease(u);
+      this._applyShape(this._shapeW);
+      if (u >= 1) { this.phase = 'down'; this.t = 0; }
     } else if (this.phase === 'down') {
       this.t += dt;
-      // the club accelerates all the way into the ball
+      // the club accelerates all the way into the ball, which it meets at the impact angle
       const u = Math.min(1, this.t / this.downTime);
-      this.theta = this.topTheta * (1 - u * u * (1.6 - 0.6 * u));
+      const imp = this.shape ? this.shape.impact : 0;
+      this.theta = this.topTheta + (imp - this.topTheta) * (u * u * (1.6 - 0.6 * u));
+      // a meter swing turns onto its path in the first half of the downswing
+      if (this.shape) { this._shapeW = Math.max(this._shapeW || 0, Math.min(1, u * 2)); this._applyShape(this._shapeW); }
       if (u >= 1) {
-        this.theta = 0;
+        this.theta = imp;
         this.phase = 'follow';
         this.t = 0;
         const cb = this.onImpact;
@@ -296,7 +385,9 @@ export class Club {
     } else if (this.phase === 'follow') {
       this.t += dt;
       const u = Math.min(1, this.t / FOLLOW);
-      this.theta = THREE.MathUtils.degToRad(250) * (1 - (1 - u) ** 3);
+      const imp = this.shape ? this.shape.impact : 0;
+      const fin = this.shape ? this.shape.finish : THREE.MathUtils.degToRad(250);
+      this.theta = imp + (fin - imp) * (1 - (1 - u) ** 3);
       if (this.t > FOLLOW + 0.9) this.hide();
     }
     this._pose();
