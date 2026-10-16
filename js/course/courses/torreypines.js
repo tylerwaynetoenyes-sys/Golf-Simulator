@@ -234,7 +234,7 @@ export default {
       lm: { type: "none", at: [0, 0] },
     },
     {
-      n: 17, name: "Hole 17", par: 4,
+      n: 17, name: "Hole 17", crowds: true, par: 4,
       note: "Along the canyon rim, back toward the clubhouse, the drop down the left off the tee. Par 4, 443 yards from the back tees. Stroke index 4.",
       pts: [[-22, 115], [99, -26], [221, -202]],
       fw: 24,
@@ -247,7 +247,7 @@ export default {
       lm: { type: "none", at: [0, 0] },
     },
     {
-      n: 18, name: "Hole 18", par: 5,
+      n: 18, name: "Hole 18", crowds: true, par: 5,
       note: "The par 5 home to the clubhouse and the Lodge, a pond (Devlin's Billabong) guarding the front of the green. Tiger Woods holed for birdie here to force a playoff in 2008, Jon Rahm to win in 2021. Par 5, 570 yards from the back tees. Stroke index 10.",
       pts: [[268, -170], [211, -427], [187, -685]],
       fw: 24,

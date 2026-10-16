@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { seeded } from './kit.js';
 import { pbr, painted } from '../../scene/pbr.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Batch, bx, cy, place } from './riverfront.js';
 
 // canopy colours seen over the gliderport: bright solids and two-tones
@@ -23,16 +24,45 @@ function wingGeometry(span = 11, chord = 2.6) {
   return g;
 }
 
-/** Suspension lines from the wing to the pilot (one LineSegments per glider). */
-function linesGeometry(span = 11, drop = 7) {
-  const R = span / 1.7, p = [];
+/**
+ * The pilot seated in the harness 7.4 m under the wing, with the risers and
+ * the fans of lines up to it as thin strips: one mesh, so a glider is two draws.
+ */
+function pilotGeometry(span = 11, drop = 7.4) {
+  const R = span / 1.7, parts = [];
+  const pilot = new THREE.CapsuleGeometry(0.28, 0.7, 4, 8).rotateX(1.2).translate(0, -drop, 0);
+  parts.push(pilot);
+  const A = new THREE.Vector3(0, -drop + 0.6, 0.15), B = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   for (let i = -4; i <= 4; i++) {
     const a = (i / 4) * 0.82;
-    const x = Math.sin(a) * R, y = Math.cos(a) * R - R;
-    for (const z of [-0.9, 0.7]) p.push(x, y, z, 0, -drop, 0.15);
+    for (const z of [-0.9, 0.7]) {
+      B.set(Math.sin(a) * R, Math.cos(a) * R - R, z);
+      const d = B.clone().sub(A), L = d.length();
+      const line = new THREE.BoxGeometry(0.03, L, 0.03).translate(0, L / 2, 0);
+      line.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up, d.normalize())).translate(A.x, A.y, A.z);
+      parts.push(line);
+    }
   }
-  return new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(p, 3));
+  return mergeGeometries(parts.map((p) => { p.deleteAttribute('uv'); return p.index ? p.toNonIndexed() : p; }));
 }
+
+/**
+ * Ripstop nylon, coloured per instance. Sunlight comes through the cloth, so
+ * seen from below a canopy glows its colour (`glow` of it) rather than going to shadow.
+ */
+function canopyMaterial(glow) {
+  const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.65, side: THREE.DoubleSide });
+  if (glow) {
+    m.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>\n#ifdef USE_INSTANCING_COLOR\n  totalEmissiveRadiance += vColor.rgb * ${glow.toFixed(2)};\n#endif`);
+    };
+    m.customProgramCacheKey = () => `canopyGlow${glow}`;
+  }
+  return m;
+}
+
+const _Y = new THREE.Vector3(0, 1, 0);
 
 function gliderport() {
   const g = new THREE.Group();
@@ -64,40 +94,36 @@ function gliderport() {
   sock.position.set(-22, 7.6, -16);
   g.add(sock);
 
-  // canopies laid out on the grass by the huts, ready to launch
-  const flat = new THREE.PlaneGeometry(10, 2.4).rotateX(-Math.PI / 2);
+  // canopies laid out on the grass by the huts, ready to launch (one instanced draw)
+  const laid = new THREE.InstancedMesh(new THREE.PlaneGeometry(10, 2.4).rotateX(-Math.PI / 2), canopyMaterial(0), 3);
+  const m4 = new THREE.Matrix4(), q4 = new THREE.Quaternion(), s4 = new THREE.Vector3(1, 1, 1), p4 = new THREE.Vector3(), c4 = new THREE.Color();
   for (let i = 0; i < 3; i++) {
-    const m = new THREE.Mesh(flat, painted(WINGS[(i * 3 + 1) % WINGS.length], { roughness: 0.7, side: THREE.DoubleSide }));
-    m.position.set(-16 - i * 2, 0.08, 8 + i * 6);
-    m.rotation.y = (rnd() - 0.5) * 0.4;
-    m.receiveShadow = true;
-    g.add(m);
+    laid.setMatrixAt(i, m4.compose(p4.set(-16 - i * 2, 0.08, 8 + i * 6), q4.setFromAxisAngle(_Y, (rnd() - 0.5) * 0.4), s4));
+    laid.setColorAt(i, c4.set(WINGS[(i * 3 + 1) % WINGS.length]));
   }
+  laid.receiveShadow = true;
+  g.add(laid);
 
   // paragliders soaring the ridge lift along the cliffs, north toward the
   // golf course and back: long beats on the windward face, turns out over the sea
-  const wingG = wingGeometry(), lineG = linesGeometry(), pilotG = new THREE.CapsuleGeometry(0.28, 0.7, 4, 8);
-  const lineM = new THREE.LineBasicMaterial({ color: 0x333333, transparent: true, opacity: 0.55 });
-  const pilotM = painted(0x2a2d33, { roughness: 0.8 });
+  // seven gliders, two instanced draws: the wings (each its own colour) and
+  // the pilots with their risers and lines
+  const N = 7;
+  const wings = new THREE.InstancedMesh(wingGeometry(), canopyMaterial(0.45), N);
+  const pilots = new THREE.InstancedMesh(pilotGeometry(), painted(0x2a2d33, { roughness: 0.8 }), N);
+  wings.castShadow = true;
+  wings.frustumCulled = pilots.frustumCulled = false; // they range a kilometre along the cliffs
+  for (let i = 0; i < N; i++) wings.setColorAt(i, c4.set(WINGS[i % WINGS.length]));
+  g.add(wings, pilots);
   const fliers = [];
-  for (let i = 0; i < 7; i++) {
-    const f = new THREE.Group();
-    // sunlight comes through the ripstop: seen from below a canopy glows its colour, not a shadow
-    const c = WINGS[i % WINGS.length];
-    const wing = new THREE.Mesh(wingG, painted(c, { roughness: 0.65, side: THREE.DoubleSide, emissive: c, emissiveIntensity: 0.45 }));
-    wing.castShadow = true;
-    const pilot = new THREE.Mesh(pilotG, pilotM);
-    pilot.position.y = -7.4;
-    pilot.rotation.x = 1.2; // seated in the harness
-    f.add(wing, new THREE.LineSegments(lineG, lineM), pilot);
-    g.add(f);
+  for (let i = 0; i < N; i++) {
     fliers.push({
-      f,
       // each flies its own beat: how far north it ranges, how high, how fast
       north: 380 + rnd() * 520, south: 40 + rnd() * 160, x: -70 - rnd() * 60,
       alt: 25 + rnd() * 80, speed: 9 + rnd() * 3, phase: rnd(),
     });
   }
+  const _o = new THREE.Object3D();
   const _p = new THREE.Vector3(), _q = new THREE.Vector3();
   const at = (b, u, out) => {
     // a stadium-shaped beat: up the face, a turn out to sea, back down the line further out
@@ -116,16 +142,22 @@ function gliderport() {
     // the sock fills and swings in the onshore breeze
     sock.rotation.y = Math.PI + Math.sin(t * 0.7) * 0.25;
     sock.rotation.z = -0.08 + Math.sin(t * 2.3) * 0.04;
-    for (const b of fliers) {
+    // nobody flies after dark
+    wings.visible = pilots.visible = day > 0.15;
+    if (!wings.visible) return;
+    fliers.forEach((b, i) => {
       const L = b.north + b.south, per = 2 * L + Math.PI * 30, u = b.phase + (t * b.speed) / per;
       at(b, u, _p); at(b, u + 2 / per, _q);
-      b.f.visible = day > 0.15; // nobody flies after dark
-      b.f.position.copy(_p);
-      b.f.position.y += Math.sin(t * 0.5 + b.phase * 9) * 3;
+      _o.position.copy(_p);
+      _o.position.y += Math.sin(t * 0.5 + b.phase * 9) * 3;
       // heading: -z of the wing leads; bank into the turns at the ends of the beat
       const dx = _q.x - _p.x, dz = _q.z - _p.z;
-      b.f.rotation.set(0, Math.atan2(-dx, -dz), Math.abs(dx) > 0.05 ? -0.35 * Math.sign(dz || 1) : 0, 'YXZ');
-    }
+      _o.rotation.set(0, Math.atan2(-dx, -dz), Math.abs(dx) > 0.05 ? -0.35 * Math.sign(dz || 1) : 0, 'YXZ');
+      _o.updateMatrix();
+      wings.setMatrixAt(i, _o.matrix);
+      pilots.setMatrixAt(i, _o.matrix);
+    });
+    wings.instanceMatrix.needsUpdate = pilots.instanceMatrix.needsUpdate = true;
   };
   return { group: g, glow: [], update };
 }
