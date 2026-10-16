@@ -6,7 +6,7 @@
 //
 // For each club it checks that the model (not the procedural stand-in) is in
 // hand, that at address the face centre sits square behind the ball on the
-// ground, and that the swing brings the face centre back to the ball on the
+// ground, and that the swing (replayed from address) brings the face centre back to the ball on the
 // impact frame. For each ball, that its model replaced the procedural one.
 // Any console error fails the run.
 import { spawn } from 'node:child_process';
@@ -56,10 +56,11 @@ const CHECK_SET = (set) => `(async () => {
     const box = new THREE.Box3().setFromObject(head, true);
     const a = at();
     const sole = c.root.worldToLocal(box.min.clone()).y;
-    // swing: from the top to impact
+    // swing: a launch-monitor shot replays from address, back and down (at most
+    // 1.3 s back + 0.45 s down, see Club.strike), so allow 2.5 s to reach impact
     let hit = false, imp = null;
     c.strike(() => { hit = true; }, { fromTop: true });
-    for (let i = 0; i < 240 && !hit; i++) window.__advance(1 / 240, 1 / 240);
+    for (let i = 0; i < 600 && !hit; i++) window.__advance(1 / 240, 1 / 240);
     if (hit) { c.root.updateMatrixWorld(true); imp = at(); }
     c.phase = 'address'; c.theta = 0; c._pose();
     out.push({ id, ax: +(a.x - ballL.x).toFixed(4), az: +(a.z - ballL.z).toFixed(4), sole: +sole.toFixed(4),
@@ -118,7 +119,7 @@ try {
       const bad = r.error || Math.abs(r.ax) > 0.006 || Math.abs(r.az - R) > 0.006 || Math.abs(r.sole) > 0.004
         || r.ix == null || Math.hypot(r.ix, r.iz - R) > 0.02;
       if (bad) failed++;
-      console.log(`${bad ? 'FAIL' : 'ok  '} ${s.padEnd(10)} ${r.id.padEnd(5)} ${r.error || `loft ${r.loft}° lie ${r.lie}°  address x ${(r.ax * 1000).toFixed(1)} z ${(r.az * 1000).toFixed(1)} sole ${(r.sole * 1000).toFixed(1)} mm  impact x ${(r.ix * 1000).toFixed(1)} z ${(r.iz * 1000).toFixed(1)} mm`}`);
+      console.log(`${bad ? 'FAIL' : 'ok  '} ${s.padEnd(10)} ${r.id.padEnd(5)} ${r.error || `loft ${r.loft}° lie ${r.lie}°  address x ${(r.ax * 1000).toFixed(1)} z ${(r.az * 1000).toFixed(1)} sole ${(r.sole * 1000).toFixed(1)} mm  ${r.ix == null ? 'no impact' : `impact x ${(r.ix * 1000).toFixed(1)} z ${(r.iz * 1000).toFixed(1)} mm`}`}`);
     }
   }
   for (const b of await ev(CHECK_BALLS)) {
