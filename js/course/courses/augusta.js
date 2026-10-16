@@ -15,6 +15,7 @@ export default {
   dem: true,
   buildings: 'midwest', // the clubhouse, cabins and the brick houses round the course (OSM footprints, LiDAR roofs)
   sky: { day: 'subtropical' }, // humid Georgia spring (js/scene/sky.js)
+  noShore: true, // Rae's Creek and the ponds are mown to the water's edge: no cattails or reeds
   origin: [33.49927, -82.02375],
   blurb: "Augusta's par-72 championship course on one-metre USGS LiDAR: the 30-metre fall of the 10th, Rae's Creek at the 12th and 13th, the ponds at 15 and 16, and the loblolly pines at their surveyed heights.",
   credit: "Holes © OpenStreetMap contributors (ODbL); par and yardage from the 2026 tournament card (PGA TOUR course stats), handicaps via OpenGolfAPI (ODbL); elevation, trees and roofs: USGS 3DEP LiDAR, GA_Statewide_2018_B18_DRRA / GA_Statewide_B8_2018 (public domain); ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0",
