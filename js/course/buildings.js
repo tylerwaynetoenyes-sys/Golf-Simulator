@@ -417,7 +417,8 @@ export function buildCity(data, T, style = 'paris', pull = null) {
     const inPlay = S.house
       ? (x, z) => { const pr = T.project(x, z); return Math.abs(pr.d) < T.oobLateral * 0.7 && pr.s > -6 && pr.s < T.length + 15; }
       : (x, z) => { const pr = T.project(x, z); return Math.abs(pr.d) < T.oobLateral + 4 && pr.s > -40 && pr.s < T.length + 60; };
-    if (inPlay(cx, cz) || pts.some(([x, z], i) => { const [x2, z2] = pts[(i + 1) % n]; return inPlay(x, z) || inPlay((x + x2) / 2, (z + z2) / 2); })) continue;
+    // (`keep`: checked against the aerial as standing clear of the shot, e.g. a pro shop beside the first tee)
+    if (!b.keep && (inPlay(cx, cz) || pts.some(([x, z], i) => { const [x2, z2] = pts[(i + 1) % n]; return inPlay(x, z) || inPlay((x + x2) / 2, (z + z2) / 2); }))) continue;
     // seated on its own ground: walls reach below the lowest corner (no gap on a slope), and the
     // building stands from the footprint's average ground, eaves clear of the highest corner
     const gs = pts.map(([x, z]) => T.drawnHeight(x, z));
