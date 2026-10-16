@@ -504,3 +504,46 @@ normal and roughness, laid on the bunkers with rake furrows drawn over it.
 - Motion: CMU Graphics Lab Motion Capture Database, subject 64 (golf): swing 64_01, putt 64_11
   (the CMU data carries no restrictions on use), as the cgspeed BVH conversions from
   github.com/Shriinivas/cmubvh (Sequence-060-075/64). Retargeted onto MPFB's cmu_mb rig.
+
+## Augusta National
+
+All 18 holes of the championship course, imported with
+`tools/import-course.mjs --lidar --outlines`, run with two changes to its
+Overpass step: `out geom` instead of `out tags geom` (24 of the fairways
+are multipolygon relations, which come without their members otherwise),
+and only the hole lines that carry a name (the par-3 course's unnamed hole
+lines inside the same boundary share the numbers 1-9).
+
+- **Holes, greens, fairways, bunkers, ponds and Rae's Creek**: OpenStreetMap
+  (© OpenStreetMap contributors, ODbL 1.0), traced from aerial imagery;
+  hole names as tagged on the hole lines, which match the club's card.
+- **Scorecard** (`assets/courses/augusta/scorecard.json`): par and
+  tournament yardages from the 2026 card as published by the PGA TOUR
+  (pgatour.com, course stats of PGA TOUR event R2026014,
+  7,565 yards, par 72; cross-checked against the 2025 AP yardages, which
+  differ only at the 17th); member yardages and handicap index from
+  OpenGolfAPI (ODbL 1.0), not cross-checked. Retrieved 16 October 2026.
+- **Elevation**: `dem.*` (1 m over 1.9 km) from USGS 3DEP tile `x40y371` of
+  **GA_Statewide_2018_B18_DRRA** (100% of the playing area); `far.*` (32 m
+  over 16 km) from the same project and SC_SavannahPeeDee_2019_B19, with
+  Terrarium tiles for the 0.5% no LiDAR covers. Public domain.
+  Edited: the 15th's championship tee (built after the 2018 flight) sat on
+  a 6 m bank in the survey; the ground under OSM's tee polygon is raised to
+  the plateau in front (`dem.json` `edits`).
+- **Trees** (`trees.json`, 15,457): `tools/fetch-trees.py --project
+  GA_Statewide_B8_2018`, USGS 3DEP point cloud, public domain. The TNM LAZ
+  tiles were downloading at ~35 KB/s, so the same gridded returns were read
+  from the public EPT copy of the flight (s3 `usgs-lidar-public`), whose
+  heights match the DEM on class-2 ground to the centimetre. 43 trees that
+  the 2018 survey has standing in the tee chutes (the 11th's and 13th's tees
+  were moved back in 2022 and 2023) are taken out; `trees.json` `cleared`
+  lists them by hole.
+- **Buildings** (`buildings.json`): OSM footprints (ODbL) by
+  `tools/fetch-buildings.mjs --near 1100`; heights, roof shapes and colours
+  by `tools/fetch-building-shapes.py --project GA_Statewide_B8_2018` (USGS
+  3DEP EPT, and NAIP imagery, public domain).
+- **Ground colour** (`sat.*`): EOxCloudless 2024, CC BY-NC-SA 4.0, as above.
+
+The club guards its name, marks and imagery closely. Fairway shows the
+course as "Augusta National" from public map and survey data only: no club
+logo, trademark, tournament name or photograph of the course ships with it.

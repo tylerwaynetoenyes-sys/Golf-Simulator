@@ -1,0 +1,13 @@
+{
+  "course": "Augusta National Golf Club, 2604 Washington Road, Augusta, Georgia 30904",
+  "source": "Tournament yardages and par as published for the club's 2026 tournament (pgatour.com, course stats of PGA TOUR event R2026014); member tees and handicap index from OpenGolfAPI (ODbL, https://api.opengolfapi.org/v1/courses/9b0c9a02-fb5a-4f55-9a0b-0c7a664675e6/holes); hole names as on the club's card, tagged on the OpenStreetMap hole ways",
+  "retrieved": "2026-10-16",
+  "notes": "The 2026 card adds 10 yards at the 17th (450) over 2025's 7,555; tournament total 7,565 (out 3,775, in 3,790). The member yardages are OpenGolfAPI's and are not cross-checked.",
+  "back": "tournament",
+  "par": [4, 5, 4, 3, 4, 3, 4, 5, 4, 4, 4, 3, 5, 4, 5, 3, 4, 4],
+  "handicap": [9, 1, 13, 15, 5, 17, 11, 3, 7, 6, 8, 16, 4, 12, 2, 18, 14, 10],
+  "tees": {
+    "tournament": [445, 585, 350, 240, 495, 180, 450, 570, 460, 495, 520, 155, 545, 440, 550, 170, 450, 465],
+    "member": [365, 515, 340, 170, 400, 165, 330, 480, 395, 450, 400, 145, 455, 380, 475, 145, 370, 385]
+  }
+}
