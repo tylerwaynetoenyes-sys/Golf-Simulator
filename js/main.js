@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 // Entry point: build the world, wire the bridge client, pairing UI, HUD and
 // game, then run the frame loop. The 3D range renders behind the launch
 // screen as a slow establishing shot.
@@ -29,6 +30,16 @@ function fail(msg) {
   const l = $('#loading');
   l.innerHTML = `<div class="webgl-error"><h2>Can't light the range</h2><p>${msg}</p></div>`;
 }
+
+// models and textures in flight (three's default loading manager), so the intro can wait for quiet
+let _loads = 0;
+{
+  const M = THREE.DefaultLoadingManager, start = M.itemStart.bind(M), end = M.itemEnd.bind(M), err = M.itemError.bind(M);
+  M.itemStart = (u) => { _loads++; start(u); };
+  M.itemEnd = (u) => { _loads = Math.max(0, _loads - 1); end(u); };
+  M.itemError = (u) => { _loads = Math.max(0, _loads - 1); err(u); };
+}
+const pendingLoads = () => _loads;
 
 async function boot() {
   if (!webglAvailable()) {
@@ -78,27 +89,59 @@ async function boot() {
     }
   });
 
+  // The reveal, staged the way a polished game stages it: every shader compiled and the frame time settled
+  // behind the loader first, then the 3D view holds still under the launch screen while the wordmark plays,
+  // so the drop and its bounces get the whole frame budget (a smooth 60 instead of hitching on first draws).
+  const dts = [];
+  let holdUntil = 0;
+  // the launch screen's backdrop draws light; full quality returns as soon as play starts
+  const launchEl = $('#launch');
+  world.r.setBackdrop(launchEl.dataset.visible === 'true');
+  new MutationObserver(() => world.r.setBackdrop(launchEl.dataset.visible === 'true')).observe(launchEl, { attributes: true, attributeFilter: ['data-visible'] });
+  const reveal = async () => {
+    const t0 = performance.now();
+    // nothing still downloading or parsing (a model landing mid-drop costs a few hundred ms), up to 5 s
+    await new Promise((res) => {
+      const idle = () => (pendingLoads() === 0 || performance.now() - t0 > 5000 ? res() : setTimeout(idle, 100));
+      idle();
+    });
+    try { await world.r.renderer.compileAsync(world.scene, world.camera); } catch { /* compile as it draws */ }
+    await new Promise((res) => {
+      const check = () => {
+        const recent = dts.slice(-10);
+        if ((recent.length === 10 && recent.every((d) => d < 24)) || performance.now() - t0 > 6500) res();
+        else requestAnimationFrame(check);
+      };
+      check();
+    });
+    $('#loading').classList.add('done');
+    stopRoll();
+    if ($('#launch').dataset.visible === 'true') {
+      holdUntil = Infinity;
+      launchIn($('#launch'));
+      launchLogo.then((h) => dropIn(h, 0.45));
+      // once the drop has played, compile whatever arrived during the hold (models, trees) before the view
+      // moves again, so resuming doesn't hitch either
+      setTimeout(async () => {
+        try { await world.r.renderer.compileAsync(world.scene, world.camera); } catch { /* fine */ }
+        holdUntil = 0;
+      }, 2500);
+    }
+  };
+
   // Frame loop
   let last = performance.now();
   let firstFrame = true;
   const frame = (now) => {
     // game.timeScale: slow motion for a moment (js/ui/moments.js)
-    const dt = Math.min(MAX_DT, (now - last) / 1000) * (game.timeScale ?? 1);
+    const raw = now - last;
+    const dt = Math.min(MAX_DT, raw / 1000) * (game.timeScale ?? 1);
     last = now;
+    if (dts.length < 400) dts.push(raw);
     const ballPos = game.update(dt);
     const playT = game.shot ? game.shot.t : 0;
-    world.update(dt, ballPos, playT);
-    if (firstFrame) {
-      firstFrame = false;
-      setTimeout(() => {
-        $('#loading').classList.add('done');
-        stopRoll();
-        if ($('#launch').dataset.visible === 'true') {
-          launchIn($('#launch'));
-          launchLogo.then((h) => dropIn(h, 0.55));
-        }
-      }, 250);
-    }
+    world.update(dt, ballPos, playT, now >= holdUntil);
+    if (firstFrame) { firstFrame = false; reveal(); }
     requestAnimationFrame(frame);
   };
   if (MANUAL) {

@@ -3,7 +3,7 @@
 // card, name tags over other players' balls).
 import { CLUBS } from '../data/clubs.js';
 import { $, esc, countUp } from './dom.js';
-import { holeCardIn, wipeIn } from './motion.js';
+import { holeCardIn, wipeIn, yieldTo } from './motion.js';
 import * as U from '../core/units.js';
 import { MPH, YD } from '../core/physics.js';
 import { GREENS, CTP_GREEN, LAYOUT } from '../scene/layout.js';
@@ -18,6 +18,8 @@ export class HUD {
     this.card = $('#shotCard');
     this.commentEl = $('#commentary');
     this.map = $('#minimap');
+    // the shot card slides in over the right edge: the minimap and wind dial step aside for it, then return
+    yieldTo(this.card, [$('#minimapWrap'), document.querySelector('.wind-dial')]);
     // tap the map to enlarge it (and again to shrink it)
     $('#minimapWrap')?.addEventListener('click', () => $('#minimapWrap').classList.toggle('big'));
     this.mapCtx = this.map.getContext('2d');

@@ -187,7 +187,7 @@ export class Renderer {
     this.qualityName = name;
     this.renderer.shadowMap.enabled = this.quality.shadows;
     this.bloom.enabled = this.quality.bloom;
-    this.ao.enabled = !!this.quality.ao;
+    this.ao.enabled = !!this.quality.ao && !this.backdrop;
     this.smaa.enabled = !!this.quality.smaa;
     if (this.target.samples !== (this.quality.msaa || 0)) {
       this.target.samples = this.quality.msaa || 0;
@@ -207,10 +207,21 @@ export class Renderer {
     this.renderer.toneMappingExposure = 1.05 * this.toneGain;
   }
 
+  /**
+   * Behind the launch screen the 3D range is a darkened backdrop: draw it at a fraction of the resolution
+   * (and without the AO and mirror passes) so the screen's motion stays smooth; play restores it.
+   */
+  setBackdrop(on) {
+    if (this.backdrop === on) return;
+    this.backdrop = on;
+    this.ao.enabled = !on && !!this.quality.ao;
+    this.resize(true);
+  }
+
   /** Returns true when the drawing buffer actually changed. */
   resize(force = false) {
     const w = window.innerWidth, h = window.innerHeight;
-    const pr = Math.min(window.devicePixelRatio || 1, this.quality.pixelRatio);
+    const pr = Math.min(window.devicePixelRatio || 1, this.quality.pixelRatio) * (this.backdrop ? 0.5 : 1);
     if (!force && w === this._w && h === this._h && pr === this._pr) return false;
     this._w = w; this._h = h; this._pr = pr;
     this.renderer.setPixelRatio(pr);

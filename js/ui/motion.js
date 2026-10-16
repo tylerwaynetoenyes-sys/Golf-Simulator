@@ -62,7 +62,7 @@ export function wipeIn(el) {
 export function launchIn(root) {
   if (!on() || !root) return;
   G.timeline({ defaults: { ease: 'expo.out' } })
-    .from(root.querySelector('.launch-title'), { opacity: 0, y: 14, scale: 0.985, filter: 'blur(6px)', duration: 1.4, clearProps: 'filter' }, 0.1)
+    .from(root.querySelector('.launch-title'), { opacity: 0, y: 18, scale: 0.97, duration: 1.3, force3D: true, clearProps: 'transform,opacity' }, 0.05)
     .from(root.querySelector('.rule'), { scaleX: 0, duration: 1, ease: 'power3.inOut' }, 0.5)
     .from(root.querySelector('.launch-tag'), { opacity: 0, letterSpacing: '0.4em', duration: 1.1 }, 0.6)
     .from(root.querySelectorAll('.launch-actions > *, .launch-inner > .link-btn, .launch-foot'), { opacity: 0, y: 10, duration: 0.7, stagger: 0.07, ease: 'power3.out', clearProps: 'transform,opacity' }, 0.8);
@@ -78,3 +78,32 @@ export function countTo(el, to, { digits = 0, duration = 0.9, from = 0 } = {}) {
 }
 
 export const motionOn = on;
+
+/**
+ * Make room for a panel: while `panel` is showing (data-visible="true"), the elements it would cover step
+ * out of its way (they sink a little toward their corner, shrink and fade, fast in: 0.3 s power3.in), and when
+ * it goes they come back on a soft spring (0.75 s expo.out), a beat after it has left so the two never pass
+ * through each other. Pointer events follow. Reduced motion: a plain fade.
+ */
+export function yieldTo(panel, els) {
+  els = els.filter(Boolean);
+  if (!panel || !els.length) return;
+  let away = false;
+  const set = (show) => {
+    if (show === away) return;
+    away = show;
+    for (const el of els) el.style.pointerEvents = show ? 'none' : '';
+    if (!on()) { for (const el of els) el.style.opacity = show ? '0' : ''; return; }
+    G.killTweensOf(els);
+    if (show) {
+      G.to(els, { y: 22, scale: 0.94, opacity: 0, duration: 0.3, ease: 'power3.in', stagger: 0.04, transformOrigin: '100% 100%', force3D: true });
+    } else {
+      G.fromTo(els, { y: 22, scale: 0.94, opacity: 0 }, {
+        y: 0, scale: 1, opacity: 1, duration: 0.75, ease: 'expo.out', stagger: 0.06, delay: 0.18, force3D: true,
+        transformOrigin: '100% 100%', clearProps: 'transform,opacity',
+      });
+    }
+  };
+  new MutationObserver(() => set(panel.dataset.visible === 'true')).observe(panel, { attributes: true, attributeFilter: ['data-visible'] });
+  set(panel.dataset.visible === 'true');
+}

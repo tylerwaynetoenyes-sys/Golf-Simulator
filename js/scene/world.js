@@ -252,7 +252,7 @@ export class World {
     if (render) {
       // the scene in the water (High quality), drawn just before the frame that shows it
       const r = this.r;
-      this.reflections.enabled = !!r.quality.reflections;
+      this.reflections.enabled = !!r.quality.reflections && !r.backdrop;
       if (this.reflections.enabled) {
         if (this._reflSize !== `${r._w}x${r._h}x${r._pr}`) { this._reflSize = `${r._w}x${r._h}x${r._pr}`; this.reflections.setSize(r._w * r._pr, r._h * r._pr); }
         this.reflections.update(r.renderer, this.scene, this.camera, dt);

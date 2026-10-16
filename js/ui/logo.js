@@ -68,15 +68,22 @@ export function dropIn(h, delay = 0) {
   reset(h);
   const tl = G.timeline({ delay });
   h.tl = tl;
-  tl.from(h.pen, { scaleX: 0, duration: 0.7, ease: 'back.out(1.6)' }, 0)
+  // the pennant unfurls from the hoist; the ball falls from above the frame under gravity, stretching with speed
+  // in the last of its fall, squashes on the pole, and bounces twice (restitution about 0.5, then 0.25); the
+  // pennant flicks at each landing and settles into the breeze
+  tl.from(h.pen, { scaleX: 0, skewY: -8, duration: 0.8, ease: 'expo.out' }, 0)
     .set(h.ball, { y: -1400 }, 0)
-    .to(h.ball, { y: 0, duration: 0.55, ease: 'power2.in' }, 0.35)
-    .to(h.dim, { x: STEP * 2, duration: 0.55, ease: 'power1.in' }, 0.35);
-  land(tl, h, 0.9, 1);
-  tl.to(h.ball, { y: -110, duration: 0.25, ease: 'power2.out' }, 0.96).to(h.ball, { y: 0, duration: 0.25, ease: 'power2.in' }, 1.21);
-  land(tl, h, 1.46, 0.5);
-  tl.to(h.ball, { y: -26, duration: 0.12, ease: 'power2.out' }, 1.52).to(h.ball, { y: 0, duration: 0.12, ease: 'power2.in' }, 1.64)
-    .add(() => fly(h, 0.6, 1.1), 0.75);
+    .to(h.ball, { y: 0, duration: 0.58, ease: 'power2.in' }, 0.3)
+    .to(h.ball, { scaleY: 1.14, scaleX: 0.9, duration: 0.18, ease: 'power1.in' }, 0.7)
+    .to(h.dim, { x: STEP * 2, duration: 0.58, ease: 'power1.in' }, 0.3);
+  land(tl, h, 0.88, 1);
+  tl.to(h.pen, { skewY: 7, scaleY: 1.04, duration: 0.1, ease: 'power2.out' }, 0.88).to(h.pen, { skewY: 0, scaleY: 1, duration: 0.5, ease: 'expo.out' }, 0.98)
+    .to(h.ball, { y: -118, duration: 0.26, ease: 'power2.out' }, 0.96).to(h.ball, { y: 0, duration: 0.26, ease: 'power2.in' }, 1.22);
+  land(tl, h, 1.48, 0.5);
+  tl.to(h.pen, { skewY: 3, duration: 0.08, ease: 'power2.out' }, 1.48)
+    .to(h.ball, { y: -28, duration: 0.13, ease: 'power2.out' }, 1.54).to(h.ball, { y: 0, duration: 0.13, ease: 'power2.in' }, 1.67);
+  land(tl, h, 1.8, 0.2);
+  tl.add(() => fly(h, 0.6, 1.1), 1.85);
   return tl;
 }
 
