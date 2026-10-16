@@ -33,7 +33,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, lit, seeded, canvasTex, tree, SLOT, boulderGeometry } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { carsAt } from '../../scene/cars.js';
 import { crowdAt } from '../../scene/crowd.js';
 import { boatFleet } from '../../scene/boats.js';
@@ -1483,7 +1483,7 @@ export default function build() {
     for (const [x, z] of pylons) B.add(stone, bx(2.6, 10, 2.6, x, 0, z), bx(3.2, 0.6, 3.2, x, 10, z));
     // the membrane: a long barrel vault, highest along its centre line,
     // with the seams of its arched ribs
-    const mem = new THREE.MeshStandardMaterial({ color: 0xfbfaf6, roughness: 0.6, side: THREE.DoubleSide, emissive: 0xffd7a8, emissiveIntensity: 0 });
+    const mem = painted(0xfbfaf6, { roughness: 0.6, side: THREE.DoubleSide, emissive: 0xffd7a8, emissiveIntensity: 0 });
     mem.userData.night = 0.55;
     glow.push(mem);
     const nu = 16, nv = 32, Lz = 42, Wx = 16;
@@ -1613,7 +1613,7 @@ export default function build() {
   });
   ripple.colorSpace = THREE.NoColorSpace;
   ripple.wrapS = ripple.wrapT = THREE.RepeatWrapping;
-  const water = new THREE.MeshStandardMaterial({ color: 0x5a5a45, roughness: 0.22, metalness: 0.08, normalMap: ripple, normalScale: new THREE.Vector2(0.3, 0.3) });
+  const water = painted(0x5a5a45, { roughness: 0.22, metalness: 0.08, normalMap: ripple, normalScale: new THREE.Vector2(0.3, 0.3) });
 
   // set by addWorld for the per-frame life
   const live = { bulbs: null, halos: null, nav: null, boats: null, tow: null };

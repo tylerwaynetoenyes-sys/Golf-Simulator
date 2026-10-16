@@ -103,10 +103,10 @@ export function courseLife(T, hole, { style = 'club', rnd = Math.random } = {}) 
       const face = new THREE.Mesh(new THREE.PlaneGeometry(0.62, 0.78), signM); face.position.set(0, 1.25, 0.08); sg.add(face);
       const back = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.86, 0.06).translate(0, 1.25, 0.03), wood); sg.add(back);
       // the ball washer: a green cast housing on a post, a towel over it
-      const green = new THREE.MeshStandardMaterial({ color: 0x2d5a3a, roughness: 0.5, metalness: 0.3 });
+      const green = pbr('painted_steel', { scale: 1, tint: 0x3f7a52, metal: 0.3, rough: 0.8, bright: 1.6 }); // green-painted cast iron
       sg.add(new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 8).translate(1.1, 0.45, 0), green));
       sg.add(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.2).translate(1.1, 1.0, 0), green));
-      sg.add(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.3, 0.16).translate(1.19, 0.95, 0), new THREE.MeshStandardMaterial({ color: 0xe8e4da, roughness: 0.9 })));
+      sg.add(new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.3, 0.16).translate(1.19, 0.95, 0), pbr('rough_linen', { scale: 0.4, tint: 0xf4f0e6, bright: 2 }))); // a cotton towel
       // a slatted bench
       for (let k = 0; k < 4; k++) sg.add(new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.04, 0.09).translate(-1.4, 0.45, -0.15 + k * 0.1), wood));
       for (const bx of [-2.0, -0.8]) sg.add(new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.45, 0.4).translate(bx, 0.22, 0), green));

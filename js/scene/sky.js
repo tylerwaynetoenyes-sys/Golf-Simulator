@@ -170,8 +170,8 @@ export function createSky() {
       mat.uniforms.uStormTex.value = t;
     });
   }
-  // this place's skies (a course's `sky`: { day: 'prairie' | 'mediterranean', night: 'milkyway' })
-  const PHOTOS = { prairie: 'sky_prairie_4k.jpg', mediterranean: 'sky_mediterranean_4k.jpg', milkyway: 'milkyway_4k.jpg' };
+  // this place's skies (a course's `sky`: { day: 'prairie' | 'mediterranean' | 'coastal' | 'subtropical', night: 'milkyway' })
+  const PHOTOS = { prairie: 'sky_prairie_4k.jpg', mediterranean: 'sky_mediterranean_4k.jpg', coastal: 'sky_coastal_4k.jpg', subtropical: 'sky_subtropical_4k.jpg', milkyway: 'milkyway_4k.jpg' };
   const cache = {};
   const photoTex = (id, cb) => {
     if (!id || typeof window === 'undefined') { cb(null); return; }

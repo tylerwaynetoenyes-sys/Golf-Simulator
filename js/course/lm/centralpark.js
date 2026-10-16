@@ -20,7 +20,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, lit, canvasTex, boulderGeometry } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { createWaterMaterial } from '../../scene/river.js';
 import { shoreLife } from '../../scene/shore.js';
 let _lakeWater = null; // one water for every hole's lakes
@@ -56,7 +56,7 @@ const M = () => ({
   darkIron: pbr('painted_steel', { scale: 1.5, tint: 0x2f3a33, metal: 0.4, rough: 0.55 }),
   wood: pbr('brown_planks_08', { scale: 1.2 }),
 });
-const bronze = () => new THREE.MeshStandardMaterial({ color: 0x3f4a3a, metalness: 0.8, roughness: 0.45 });
+const bronze = () => painted(0x3f4a3a, { metalness: 0.8, roughness: 0.45 });
 
 /** Point-in-polygon and the centroid of a polygon [[x, z], ...]. */
 function inside(p, x, z) {

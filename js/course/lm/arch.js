@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { archGeometry, archMaterial } from '../../scene/skyline.js';
 import { mat, lit, seeded, canvasTex, facadeMaterial, tree, SLOT } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { createWaterMaterial } from '../../scene/river.js';
 import { crowdAt } from '../../scene/crowd.js';
 import { courthouse } from './gatewayarch.js';
@@ -295,7 +295,7 @@ export default function build(opts = {}) {
 
   // west entrance (2018): glazed crescent set into a lawn berm behind the Arch
   {
-    const glass = new THREE.MeshStandardMaterial({ color: 0x3c4c58, roughness: 0.1, metalness: 0.6, emissive: 0xffe0b0, emissiveIntensity: 0 });
+    const glass = painted(0x3c4c58, { roughness: 0.1, metalness: 0.6, emissive: 0xffe0b0, emissiveIntensity: 0 });
     glass.userData.night = 0.9;
     glow.push(glass);
     const arcG = new THREE.CylinderGeometry(22, 22, 4, 28, 1, true, Math.PI * 0.7, Math.PI * 0.6).translate(0, GY - 1.4 + 2, -62);

@@ -9,6 +9,8 @@ import { LAYOUT, GREENS, CTP_GREEN, groundHeight } from './layout.js';
 import { buildVenue } from './venue.js';
 import { surroundHeight } from './terrain.js';
 import { MOON_DIR } from './sky.js';
+import { pbr, painted } from './pbr.js';
+import { plantTrees, updateTrees, loadHeroTrees } from './trees.js';
 
 const AMBER = 0xffb46b;
 
@@ -64,7 +66,19 @@ export function lightConeMaterial(color, strength) {
 
 export function makeFlag(color, poleHeight = 2.4, emissive = 1.2) {
   const g = new THREE.Group();
-  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, poleHeight, 8), new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.4 }));
+  // a real flagstick: 13 mm fibreglass (half an inch), painted, with a little sheen
+  const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.0065, 0.0065, poleHeight, 12), painted(0xe8e2d4, { roughness: 0.35, metalness: 0.3 }));
+  // its real 13 mm up close; far off it widens to stay about a pixel wide (measured from the
+  // camera actually drawing it)
+  const wp = new THREE.Vector3();
+  pole.onBeforeRender = (r, sc, cam) => {
+    if (!cam.isPerspectiveCamera) return;
+    pole.getWorldPosition(wp);
+    const d = cam.position.distanceTo(wp), view = 2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2);
+    const px = (d * view) / Math.max(1, r.domElement.height);
+    const w = Math.max(1, (px * 1.1) / 0.013);
+    if (Math.abs(pole.scale.x - w) > 1e-3) { pole.scale.set(w, 1, w); pole.updateMatrixWorld(); }
+  };
   pole.position.y = poleHeight / 2;
   pole.castShadow = true;
   g.add(pole);
@@ -90,6 +104,7 @@ export function makeFlag(color, poleHeight = 2.4, emissive = 1.2) {
   flag.position.y = poleHeight - 0.2;
   g.add(flag);
   g.userData.flagMat = flagMat;
+  g.userData.pole = pole;
   g.userData.baseEmissive = emissive;
   return g;
 }
@@ -127,12 +142,12 @@ export function createRange(scene, river, quality) {
   group.add(moon, moon.target);
 
   // ── The hitting venue: three tiers of bays round the player (js/scene/venue.js) ──
-  const wood = new THREE.MeshStandardMaterial({ color: 0x4a3524, roughness: 0.8 });
-  const steel = new THREE.MeshStandardMaterial({ color: 0x23262b, roughness: 0.5, metalness: 0.6 });
+  const wood = pbr('brown_planks_08', { scale: 1.5, tint: 0xa58a6c });
+  const steel = pbr('painted_steel', { scale: 2, tint: 0x3c4046, metal: 0.6, rough: 0.8 });
   const dayHooks = [];
   const venue = buildVenue(group, { quality, updaters, dayHooks });
   // tee peg in the player's bay
-  const tee = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.002, 0.04, 8), new THREE.MeshStandardMaterial({ color: 0xf5d07a }));
+  const tee = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.002, 0.04, 8), pbr('brown_planks_08', { scale: 0.3, tint: 0xf8e2b0, bright: 2 })); // a wooden tee
   tee.position.set(0, 0.07, 0);
   group.add(tee);
   const canopy = new THREE.Group(); // (kept for the authored-asset slot)
@@ -333,19 +348,10 @@ export function createRange(scene, river, quality) {
     signLight.intensity = signLightBase * (0.66 + 0.34 * on);
   });
 
-  // ── Trees ──
+  // ── Trees: the real oak, beech, maple, sycamore, red cedar and spruce models (js/scene/trees.js) ──
   const treeCount = Math.round(900 * quality.trees);
-  const conGeo = new THREE.ConeGeometry(1, 1, 7);
-  conGeo.translate(0, 0.5, 0);
-  const decGeo = new THREE.IcosahedronGeometry(1, 1);
-  decGeo.translate(0, 0.9, 0);
-  const treeMatA = new THREE.MeshStandardMaterial({ color: 0x0f1d12, roughness: 1, flatShading: true });
-  const treeMatB = new THREE.MeshStandardMaterial({ color: 0x15200f, roughness: 1, flatShading: true });
-  const conifers = new THREE.InstancedMesh(conGeo, treeMatA, treeCount);
-  const decids = new THREE.InstancedMesh(decGeo, treeMatB, treeCount);
-  const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
-  let nc = 0, nd = 0;
-  for (let i = 0; i < treeCount * 2; i++) {
+  const spots = [];
+  for (let i = 0; i < treeCount * 2 && spots.length < treeCount; i++) {
     let x, z;
     const r = rand();
     if (r < 0.8) {
@@ -358,24 +364,12 @@ export function createRange(scene, river, quality) {
       if (Math.abs(x) < 26 && z < 50) continue;
     }
     if (z < LAYOUT.plateauEnd + 3) continue;
-    const y = surroundHeight(x, z);
-    if (rand() < 0.45 && nc < treeCount) {
-      const h = 9 + rand() * 12;
-      s.set(2.4 + rand() * 2, h, 2.4 + rand() * 2);
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * 6);
-      conifers.setMatrixAt(nc++, m4.compose(p.set(x, y - 0.3, z), q, s));
-    } else if (nd < treeCount) {
-      const r2 = 3.5 + rand() * 4;
-      s.set(r2, r2 * (0.9 + rand() * 0.4), r2);
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rand() * 6);
-      decids.setMatrixAt(nd++, m4.compose(p.set(x, y + r2 * 0.4, z), q, s));
-    }
+    const conifer = rand() < 0.3;
+    spots.push({ x, z, y: surroundHeight(x, z) - 0.2, scale: 0.8 + rand() * 0.5, squash: 0.9 + rand() * 0.25, rot: rand() * 6.28,
+      variant: conifer ? 4 + Math.floor(rand() * 2) : Math.floor(rand() * 4), hue: 0.22 + rand() * 0.07, sat: rand(), light: rand(), far: true });
   }
-  conifers.count = nc;
-  decids.count = nd;
-  conifers.castShadow = decids.castShadow = false;
-  conifers.receiveShadow = decids.receiveShadow = true;
-  group.add(conifers, decids);
+  loadHeroTrees(null, 'parkland').then(() => group.add(plantTrees(spots).group)).catch((e) => console.warn('range trees', e));
+  const breeze = new THREE.Vector2(0.35, 0.15);
 
   // ── Closest-to-Pin green ──
   const ctp = new THREE.Group();
@@ -460,7 +454,8 @@ export function createRange(scene, river, quality) {
       for (const f of flags) f.userData.flagMat.emissiveIntensity = f.userData.baseEmissive * (0.25 + 0.75 * n);
       for (const h of dayHooks) h(d);
     },
-    update(t, dt) {
+    update(t, dt, camera) {
+      updateTrees(t, breeze, camera || null);
       for (const f of flags) {
         const sh = f.userData.flagMat.userData.shader;
         if (sh) { sh.uniforms.uTime.value = t; sh.uniforms.uWind.value = windAmt; }

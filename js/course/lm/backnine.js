@@ -21,7 +21,7 @@
 // Local axes as in kit.js: +Z toward the tee (the faces you see), y = 0 grade.
 import * as THREE from 'three';
 import { lit, tree, SLOT, FT, landmarkWater as water } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { place, bx, cy, rod, Batch } from './riverfront.js';
 import { confluenceTower, materials as confluenceMaterials } from './confluencepoint.js';
 
@@ -208,7 +208,7 @@ function climatron() {
   const alu = pbr('metal_plate', { scale: 1.2, tint: 0xd9dee2, metal: 0.85, rough: 0.55 });
   const conc = pbr('concrete_wall_008', { scale: 3, tint: 0xd2dcf2, bright: 1.3 });
   const paving = pbr('brushed_concrete', { scale: 3, tint: 0xd8d2c6 });
-  const glass = new THREE.MeshStandardMaterial({ color: 0xd4e6e8, roughness: 0.04, metalness: 0.2, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide, emissive: 0x9bd6a8, emissiveIntensity: 0 });
+  const glass = painted(0xd4e6e8, { roughness: 0.04, metalness: 0.2, transparent: true, opacity: 0.32, depthWrite: false, side: THREE.DoubleSide, emissive: 0x9bd6a8, emissiveIntensity: 0 });
   glass.userData.night = 0.35;
   glow.push(glass);
   const B = new Batch();

@@ -38,11 +38,11 @@ export function buildVenue(group, { quality, updaters, dayHooks }) {
   const conc = pbr('concrete_wall_008', { scale: 3, tint: 0xd9d6d0, bright: 1.1, glow: 0xffc890 }); // lit from inside after dark
   const steel = pbr('painted_steel', { scale: 2, tint: 0x2a2e33, metal: 0.5 });
   const wood = pbr('brown_planks_08', { scale: 1.5, tint: 0xc09070 });
-  const turf = new THREE.MeshStandardMaterial({ color: 0x2f6a3a, roughness: 0.95 });
+  const turf = pbr('grass_ground', { scale: 1.2, tint: 0x5f9a58, bright: 1.6 }); // the hitting mats: dense turf
   const glass = new THREE.MeshStandardMaterial({ color: 0x9fb2bd, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.22, depthWrite: false });
   const led = new THREE.MeshBasicMaterial({ color: new THREE.Color(0x8fd3ff).multiplyScalar(2.2) });
   const warm = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffd8a8).multiplyScalar(1.6) });
-  const sofa = new THREE.MeshStandardMaterial({ color: 0x2b3440, roughness: 0.8 });
+  const sofa = pbr('rough_linen', { scale: 0.8, tint: 0x5a6878, bright: 1.6 }); // woven upholstery
   const frost = new THREE.MeshStandardMaterial({ color: 0xdfe8ee, roughness: 0.4, transparent: true, opacity: 0.35, depthWrite: false });
   const roofM = pbr('concrete_wall_008', { scale: 4, tint: 0x9a9894 });
   const parts = [];
@@ -164,7 +164,8 @@ export function buildVenue(group, { quality, updaters, dayHooks }) {
     const col = new THREE.Color(g.color);
     const rings = [[0.22, 0.32, col], [0.48, 0.56, 0xffffff], [0.7, 0.8, col], [0.93, 1.0, 0xffffff]];
     for (const [a, b2, c] of rings) {
-      const m = new THREE.MeshStandardMaterial({ color: c, emissive: c, emissiveIntensity: 0.1, roughness: 0.7, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 });
+      // painted onto the turf: the grass shows through the paint
+      const m = pbr('grass_ground', { scale: 2, tint: new THREE.Color(c).getHex(), bright: 2.2, unique: true, extra: { emissive: new THREE.Color(c).getHex(), emissiveIntensity: 0.1, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 } });
       ringMats.push(m);
       const r = new THREE.Mesh(new THREE.RingGeometry(g.r * a, g.r * b2, 64).rotateX(-Math.PI / 2), m);
       r.position.set(g.x, y, g.z);

@@ -8,7 +8,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { box, cyl, seeded, canvasTex } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { houses, figures, KINDS } from './mississippian.js';
 import { Batch } from './riverfront.js';
 
@@ -201,7 +201,7 @@ export default function build() {
   // artifact case: a glass-topped cabinet with a chunkey stone and pottery
   const caseG = new THREE.Group();
   caseG.add(box(3, 0.9, 1.4, timber, 0, 0, 0));
-  const glass = new THREE.Mesh(new THREE.BoxGeometry(3, 0.7, 1.4), new THREE.MeshStandardMaterial({ color: 0xcfe0e6, transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.2 }));
+  const glass = new THREE.Mesh(new THREE.BoxGeometry(3, 0.7, 1.4), painted(0xcfe0e6, { transparent: true, opacity: 0.35, roughness: 0.05, metalness: 0.2 }));
   glass.position.y = 1.25;
   caseG.add(glass);
   const stone = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.08, 20), pbr('granite_wall', { scale: 0.4, tint: 0xc8bca8 }));

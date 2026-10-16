@@ -10,7 +10,7 @@
 // cliffs ochre-red. Far landmarks are modelled in map axes (+x east, +z south).
 import * as THREE from 'three';
 import { mat, lit, seeded, tree, boulderGeometry } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { boatFleet } from '../../scene/boats.js';
 import { Batch, bx, cy, place, span } from './riverfront.js';
 
@@ -54,7 +54,7 @@ function vineyard() {
   const wood = pbr('bark_brown_02', { scale: 0.6, tint: 0x9a8270 });
   const wire = pbr('metal_plate', { scale: 0.5, tint: 0x9a9ca0, metal: 0.8 });
   // the vines: goblet-trained stocks with a lumpy leaf canopy, each one its own shape, in colour-varied instances
-  const leaf = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85 });
+  const leaf = painted(0xffffff, { roughness: 0.85 });
   const canopy = boulderGeometry(0.62, rnd, { detail: 1, flat: 0.7 });
   const n = 3 * 14 * 22;
   const im = new THREE.InstancedMesh(canopy, leaf, n);
@@ -106,7 +106,7 @@ function phare() {
   for (let i = 0; i < 16; i++) { const a = (i / 16) * Math.PI * 2; B.add(green, cy(0.03, 0.03, 0.9, Math.cos(a) * 2.1, 11.5, Math.sin(a) * 2.1, 4)); }
   B.add(green, cy(0.2, 1.2, 1, 0, 13.1, 0, 14));
   const g = built(B);
-  const lantern = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1.6, 14), new THREE.MeshStandardMaterial({ color: 0x2f8a4a, emissive: 0x40ff70, emissiveIntensity: 0, roughness: 0.1, metalness: 0.3 }));
+  const lantern = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 1.6, 14), painted(0x2f8a4a, { emissive: 0x40ff70, emissiveIntensity: 0, roughness: 0.1, metalness: 0.3 }));
   lantern.position.y = 12.3;
   g.add(lantern);
   return { group: g, glow: [white], update(t, dt, day) { lantern.material.emissiveIntensity = (1 - day) * (Math.sin(t * 2.1) > 0.3 ? 2.2 : 0.1); } };

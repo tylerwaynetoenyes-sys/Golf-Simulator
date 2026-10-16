@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { canvasTex, seeded } from './lm/kit.js';
+import { pbr } from '../scene/pbr.js';
 import { model } from '../scene/models.js';
 import { tuftGeometry, grassMaterial } from './grass.js';
 
@@ -84,16 +85,16 @@ function materials() {
   const wall = tex('container_side.jpg', false), wallN = tex('container_side_nor.jpg', false);
   shared = {
     chain: new THREE.MeshStandardMaterial({ color: 0xb8bcbf, alphaMap: chain, alphaTest: 0.35, side: THREE.DoubleSide, metalness: 0.6, roughness: 0.5 }),
-    steel: new THREE.MeshStandardMaterial({ color: 0x8f9396, metalness: 0.6, roughness: 0.55 }),
-    wood: new THREE.MeshStandardMaterial({ color: 0x3b2c22, roughness: 0.95 }),
+    steel: pbr('rusty_metal_02', { scale: 2, tint: 0xb8b4ae, metal: 0.5, rough: 0.9 }), // weathered, galvanised and rusting
+    wood: pbr('brown_planks_08', { scale: 1.2, tint: 0x8a7464 }), // old grey-brown boards
     wire: new THREE.LineBasicMaterial({ color: 0x1a1a1a }),
     brick: new THREE.MeshStandardMaterial({ map: brick, roughness: 0.95 }),
     facade: new THREE.MeshStandardMaterial({ map: facade, roughness: 0.9 }),
-    roof: new THREE.MeshStandardMaterial({ color: 0x2b2a28, roughness: 1 }),
+    roof: pbr('corrugated_iron', { scale: 2, tint: 0x8c8884, metal: 0.4 }), // tin and tarred roofs
     // faded line colours: Maersk blue, oxblood, Evergreen green, ochre, grey
     containerCols: [0x4d7aa0, 0x8e3a2e, 0x4f7d58, 0xb48a42, 0x84888a].map((c) => containerMaterial(c, wall, wallN)),
     asphalt: new THREE.MeshStandardMaterial({ map: asphalt, color: new THREE.Color(2.3, 2.25, 2.15), roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -2 }),
-    rubble: new THREE.MeshStandardMaterial({ color: 0x7a706a, roughness: 1, flatShading: true }),
+    rubble: pbr('gravel_stones', { scale: 1.2, tint: 0xd8cfc6, bright: 1.4 }), // broken brick and concrete
     weedGeo: Object.assign(tuftGeometry(9, 31), { userData: { shared: true } }),
     weed: grassMaterial(0x9c9a55), // dry, gone to seed
   };

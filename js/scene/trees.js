@@ -9,6 +9,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { loadSpecies, species, buildForest, updateForests, setTreeWind } from './treeModels.js';
+import { pbr } from './pbr.js';
 
 /** The model each species slot draws with (VARIANTS index → SPECIES name). */
 const SLOT_MODEL = [
@@ -431,7 +432,7 @@ export function plantTrees(spots) {
   const group = new THREE.Group();
   const records = [];
   const leafMat = leafMaterial();
-  const barkMat = new THREE.MeshStandardMaterial({ color: 0x4e3f31, roughness: 0.95 });
+  const barkMat = pbr('bark_brown_02', { scale: 1.2, tint: 0xb8a690 }); // real bark on the drawn trees too
   const sycBarkMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 });
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
   const by = vs.map(() => []);

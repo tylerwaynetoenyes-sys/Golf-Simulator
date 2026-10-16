@@ -12,6 +12,7 @@
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { createWaterMaterial } from '../../scene/river.js';
+import { painted } from '../../scene/pbr.js';
 
 export const FT = 0.3048;
 
@@ -53,8 +54,9 @@ export function boulderGeometry(r, rnd = Math.random, { detail = 3, flat = 0.75 
   return m;
 }
 
+/** A coloured surface on a real material (see painted() in scene/pbr.js); glass and textured ones stay as given. */
 export function mat(color, opts = {}) {
-  return new THREE.MeshStandardMaterial({ color, roughness: 0.75, metalness: 0, ...opts });
+  return painted(color, { roughness: 0.75, metalness: 0, ...opts });
 }
 /** A material that glows warmly at night (uplit stone, lit windows). */
 export function lit(color, glowColor, opts = {}) {

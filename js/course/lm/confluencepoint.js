@@ -14,7 +14,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { lit } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { place, bx, cy, span, Batch, pavingMeshes } from './riverfront.js';
 
 const BASE = new URL('../../../assets/landmarks/confluence/', import.meta.url).href;
@@ -28,7 +28,7 @@ export function materials() {
     conc: pbr('concrete_wall_008', { scale: 3.5, tint: 0xeeeae2 }),
     steel: pbr('metal_plate', { scale: 1.5, tint: 0xdfe3e6, metal: 0.35 }),
     dark: pbr('metal_plate', { scale: 1.5, tint: 0x4a5058, metal: 0.4 }),
-    glass: new THREE.MeshStandardMaterial({ color: 0x9fb8c6, roughness: 0.06, metalness: 0.6, transparent: true, opacity: 0.55 }),
+    glass: painted(0x9fb8c6, { roughness: 0.06, metalness: 0.6, transparent: true, opacity: 0.55 }),
     bark: pbr('bark_brown_02', { scale: 1.4, tint: 0x8c7660 }),
     planks: pbr('brown_planks_08', { scale: 2 }),
     granite: pbr('granite_wall', { scale: 1.5, tint: 0xc8c4bc }),

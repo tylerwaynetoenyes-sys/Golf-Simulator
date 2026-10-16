@@ -9,6 +9,7 @@ import { LAYOUT } from './layout.js';
 import { GlowPoints } from './glowPoints.js';
 import { fbm2 } from './terrain.js';
 import { SUN_DIR } from './sky.js';
+import { pbr } from './pbr.js';
 
 const FT = 0.3048;
 const WATER = LAYOUT.riverY;
@@ -276,11 +277,11 @@ export function createSkyline(scene, river) {
   const bridge = new THREE.Group();
   const deckY = WATER + 24;
   const length = 1300;
-  const deckMat = new THREE.MeshStandardMaterial({ color: 0x5a5a5e, roughness: 0.8 });
+  const deckMat = pbr('brushed_concrete', { scale: 4, tint: 0xa8a6a2 }); // the concrete deck
   const deck = new THREE.Mesh(new THREE.BoxGeometry(22, 2.2, length), deckMat);
   deck.position.set(0, deckY, 0);
   bridge.add(deck);
-  const pylonMat = new THREE.MeshStandardMaterial({ color: 0xb8b4aa, roughness: 0.6, emissive: 0x2a2620 });
+  const pylonMat = pbr('concrete_wall_008', { scale: 5, tint: 0xe2ddd2, bright: 1.3, unique: true, extra: { emissive: 0x2a2620 } }); // cast concrete pylons
   const towerZ = [-length * 0.18, length * 0.18];
   const cableVerts = [];
   for (const tz of towerZ) {
@@ -338,8 +339,8 @@ export function createSkyline(scene, river) {
   group.add(bridge);
 
   // ── Barge tows ──
-  const hullMat = new THREE.MeshStandardMaterial({ color: 0x2b211b, roughness: 0.9 });
-  const boatMat = new THREE.MeshStandardMaterial({ color: 0xd8d4c8, roughness: 0.7, emissive: 0x1a1612 });
+  const hullMat = pbr('rusty_metal_02', { scale: 3, tint: 0x8a7a6e, metal: 0.4 }); // barge steel
+  const boatMat = pbr('painted_steel', { scale: 2, tint: 0xece8de, bright: 2, metal: 0.3, unique: true, extra: { emissive: 0x1a1612 } }); // the towboat's white superstructure
   const winMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffc074).multiplyScalar(2.2) });
   const beamMat = new THREE.MeshBasicMaterial({ color: 0xfff1d0, transparent: true, opacity: 0.08, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
 
@@ -424,11 +425,11 @@ export function createSkyline(scene, river) {
 
   // ── Riverboat casino, docked on the Alton side (muted, not Vegas) ──
   const rb = new THREE.Group();
-  const rbHull = new THREE.Mesh(new THREE.BoxGeometry(95, 5, 26), new THREE.MeshStandardMaterial({ color: 0x1d1d22, roughness: 0.8 }));
+  const rbHull = new THREE.Mesh(new THREE.BoxGeometry(95, 5, 26), pbr('painted_steel', { scale: 3, tint: 0x3a3a40, metal: 0.4 }));
   rbHull.position.y = WATER + 2;
   rb.add(rbHull);
   for (let d = 0; d < 3; d++) {
-    const deckBox = new THREE.Mesh(new THREE.BoxGeometry(88 - d * 12, 4, 23 - d * 2), new THREE.MeshStandardMaterial({ color: 0x2c2a2e, roughness: 0.6 }));
+    const deckBox = new THREE.Mesh(new THREE.BoxGeometry(88 - d * 12, 4, 23 - d * 2), pbr('painted_steel', { scale: 3, tint: 0x4a464c, metal: 0.3 }));
     deckBox.position.y = WATER + 6.5 + d * 4.2;
     rb.add(deckBox);
     for (let i = 0; i < 22 - d * 3; i++) {
@@ -437,7 +438,7 @@ export function createSkyline(scene, river) {
     }
   }
   const stacks = [-6, 6].map((z) => {
-    const s = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 14, 10), new THREE.MeshStandardMaterial({ color: 0x141416 }));
+    const s = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 14, 10), pbr('painted_steel', { scale: 2, tint: 0x2a2a2e, metal: 0.5 }));
     s.position.set(-30, WATER + 24, z * 0.6);
     rb.add(s);
     return s;

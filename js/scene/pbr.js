@@ -60,13 +60,14 @@ function set(id) {
 const ALIAS = { metal_plate: 'painted_steel', red_bricks_02: 'red_brick' };
 
 const cache = new Map();
-export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow = null, night = 0.5, side = THREE.FrontSide, offset = 0, bright = 1, vertex = false, facade = null } = {}) {
+export function pbr(id, { scale = 3, tint = 0xffffff, metal = 0, rough = 1, glow = null, night = 0.5, side = THREE.FrontSide, offset = 0, bright = 1, vertex = false, facade = null, extra = null, unique = false } = {}) {
   id = ALIAS[id] || id;
-  const key = `${id}|${scale}|${tint}|${metal}|${rough}|${glow}|${side}|${offset}|${bright}|${vertex}|${facade ? JSON.stringify(facade) : ''}`;
-  if (cache.has(key)) return cache.get(key);
+  const key = `${id}|${scale}|${tint}|${metal}|${rough}|${glow}|${side}|${offset}|${bright}|${vertex}|${facade ? JSON.stringify(facade) : ''}|${extra ? JSON.stringify(extra) : ''}`;
+  if (!unique && cache.has(key)) return cache.get(key);
   const tx = set(id);
   const m = new THREE.MeshStandardMaterial({ color: tint, metalness: metal, roughness: 1, side, vertexColors: vertex });
   if (offset) Object.assign(m, { polygonOffset: true, polygonOffsetFactor: offset, polygonOffsetUnits: offset });
+  if (extra) for (const [k, v] of Object.entries(extra)) m[k] = k === 'emissive' ? new THREE.Color(v) : v;
   if (glow != null) { m.emissive = new THREE.Color(glow); m.emissiveIntensity = 0; m.userData.night = night; }
   const F = facade && { bay: 3, floor: 3.3, win: [0.28, 0.72, 0.18, 0.82], frame: 0xe8e2d6, balcony: 0, shop: 0, lit: 0.4, ...facade };
   if (F && glow == null) { m.emissive = new THREE.Color(0xffd39a); m.emissiveIntensity = 0; m.userData.night = 1.1; }
@@ -166,6 +167,33 @@ float facWin = 0.0, facLit = 0.0, facGlass = 0.0;` : ''))
     if (F) sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance *= facWin * facLit;');
   };
   m.customProgramCacheKey = () => `pbrTri|${id}|${F ? 'facade' : ''}`;
-  cache.set(key, m);
+  if (!unique) cache.set(key, m);
   return m;
+}
+
+/**
+ * A coloured surface that is still a real one: the colour laid over a
+ * photographed material chosen for what the surface is, so nothing in the
+ * game is a flat plastic fill. Metal (metalness >= 0.3) gets painted steel,
+ * lawn greens real grass, everything else the fine grain of painted plaster
+ * (or concrete where it is rough). The colour stays what was asked for (the
+ * photograph is normalised and brightened to it). Glass, see-through and
+ * already-textured materials are left as they are: those are real already.
+ * Each call gets its own material (callers animate colour and glow), the
+ * photographs themselves are loaded once and shared.
+ *   painted(0xb8202a, { roughness: 0.5, emissive: 0xffd39a, emissiveIntensity: 0 })
+ */
+export function painted(color, opts = {}) {
+  const { roughness = 0.75, metalness = 0, map, alphaMap, normalMap, vertexColors, transparent, opacity = 1, side = THREE.FrontSide, ...rest } = opts;
+  if (map || alphaMap || normalMap || vertexColors || transparent || opacity < 1 || roughness < 0.15) {
+    return new THREE.MeshStandardMaterial({ color, ...opts });
+  }
+  const c = new THREE.Color(color);
+  const hsl = {};
+  c.getHSL(hsl);
+  const lawn = hsl.h > 0.18 && hsl.h < 0.42 && hsl.s > 0.2 && hsl.l < 0.55 && metalness < 0.3;
+  const id = metalness >= 0.3 ? 'painted_steel' : lawn ? 'grass_ground' : roughness >= 0.9 ? 'concrete_wall_008' : 'white_plaster_02';
+  const scale = id === 'painted_steel' ? 2 : id === 'grass_ground' ? 3 : 2.5;
+  // texture roughness is ~0.7 on average: scale it to the roughness asked for
+  return pbr(id, { scale, tint: color, metal: metalness, rough: Math.min(1.6, roughness / 0.7), side, bright: 2.2, extra: Object.keys(rest).length ? rest : null, unique: true });
 }

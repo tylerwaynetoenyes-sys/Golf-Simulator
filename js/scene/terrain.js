@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { CUP } from '../core/physics.js';
 import { cutHoles } from './cup.js';
 import { LAYOUT, groundHeight, GREENS, CTP_GREEN } from './layout.js';
+import { pbr } from './pbr.js';
 
 function hash2(x, z) {
   const s = Math.sin(x * 127.1 + z * 311.7) * 43758.5453;
@@ -190,7 +191,7 @@ export function createTerrain(scene) {
   // ── Missouri floodplain across the river ──
   const far = new THREE.Mesh(
     new THREE.PlaneGeometry(120000, 60000, 1, 1).rotateX(-Math.PI / 2),
-    new THREE.MeshLambertMaterial({ color: 0x6f8a52 }),
+    pbr('grass_ground', { scale: 6, tint: 0xa8c08a }),
   );
   far.position.set(0, LAYOUT.riverY + 1.2, LAYOUT.riverFar - 30000);
   group.add(far);

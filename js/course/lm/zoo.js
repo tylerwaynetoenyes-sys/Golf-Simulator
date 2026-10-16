@@ -12,7 +12,7 @@
 // Animals, rocks and people are the real models (assets/models/zoo_*.glb,
 // people_lo.glb; credited in docs/SOURCES.md); surfaces are photographed PBR.
 import * as THREE from 'three';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { model } from '../../scene/models.js';
 import { crowdAt } from '../../scene/crowd.js';
 import { canvasTex, tree, SLOT } from './kit.js';
@@ -186,7 +186,7 @@ export default function build() {
       ps.moveTo(-5, 0); ps.lineTo(-5, 3); ps.quadraticCurveTo(-3.5, 3.4, -2.6, 4.6); ps.quadraticCurveTo(0, 6.2, 2.6, 4.6); ps.quadraticCurveTo(3.5, 3.4, 5, 3); ps.lineTo(5, 0); ps.closePath();
       H2.add(m.stucco, place(new THREE.ExtrudeGeometry(ps, { depth: 0.8, bevelEnabled: false }).rotateY(Math.PI / 2), -D / 2 - 0.5, H - 0.4, 0));
       H2.add(m.trim, bx(0.4, 0.5, W + 0.6, -D / 2 - 0.1, H - 0.2, 0));
-      const win = new THREE.MeshStandardMaterial({ color: 0x1e2629, roughness: 0.1, metalness: 0.5 });
+      const win = painted(0x1e2629, { roughness: 0.1, metalness: 0.5 });
       for (let k = -3; k <= 3; k++) {
         const zz = k * 3.8;
         H2.add(win, bx(0.2, 2.8, 1.6, -D / 2 - 0.02, 1.6, zz));

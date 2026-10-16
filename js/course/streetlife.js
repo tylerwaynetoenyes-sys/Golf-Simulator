@@ -6,13 +6,13 @@
 import * as THREE from 'three';
 import { mergeByMaterial } from '../scene/merge.js';
 import { model } from '../scene/models.js';
-import { pbr } from '../scene/pbr.js';
+import { pbr, painted } from '../scene/pbr.js';
 
 const M = {};
 function mats() {
   if (M.ready) return M;
   M.ready = true;
-  M.gold = new THREE.MeshStandardMaterial({ color: 0xe0b44c, roughness: 0.22, metalness: 1 });
+  M.gold = painted(0xe0b44c, { roughness: 0.22, metalness: 1 });
   M.block = pbr('concrete_wall_008', { scale: 0.6, tint: 0xc8d0e0, bright: 1.2 }); // cast concrete blocks
   return M;
 }

@@ -4,6 +4,7 @@
 // volley for a hole-out).
 import * as THREE from 'three';
 import { bus } from '../core/events.js';
+import { painted } from '../scene/pbr.js';
 
 let flagTex = null;
 /** The US flag (13 stripes, 50 stars), 10:19 proportions. */
@@ -41,12 +42,12 @@ export function dressPinFlag(flagGroup) {
 /** A tall white flagpole flying a large flag that waves in the wind. */
 export function flagpole(height = 12) {
   const g = new THREE.Group();
-  const white = new THREE.MeshStandardMaterial({ color: 0xf2f2ee, metalness: 0.4, roughness: 0.35 });
+  const white = painted(0xf2f2ee, { metalness: 0.4, roughness: 0.35 });
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.11, height, 10), white);
   pole.position.y = height / 2;
   pole.castShadow = true;
   g.add(pole);
-  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), new THREE.MeshStandardMaterial({ color: 0xd8b25a, metalness: 0.9, roughness: 0.3 }));
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.14, 10, 8), painted(0xd8b25a, { metalness: 0.9, roughness: 0.3 }));
   ball.position.y = height + 0.1;
   g.add(ball);
   const geo = new THREE.PlaneGeometry(3.6, 1.9, 18, 6).translate(1.8, 0, 0);

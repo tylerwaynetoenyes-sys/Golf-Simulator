@@ -25,7 +25,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, lit, canvasTex } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { createWaterMaterial } from '../../scene/river.js';
 import { shoreLife } from '../../scene/shore.js';
 let _lakeWater = null; // one water for every hole's lakes
@@ -138,7 +138,7 @@ function artMuseum(m, group) {
 // ── the Apotheosis of St. Louis: Louis IX on horseback, sword raised hilt-up ──
 function apotheosis(m) {
   const B = new Batch();
-  const bronze = new THREE.MeshStandardMaterial({ color: 0x4a3a26, metalness: 0.85, roughness: 0.42 });
+  const bronze = painted(0x4a3a26, { metalness: 0.85, roughness: 0.42 });
   B.add(m.granite, bx(5.4, 1, 9, 0, 0, 0), bx(4.2, 6.2, 7.6, 0, 1, 0), bx(4.8, 0.6, 8.2, 0, 7.2, 0));
   const y0 = 7.8;
   const cap = (r, l, x, y, z, rx = 0, rz = 0) => place(new THREE.CapsuleGeometry(r, l, 6, 14), x, y, z, 0, 1, 1, 1, rx, rz);
@@ -179,7 +179,7 @@ function historyMuseum(m) {
   B.add(m.lime, bx(30, 11.5, 1, 0, 2, 2)); // the back wall of the loggia
   // the Emerson Center addition behind (2000): limestone and a glass atrium
   B.add(m.lime, bx(70, 12, 30, 0, 0.4, -36));
-  B.add(new THREE.MeshStandardMaterial({ color: 0x9fb3bd, roughness: 0.08, metalness: 0.6 }), bx(24, 13, 12, 0, 0.4, -18));
+  B.add(painted(0x9fb3bd, { roughness: 0.08, metalness: 0.6 }), bx(24, 13, 12, 0, 0.4, -18));
   return B;
 }
 
@@ -199,14 +199,14 @@ function pavilion(m) {
   B.add(m.tile, place(new THREE.ConeGeometry(1, 1, 4).rotateY(Math.PI / 4).scale(16, 3.5, 9).translate(0, 1.75, 0), 0, 17.4, 0));
   // the fountain terrace below it to the south
   B.add(m.granite, place(new THREE.CylinderGeometry(9, 9.4, 1, 40).translate(0, 0.5, 0), 0, -1.5, D / 2 + 18));
-  B.add(new THREE.MeshStandardMaterial({ color: 0x3f6f7a, roughness: 0.05, metalness: 0.3 }), place(new THREE.CylinderGeometry(8.2, 8.2, 0.1, 40), 0, -0.45, D / 2 + 18));
+  B.add(painted(0x3f6f7a, { roughness: 0.05, metalness: 0.3 }), place(new THREE.CylinderGeometry(8.2, 8.2, 0.1, 40), 0, -0.45, D / 2 + 18));
   return B;
 }
 
 // ── the Jewel Box: stepped walls of glass on a steel frame (long axis north-south) ──
 function jewelBox(m) {
   const B = new Batch();
-  const glass = new THREE.MeshStandardMaterial({ color: 0xcfe0e4, roughness: 0.04, metalness: 0.55, transparent: true, opacity: 0.55, emissive: 0xffe6b0, emissiveIntensity: 0 });
+  const glass = painted(0xcfe0e4, { roughness: 0.04, metalness: 0.55, transparent: true, opacity: 0.55, emissive: 0xffe6b0, emissiveIntensity: 0 });
   glass.userData.night = 0.8;
   const tiers = [[17, 4.5, 44], [14, 3.6, 38], [11, 3.2, 31], [8, 3, 23], [5, 2.6, 15]];
   let y = 0.6;
@@ -368,7 +368,7 @@ export default function build() {
         }
         K.build(group);
         if (/Grand Basin/.test(lake.n)) {
-          const jetM = new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.38, roughness: 0.3, depthWrite: false, side: THREE.DoubleSide });
+          const jetM = painted(0xffffff, { transparent: true, opacity: 0.38, roughness: 0.3, depthWrite: false, side: THREE.DoubleSide });
           const cx = p.reduce((s, q) => s + q[0], 0) / p.length;
           const zs = p.map((q) => q[1]), z0 = Math.min(...zs), z1 = Math.max(...zs);
           for (let k = 0; k < 9; k++) {

@@ -209,7 +209,7 @@ export class World {
     this.sky.update(t);
     this.river.update(t);
     this.skyline.update(t, dt, this.camera, this.r.renderer.domElement.height);
-    this.range.update(t, dt);
+    this.range.update(t, dt, this.camera);
     this.rig.update(dt, ballPos, playT);
     // keep the view clear along what the camera is aiming at (the ball, or
     // the landing area the spotter frames). In a flyover only what passes

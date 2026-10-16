@@ -16,7 +16,7 @@
 // Surfaces are photographed PBR sets (js/scene/pbr.js).
 import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { model } from '../../scene/models.js';
 import { crowdAt } from '../../scene/crowd.js';
 import { seeded, landmarkWater } from './kit.js';
@@ -125,7 +125,7 @@ export default function build() {
       canvas: pbr('rough_linen', { scale: 1.2, tint: 0x2f6b4f, side: THREE.DoubleSide }), // the zoo's green awnings
       iron: pbr('painted_steel', { scale: 1, tint: 0x2c3431, metal: 0.5 }),
     };
-    const glass = new THREE.MeshStandardMaterial({ color: 0x1c2428, roughness: 0.08, metalness: 0.6, envMapIntensity: 1.2 });
+    const glass = painted(0x1c2428, { roughness: 0.08, metalness: 0.6, envMapIntensity: 1.2 });
     const inside = (p, x, z) => { let c = false; for (let i = 0, j = p.length - 1; i < p.length; j = i++) { const [xi, zi] = p[i], [xj, zj] = p[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; };
     const B = new Batch();
 

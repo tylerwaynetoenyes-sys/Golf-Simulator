@@ -20,7 +20,7 @@
 //   bateaux-mouches: long, low sightseeing boats with glass cabins
 import * as THREE from 'three';
 import { mat, lit, canvasTex, tree, SLOT } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { place, bx, cy, span, Batch } from './riverfront.js';
 import { crowdAt } from '../../scene/crowd.js';
 import { model } from '../../scene/models.js';
@@ -156,8 +156,8 @@ export function seine() {
     const steel = pbr('painted_steel', { scale: 2, tint: 0x4d5a52, metal: 0.4, rough: 0.55 });
     const metroSteel = pbr('painted_steel', { scale: 2, tint: 0x5f6b62, metal: 0.4, rough: 0.55 });
     const asphalt = pbr('asphalt_02', { scale: 5, tint: 0x9a9a9a, offset: -2 });
-    const gold = new THREE.MeshStandardMaterial({ color: 0xd8b04a, metalness: 0.9, roughness: 0.3 });
-    const bronze = new THREE.MeshStandardMaterial({ color: 0x3d4536, metalness: 0.8, roughness: 0.45 });
+    const gold = painted(0xd8b04a, { metalness: 0.9, roughness: 0.3 });
+    const bronze = painted(0x3d4536, { metalness: 0.8, roughness: 0.45 });
     glow.push(stone);
     const spots = [];
 
@@ -340,7 +340,7 @@ export function seine() {
       for (let i = 1; i < path.length; i++) cum.push(cum[i - 1] + Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
       for (let i = 0; i < path.length - 1; i++) ang.push(Math.atan2(path[i + 1][1] - path[i][1], path[i + 1][0] - path[i][0]));
       const hullM = mat(0xf2f1ec, { roughness: 0.5 }), trim = mat(0x1d3a5a, { roughness: 0.6 });
-      const glass = new THREE.MeshStandardMaterial({ color: 0x4c5c64, roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.28, depthWrite: false });
+      const glass = painted(0x4c5c64, { roughness: 0.05, metalness: 0.3, transparent: true, opacity: 0.28, depthWrite: false });
       for (let k = 0; k < 4; k++) {
         const boat = new THREE.Group();
         const hull = new THREE.BoxGeometry(36, 2, 7, 12, 1, 1);

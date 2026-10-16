@@ -7,7 +7,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, lit, seeded, canvasTex, tree as mkTree, SLOT, boulderGeometry } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 
 const DEG = Math.PI / 180;
 const XMIN = -120, XMAX = 520, ZMIN = -300, ZMAX = 60;
@@ -291,7 +291,7 @@ export default function build() {
   }
 
   // ---- lamp posts (subtle night lights) -------------------------------------------
-  const lampMat = new THREE.MeshStandardMaterial({ color: 0xd8d4c8, emissive: 0xffd7a0, emissiveIntensity: 0 });
+  const lampMat = painted(0xd8d4c8, { emissive: 0xffd7a0, emissiveIntensity: 0 });
   lampMat.userData.night = 2.2;
   glow.push(lampMat);
   {
@@ -386,7 +386,7 @@ export default function build() {
   glow.push(stone);
   const slate = pbr('roof_slates_02', { scale: 1.2, tint: 0x9aa0aa });
   const dark = mat(0x1d1f22, { roughness: 0.6 });
-  const winLit = new THREE.MeshStandardMaterial({ color: 0x23282c, emissive: 0xffc982, emissiveIntensity: 0, roughness: 0.4 });
+  const winLit = painted(0x23282c, { emissive: 0xffc982, emissiveIntensity: 0, roughness: 0.4 });
   winLit.userData.night = 0.9;
   glow.push(winLit);
   {

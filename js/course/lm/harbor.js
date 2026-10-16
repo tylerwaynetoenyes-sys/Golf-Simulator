@@ -13,7 +13,7 @@
 import * as THREE from 'three';
 import { model } from '../../scene/models.js';
 import { mat, lit, box, cyl, sphere, seeded, facadeMaterial } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { Batch, bx, cy, place } from './riverfront.js';
 
 const COPPER = 0x7fae98; // weathered verdigris
@@ -24,7 +24,7 @@ function statueofliberty() {
   const granite = pbr('granite_wall', { scale: 2, tint: 0xd8c8b8, bright: 1.2, glow: 0xffe2b8, night: 0.5 });
   const concrete = pbr('concrete_wall_008', { scale: 3, tint: 0xd2dcf2, bright: 1.3, glow: 0xffe2b8, night: 0.35 });
   const cu = lit(COPPER, 0xc8ffe6, { night: 0.45, roughness: 0.7, metalness: 0.15 });
-  const gold = new THREE.MeshStandardMaterial({ color: 0xf2c25a, emissive: 0xffc04a, emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.3 });
+  const gold = painted(0xf2c25a, { emissive: 0xffc04a, emissiveIntensity: 0.6, metalness: 0.8, roughness: 0.3 });
   // Liberty Island: ~6 ha of lawn and paths, just above the water
   const island = new THREE.Mesh(new THREE.CylinderGeometry(1, 1.05, 2.2, 40), lawn);
   island.scale.set(150, 1, 95);
@@ -222,7 +222,7 @@ function manhattan() {
   // triangular facets), roof at 417 m, spire to 541 m
   const owtc = new THREE.Group();
   const shaft = new THREE.CylinderGeometry(Math.SQRT1_2 * 30, Math.SQRT1_2 * 61, 330, 4, 1);
-  const m1 = new THREE.MeshStandardMaterial({ color: 0x9fb8c8, metalness: 0.75, roughness: 0.18, emissive: 0x7fa0c0, emissiveIntensity: 0 });
+  const m1 = painted(0x9fb8c8, { metalness: 0.75, roughness: 0.18, emissive: 0x7fa0c0, emissiveIntensity: 0 });
   m1.userData.night = 0.35;
   const body = new THREE.Mesh(shaft, m1);
   body.rotation.y = Math.PI / 4;

@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mat, seeded, canvasTex, tree, SLOT, boulderGeometry } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { piasaCanvas, piasaEngravedCanvas } from '../../ui/piasa.js';
 import { crowdAt } from '../../scene/crowd.js';
 import { carsAt } from '../../scene/cars.js';
@@ -369,7 +369,7 @@ export default function build() {
 
   // ---- the Piasa mural -------------------------------------------------------
   // painted straight onto the rock: the canvas is transparent between the strokes
-  const muralMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, emissive: 0xffd9a8, emissiveIntensity: 0, polygonOffset: true, polygonOffsetFactor: -2, transparent: true, alphaTest: 0.08, depthWrite: false });
+  const muralMat = painted(0xffffff, { roughness: 0.95, emissive: 0xffd9a8, emissiveIntensity: 0, polygonOffset: true, polygonOffsetFactor: -2, transparent: true, alphaTest: 0.08, depthWrite: false });
   muralMat.userData.night = 0.35;
   glow.push(muralMat);
   // John Wright's 1898 engraving in the mural's colours (js/ui/piasa.js);
@@ -404,7 +404,7 @@ export default function build() {
   g.add(wash);
   // the flood fixtures at the foot of the bluff
   const fixMat = pbr('metal_plate', { scale: 0.6, tint: 0x2a2b2d, metal: 0.6 });
-  const lensMat = new THREE.MeshStandardMaterial({ color: 0x333333, emissive: 0xffe2b0, emissiveIntensity: 0 });
+  const lensMat = painted(0x333333, { emissive: 0xffe2b0, emissiveIntensity: 0 });
   lensMat.userData.night = 2.5;
   glow.push(lensMat);
   for (const x of [-13, 13]) {
@@ -466,7 +466,7 @@ export default function build() {
     const pm = new THREE.Matrix4();
     for (let i = 0; i < nPost; i++) { pm.makeTranslation(-75 + i * 2, 1.6, -5.2); posts.setMatrixAt(i, pm); }
     g.add(posts);
-    const lampGlass = new THREE.MeshStandardMaterial({ color: 0xf4efe2, emissive: 0xffd9a0, emissiveIntensity: 0 });
+    const lampGlass = painted(0xf4efe2, { emissive: 0xffd9a0, emissiveIntensity: 0 });
     lampGlass.userData.night = 2.2;
     glow.push(lampGlass);
     for (const x of [-58, -30, 30, 58]) {

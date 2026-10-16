@@ -6,7 +6,10 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { HoleTerrain } from './holeTerrain.js';
 import { buildLandmark, setLandmarkDay } from './landmarks.js';
 import { createWaterMaterial, waterMaterials } from '../scene/river.js';
+import { pbr, painted } from '../scene/pbr.js';
 import { shoreLife, ellipseRing } from '../scene/shore.js';
+import { bulkheads } from './bulkhead.js';
+import { buildSurf } from '../scene/surf.js';
 import { courseLife } from './courseLife.js';
 import { makeFlag, lightConeMaterial } from '../scene/rangeProps.js';
 import { CUP } from '../core/physics.js';
@@ -108,7 +111,7 @@ export class CourseWorld {
     // endless parkland under/around every hole
     this.base = new THREE.Mesh(
       new THREE.PlaneGeometry(40000, 40000).rotateX(-Math.PI / 2),
-      new THREE.MeshLambertMaterial({ color: 0x3f5a2c }),
+      pbr('grass_ground', { scale: 4, tint: 0x8fae74 }), // real turf, out past the edge of everything
     );
     this.base.position.y = -5;
     this.root.add(this.base);
@@ -123,6 +126,11 @@ export class CourseWorld {
     const load = (url, tex) => { tl.load(url, (t) => { tex.image = t.image; tex.needsUpdate = true; }); return tex; };
     this.detail = load('assets/textures/ground_detail.jpg', this._detailTexture());
     this.sandDetail = load('assets/textures/sand_detail.jpg', this._detailTexture());
+    // bunker sand and putting turf close up: photographed sets (Poly Haven sand_01 and grass_ground, CC0)
+    const rep = (url, srgb) => { const t = tl.load(url); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 8; return t; };
+    this.sandPhoto = rep('assets/textures/pbr/sand_01_diff.jpg', true);
+    this.sandNormal = rep('assets/textures/pbr/sand_01_nor_gl.jpg', false);
+    this.turfPhoto = rep('assets/textures/pbr/grass_ground_diff.jpg', true);
   }
 
   _detailTexture() {
@@ -187,6 +195,7 @@ export class CourseWorld {
     const rough = new Float32Array(nx * nz); // rough and native ground: coarser, patchier turf
     const dir = new Float32Array(nx * nz * 2); // the hole's direction, for the way the mowers lay the grass
     const c = new THREE.Color(), c2 = new THREE.Color();
+    const sunk = [];
     const bx1 = b.minx + (nx - 1) * step, bz0 = b.maxz - (nz - 1) * step;
     this.base.visible = !T.F;
     let k = 0;
@@ -202,6 +211,9 @@ export class CourseWorld {
         // almost coplanar (a wide z-fighting band at distance)
         if (T.F) h += (T.baseGround(x, z) - h) * ek * ek * (3 - 2 * ek);
         else h += (baseY - 6 - h) * ek * ek;
+        // under a bunker the coarse ground drops away (after its normals are taken, so the turf round
+        // it shades as if nothing moved): the fine bunker mesh (_buildBunkers) is the surface there
+        if (T.bunkers.length && this._sandSd(T, x, z, 1) < 0.4) sunk.push(k);
         pos.set([x, h, z], k * 3);
         uv.set([x * 0.15, z * 0.15], k * 2);
         const surf = this._colorAt(T, x, z, c);
@@ -211,7 +223,7 @@ export class CourseWorld {
         sd.set([prj.s, prj.d], k * 2);
         fw[k] = surf === 'tee' ? 0.7 : 0; // fairway mowing comes from the surface mask
         sandA[k] = 0; // sand comes from the surface mask
-        rough[k] = surf === 'oob' ? 1 : surf === 'rough' ? (T.roughDepth(x, z) === 'deep' ? 0.85 : 0.45) : surf === 'fairway' || surf === 'sand' ? 0.3 : 0;
+        rough[k] = surf === 'oob' ? 1 : surf === 'rough' ? (0.45 + 0.4 * T.roughGrade(x, z)) : surf === 'fairway' || surf === 'sand' ? 0.3 : 0;
         const pt = T.pointAt(Math.max(0, Math.min(T.length, prj.s)));
         dir.set([pt.dx, pt.dz], k * 2);
         k++;
@@ -236,6 +248,7 @@ export class CourseWorld {
     geo.setAttribute('aDir', new THREE.BufferAttribute(dir, 2));
     geo.setIndex(idx);
     geo.computeVertexNormals();
+    for (const v of sunk) pos[v * 3 + 1] -= 0.7;
     const groundMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, map: this.detail });
     // Drawn per pixel: the mowing pattern (lengthwise passes with a faint
     // cross-cut; each pass lays the grass one way, so it reads light looking
@@ -257,8 +270,24 @@ export class CourseWorld {
       const ha = H(i0, j0), hb = H(i0 + 1, j0), hc = H(i0, j0 + 1), hd = H(i0 + 1, j0 + 1);
       return fx + fy <= 1 ? ha + fx * (hb - ha) + fy * (hc - ha) : hd + (1 - fx) * (hc - hd) + (1 - fy) * (hb - hd);
     };
+    // the coarse mesh's colour and (smoothed) normal at a point, so fine patches can meet it invisibly
+    const nrm = geo.attributes.normal.array;
+    const coarseAttr = (arr, x, z, out) => {
+      const fi = (x - b.minx) / step, fj = (b.maxz - z) / step;
+      const i0 = Math.max(0, Math.min(nx - 2, Math.floor(fi))), j0 = Math.max(0, Math.min(nz - 2, Math.floor(fj)));
+      const fx = fi - i0, fy = fj - j0;
+      const A = (i, j, c) => arr[(j * nx + i) * 3 + c];
+      for (let c = 0; c < 3; c++) {
+        const ha = A(i0, j0, c), hb = A(i0 + 1, j0, c), hc = A(i0, j0 + 1, c), hd = A(i0 + 1, j0 + 1, c);
+        out[c] = fx + fy <= 1 ? ha + fx * (hb - ha) + fy * (hc - ha) : hd + (1 - fx) * (hc - hd) + (1 - fy) * (hb - hd);
+      }
+      return out;
+    };
+    const coarseCol = (x, z, out) => coarseAttr(col, x, z, out);
+    const coarseNrm = (x, z, out) => coarseAttr(nrm, x, z, out);
     this._coarseH = coarseH;
     this._buildGreen(T, g, coarseH, groundMat);
+    this._buildBunkers(T, g, coarseH, coarseCol, coarseNrm);
     this._buildSlopeGrid(T, g);
 
     // ── water ──
@@ -284,6 +313,11 @@ export class CourseWorld {
       const skip = (x, z) => T.greenEdge(x, z) < 6 || Math.hypot(x, z) < 12;
       g.add(shoreLife(rings, { skip, budget: this.r?.quality?.pixelRatio < 1.5 ? 500 : 900 }));
     }
+    // Pete Dye's railroad-tie bulkheads where the water meets a green
+    if (hole.bulkheads) {
+      let bs = 97 + (hole.n || 1) * 13;
+      g.add(bulkheads(T, () => ((bs = (bs * 16807) % 2147483647) / 2147483647)));
+    }
     // the course in use: cart path, carts, the next group, spectators, tee furniture
     {
       let ls = 31 + (hole.n || 1) * 7;
@@ -308,7 +342,7 @@ export class CourseWorld {
 
     // ── tee markers + pin ──
     const teeY = T.teeHeight;
-    const markerMat = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.4 });
+    const markerMat = painted(0xf2f2f2, { roughness: 0.4 }); // painted tee markers
     // tee markers a few yards ahead of the ball, out of the address camera's face
     for (const sx of [-3.2, 3.2]) {
       const mk = new THREE.Mesh(new THREE.SphereGeometry(0.11, 16, 12), markerMat);
@@ -624,6 +658,13 @@ export class CourseWorld {
 
     // ── scenery beyond play: herds and wagons, boats and sea stacks, crowds ──
     this.scenery = dressScenery(T, hole, rand, (x, z) => T.meshHeight(x, z), buildLandmark);
+    // surf on a rocky coast: the wash at the rocks and the breakers rolling in
+    this.surf = null;
+    if (hole.theme === 'coastal' && T.seaLevel != null) {
+      const mid = T.pointAt(T.length / 2);
+      this.surf = buildSurf(T, { cx: mid.x, cz: mid.z, half: Math.max(420, T.length * 0.6 + 220) });
+      if (this.surf) g.add(this.surf.group);
+    }
     g.add(this.scenery.group);
     if (this.scenery.glow.length) this.farLms.push({ group: this.scenery.group, glow: this.scenery.glow });
 
@@ -841,21 +882,35 @@ diffuseColor.rgb *= 0.5 + 0.62 * mix(bd, bd2, 0.45);
    * it, crisp and anti-aliased at any distance, curves and all, instead of
    * from the 2.2 m mesh's vertex colours.
    */
+  /** Signed distance (m) to one bunker's edge, negative in the sand; `cap` beyond it. */
+  _bunkerSd(T, bk, x, z, cap = 4) {
+    if (bk.poly) {
+      const bb = bk.poly.box;
+      if (x < bb.minx - cap || x > bb.maxx + cap || z < bb.minz - cap || z > bb.maxz + cap) return cap;
+      return Math.min(cap, bk.poly.sd(x, z));
+    }
+    const q = T._ellipse(bk, x, z);
+    return q < 4 ? Math.min(cap, (Math.sqrt(q) - 1) * Math.min(bk.rx, bk.rz)) : cap;
+  }
+
+  /** Signed distance (m) to the nearest bunker edge, negative in the sand. */
+  _sandSd(T, x, z, cap = 4) {
+    let d = cap;
+    for (const bk of T.bunkers) d = Math.min(d, this._bunkerSd(T, bk, x, z, cap));
+    return d;
+  }
+
   _buildSurfMask(T) {
     const b = T.bounds(40);
-    let res = 0.4;
+    // half-float distances (true metres, no 8-bit steps): the sand and fairway outlines interpolate
+    // as smooth curves at any distance instead of stepping with the texels
+    let res = 0.3;
     const span = Math.max(b.maxx - b.minx, b.maxz - b.minz);
-    if (span / res > 2048) res = span / 2048;
+    if (span / res > 3072) res = span / 3072;
     const W = Math.ceil((b.maxx - b.minx) / res), H = Math.ceil((b.maxz - b.minz) / res);
-    const data = new Uint8Array(W * H * 4);
-    const sandSd = (x, z) => {
-      let d = 4;
-      for (const bk of T.bunkers) {
-        if (bk.poly) { const bb = bk.poly.box; if (x < bb.minx - 4 || x > bb.maxx + 4 || z < bb.minz - 4 || z > bb.maxz + 4) continue; d = Math.min(d, bk.poly.sd(x, z)); }
-        else { const q = T._ellipse(bk, x, z); if (q < 4) d = Math.min(d, (Math.sqrt(q) - 1) * Math.min(bk.rx, bk.rz)); }
-      }
-      return d;
-    };
+    const data = new Uint16Array(W * H * 4);
+    const half = THREE.DataUtils.toHalfFloat;
+    const sandSd = (x, z) => this._sandSd(T, x, z);
     const fwPolys = T.fairwayPolys || [];
     for (let j = 0; j < H; j++) {
       const z = b.minz + (j + 0.5) * res;
@@ -873,12 +928,12 @@ diffuseColor.rgb *= 0.5 + 0.62 * mix(bd, bd2, 0.45);
         // the fairway stops at the collar and never runs under the sand
         fd = Math.max(fd, 1.8 - T.greenEdge(x, z), -sd);
         const k = (j * W + i) * 4;
-        data[k] = Math.max(0, Math.min(255, Math.round((0.5 + sd / 8) * 255)));
-        data[k + 1] = Math.max(0, Math.min(255, Math.round((0.5 + fd / 12) * 255)));
-        data[k + 3] = 255;
+        data[k] = half(sd);
+        data[k + 1] = half(fd);
+        data[k + 3] = half(1);
       }
     }
-    const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat);
+    const tex = new THREE.DataTexture(data, W, H, THREE.RGBAFormat, THREE.HalfFloatType);
     tex.magFilter = THREE.LinearFilter; tex.minFilter = THREE.LinearFilter;
     tex.needsUpdate = true;
     if (this._surf?.tex) this._surf.tex.dispose();
@@ -898,14 +953,36 @@ diffuseColor.rgb *= 0.5 + 0.62 * mix(bd, bd2, 0.45);
    */
   _turfShader(sh) {
     sh.uniforms.uSand = { value: this.sandDetail };
+    sh.uniforms.uSandP = { value: this.sandPhoto };
+    sh.uniforms.uSandN = { value: this.sandNormal };
+    sh.uniforms.uTurfP = { value: this.turfPhoto };
     Object.assign(sh.uniforms, this._surfU);
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec2 aSD;\nattribute float aFw;\nattribute float aSand;\nattribute float aRough;\nattribute vec2 aDir;\nvarying vec2 vSD;\nvarying float vFw;\nvarying float vSand;\nvarying float vRough;\nvarying vec2 vDir;\nvarying vec3 vWPos;')
       .replace('#include <uv_vertex>', '#include <uv_vertex>\nvSD = aSD;\nvFw = aFw;\nvSand = aSand;\nvRough = aRough;\nvDir = aDir;')
       .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWPos = (modelMatrix * vec4(transformed, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform sampler2D uSand;\nuniform sampler2D uMask;\nuniform vec4 uMaskBox;\nuniform vec3 uFwCol;\nuniform vec3 uSandCol;\nvarying vec2 vSD;\nvarying float vFw;\nvarying float vSand;\nvarying float vRough;\nvarying vec2 vDir;\nvarying vec3 vWPos;')
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+{
+  // the sand's surface: grain from the photographed normal map, rake furrows ~6 mm deep
+  // (screen-space bump: the furrow height's slope tilts the normal)
+  if (sandM > 0.01) {
+    vec3 sn = texture2D(uSandN, vWPos.xz / 0.85).xyz * 2.0 - 1.0;
+    vec3 gn = normalize(vec3(sn.x, sn.z, -sn.y));           // tangent space laid flat (x east, z south)
+    vec3 gv = normalize((viewMatrix * vec4(gn, 0.0)).xyz);
+    float fade = 1.0 - smoothstep(0.02, 0.08, length(fwidth(vWPos.xz)));
+    normal = normalize(mix(normal, gv, 0.45 * sandM * fade));
+    float hgt = sandRake * 0.006;
+    vec3 dpx = dFdx(-vViewPosition), dpy = dFdy(-vViewPosition);
+    vec3 r1 = cross(dpy, normal), r2 = cross(normal, dpx);
+    float det = dot(dpx, r1);
+    vec3 grad = sign(det) * (dFdx(hgt) * r1 + dFdy(hgt) * r2);
+    normal = normalize(mix(normal, normalize(abs(det) * normal - grad), sandM));
+  }
+}`)
+      .replace('#include <common>', '#include <common>\nuniform sampler2D uSand;\nuniform sampler2D uSandP;\nuniform sampler2D uSandN;\nuniform sampler2D uTurfP;\nuniform sampler2D uMask;\nuniform vec4 uMaskBox;\nuniform vec3 uFwCol;\nuniform vec3 uSandCol;\nvarying vec2 vSD;\nvarying float vFw;\nvarying float vSand;\nvarying float vRough;\nvarying vec2 vDir;\nvarying vec3 vWPos;')
       .replace('#include <map_fragment>', `
+float sandRake = 0.0;
 vec4 texelColor = texture2D(map, vMapUv);
 float big = texture2D(map, vMapUv * 0.19 + 0.37).r;
 float mottle = texture2D(map, vMapUv * 0.027 + 0.61).r; // ~250 m: wear, moisture, clover
@@ -926,8 +1003,8 @@ float keep = 1.0 - smoothstep(0.25, 0.6, au);
 vec2 muv = (vWPos.xz - uMaskBox.xy) / uMaskBox.zw;
 float inBox = step(0.0, muv.x) * step(muv.x, 1.0) * step(0.0, muv.y) * step(muv.y, 1.0);
 vec4 msk = texture2D(uMask, clamp(muv, 0.0, 1.0));
-float sdS = mix(4.0, (msk.r - 0.5) * 8.0, inBox);
-float sdF = mix(6.0, (msk.g - 0.5) * 12.0, inBox);
+float sdS = mix(4.0, msk.r, inBox);
+float sdF = mix(6.0, msk.g, inBox);
 float aS = max(fwidth(sdS) * 0.9, 0.025), aF = max(fwidth(sdF) * 0.9, 0.04);
 float sandM = 1.0 - smoothstep(-aS, aS, sdS);
 float fwyM = (1.0 - smoothstep(-aF, aF, sdF)) * (1.0 - sandM);
@@ -945,8 +1022,19 @@ diffuseColor.rgb *= stripes * turf;`)
   diffuseColor.rgb = mix(diffuseColor.rgb, uFwCol * stripes * turf, fwyM);
   // the turf lip's shadow, a hand's width outside the sand
   diffuseColor.rgb *= 1.0 - 0.2 * (1.0 - smoothstep(0.0, 0.8, sdS)) * step(0.0, sdS) * inBox;
-  // sand: the face under the edge in shade, the floor bright and clean
-  vec3 sc = uSandCol * mix(0.8, 1.05, smoothstep(0.0, 1.8, -sdS)) * (0.93 + 0.14 * detail);
+  // sand: the photographed grain (two octaves, normalised), the face under the edge in shade,
+  // and rake furrows down the line of the hole, swaying as a rake does, spent at the edges
+  vec3 sph = texture2D(uSandP, vWPos.xz / 0.85).rgb * 0.62 + texture2D(uSandP, vWPos.xz / 3.4 + 0.31).rgb * 0.38;
+  float sgl = dot(sph, vec3(0.299, 0.587, 0.114));
+  vec2 rt = normalize(vDir + 1e-5), rp = vec2(-rt.y, rt.x);
+  float ral = dot(vWPos.xz, rt);
+  float rac = dot(vWPos.xz, rp) + 0.22 * sin(ral * 0.85) + 0.09 * sin(ral * 2.4 + 1.3);
+  float tine = rac / 0.045;
+  float rakeK = (1.0 - smoothstep(0.25, 0.8, fwidth(tine))) * smoothstep(0.25, 1.3, -sdS) * (0.55 + 0.45 * smoothstep(0.2, 0.7, texture2D(uSand, vWPos.xz * 0.05).r));
+  float furrow = 0.5 + 0.5 * cos(tine * 6.2831853);
+  sandRake = furrow * rakeK;
+  vec3 sc = uSandCol * clamp(sgl / 0.47, 0.75, 1.25) * mix(vec3(1.0), sph / max(sgl, 1e-3), 0.25)
+          * mix(0.78, 1.04, smoothstep(0.0, 1.8, -sdS)) * (0.92 + 0.1 * sandRake);
   diffuseColor.rgb = mix(diffuseColor.rgb, sc, sandM);
 }`);
     }
@@ -1065,6 +1153,91 @@ diffuseColor.rgb *= stripes * turf;`)
   }
 
   /**
+   * Bunkers out on the hole (the greenside ones are part of the green patch):
+   * each its own fine mesh, 20 cm apart, so the lip, the face and the floor
+   * are true curves however close the camera comes. The coarse ground is
+   * dropped away under the sand; at the insert's rim (3-3.6 m out) its heights
+   * ease onto the coarse mesh's, so the two meet without a seam.
+   */
+  _buildBunkers(T, g, coarseH, coarseCol, coarseNrm) {
+    const STEP = 0.2, OUT = 3.6, EASE = 2.7;
+    const list = T.bunkers.filter((bk) => !this._bunkerReach || this._bunkerReach(bk)[0] > (this._Rp ?? 0) + OUT + 0.5);
+    if (!list.length) return;
+    const pos = [], col = [], uv = [], sdA = [], fwA = [], sandA = [], roughA = [], dirA = [], idx = [], ease = [];
+    const c = new THREE.Color(), cc3 = [0, 0, 0];
+    this._underlay = true; // vertex colours are the turf under the sand: the mask paints the sand, per pixel
+    for (const bk of list) {
+      let minx, maxx, minz, maxz;
+      if (bk.poly) ({ minx, maxx, minz, maxz } = bk.poly.box);
+      else { const r = Math.max(bk.rx, bk.rz); minx = bk.x - r; maxx = bk.x + r; minz = bk.z - r; maxz = bk.z + r; }
+      minx -= OUT; maxx += OUT; minz -= OUT; maxz += OUT;
+      const nx = Math.ceil((maxx - minx) / STEP) + 1, nz = Math.ceil((maxz - minz) / STEP) + 1;
+      const base = pos.length / 3;
+      const own = new Uint8Array(nx * nz);
+      for (let j = 0; j < nz; j++) {
+        for (let i = 0; i < nx; i++) {
+          const x = minx + i * STEP, z = minz + j * STEP;
+          const sd = this._bunkerSd(T, bk, x, z, OUT + 1);
+          // this bunker's ground only (another bunker's insert has its own)
+          own[j * nx + i] = sd < OUT && this._sandSd(T, x, z, OUT + 1) >= sd - 1e-6 ? 1 : 0;
+          const ht = T.meshHeight(x, z);
+          const w = THREE.MathUtils.smoothstep(sd, EASE, OUT);
+          pos.push(x, ht + (coarseH(x, z) + 0.006 - ht) * w, z);
+          ease.push(w);
+          uv.push(x * 0.15, z * 0.15);
+          const surf = this._colorAt(T, x, z, c);
+          // toward the rim the colour becomes the coarse mesh's own, so the seam doesn't show
+          coarseCol(x, z, cc3);
+          col.push(c.r + (cc3[0] - c.r) * w, c.g + (cc3[1] - c.g) * w, c.b + (cc3[2] - c.b) * w);
+          const prj = T.project(x, z);
+          sdA.push(prj.s, prj.d);
+          fwA.push(surf === 'tee' ? 0.7 : 0);
+          sandA.push(0);
+          roughA.push(surf === 'oob' ? 1 : surf === 'rough' ? (0.45 + 0.4 * T.roughGrade(x, z)) : surf === 'fairway' || surf === 'sand' ? 0.3 : 0);
+          const pt = T.pointAt(Math.max(0, Math.min(T.length, prj.s)));
+          dirA.push(pt.dx, pt.dz);
+        }
+      }
+      for (let j = 0; j < nz - 1; j++) {
+        for (let i = 0; i < nx - 1; i++) {
+          const a = j * nx + i, b2 = a + 1, cc = a + nx, d = cc + 1;
+          if (!(own[a] && own[b2] && own[cc] && own[d])) continue;
+          idx.push(base + a, base + cc, base + b2, base + b2, base + cc, base + d);
+        }
+      }
+    }
+    this._underlay = false;
+    if (!idx.length) return;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    geo.setAttribute('aSD', new THREE.Float32BufferAttribute(sdA, 2));
+    geo.setAttribute('aFw', new THREE.Float32BufferAttribute(fwA, 1));
+    geo.setAttribute('aSand', new THREE.Float32BufferAttribute(sandA, 1));
+    geo.setAttribute('aRough', new THREE.Float32BufferAttribute(roughA, 1));
+    geo.setAttribute('aDir', new THREE.Float32BufferAttribute(dirA, 2));
+    geo.setIndex(idx);
+    geo.computeVertexNormals();
+    // and the shading: normals ease onto the coarse mesh's across the rim band
+    const N = geo.attributes.normal.array, nn = [0, 0, 0];
+    for (let v = 0; v < ease.length; v++) {
+      const w = ease[v];
+      if (w <= 0) continue;
+      coarseNrm(pos[v * 3], pos[v * 3 + 2], nn);
+      const x = N[v * 3] + (nn[0] - N[v * 3]) * w, y = N[v * 3 + 1] + (nn[1] - N[v * 3 + 1]) * w, z = N[v * 3 + 2] + (nn[2] - N[v * 3 + 2]) * w;
+      const l = Math.hypot(x, y, z) || 1;
+      N[v * 3] = x / l; N[v * 3 + 1] = y / l; N[v * 3 + 2] = z / l;
+    }
+    const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.93, map: this.detail, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -1 });
+    mat.onBeforeCompile = (sh) => this._turfShader(sh);
+    mat.customProgramCacheKey = () => 'bunkerInsert';
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.receiveShadow = true;
+    g.add(mesh);
+  }
+
+  /**
    * The green complex at full detail: a radial mesh centred on the cup (rings
    * from 5 cm to ~40 cm apart) with the real hole through it, true putting
    * surface heights, mowing stripes and slope shading. The coarse hole mesh
@@ -1073,18 +1246,33 @@ diffuseColor.rgb *= stripes * turf;`)
   _buildGreen(T, g, coarseH, groundMat) {
     const pin = T.pin;
     // reach every part of the green from the cup (mapped outlines can be long)
-    const Rc = (T.greenPoly
+    let Rc = (T.greenPoly
       ? Math.max(...T.greenPoly.pts.map(([x, z]) => Math.hypot(x - pin.x, z - pin.z)))
-      : Math.hypot(pin.x - T.green.x, pin.z - T.green.z) + T.greenR) + 7;
+      : Math.hypot(pin.x - T.green.x, pin.z - T.green.z) + T.greenR) + 12;
+    // greenside bunkers belong to the patch, whole: reach past every bunker that comes near it
+    const reach = (bk) => {
+      const pts = bk.poly ? bk.poly.pts : [[bk.x, bk.z]];
+      const ds = pts.map(([x, z]) => Math.hypot(x - pin.x, z - pin.z));
+      const pad = bk.poly ? 0 : Math.max(bk.rx, bk.rz);
+      return [Math.min(...ds) - pad, Math.max(...ds) + pad];
+    };
+    for (let pass = 0; pass < 2; pass++) {
+      for (const bk of T.bunkers) {
+        const [near, far] = reach(bk);
+        if (near < Rc + 7.5) Rc = Math.min(75, Math.max(Rc, far + 4.5));
+      }
+    }
     this._Rc = Rc;
     const Rp = Rc + 3;
+    this._Rp = Rp;
+    this._bunkerReach = reach;
     const radii = [];
     for (let r = CUP.radius; r < Rp; ) {
       radii.push(r);
-      r += Math.min(0.42, Math.max(0.012, r * 0.13));
+      r += Math.min(0.24, Math.max(0.012, r * 0.13));
     }
     radii.push(Rp);
-    const NA = 200;
+    const NA = 448; // ~0.3 m between spokes at 40 m: the collar and greenside lips are true curves
     const nv = radii.length * NA;
     const pos = new Float32Array(nv * 3), col = new Float32Array(nv * 3), uv = new Float32Array(nv * 2), grn = new Float32Array(nv);
     // the same per-vertex turf data as the hole mesh, so the patch matches it at the edge
@@ -1094,7 +1282,7 @@ diffuseColor.rgb *= stripes * turf;`)
     this._underlay = true;
     let k = 0;
     for (const r of radii) {
-      const wBlend = Math.min(1, Math.max(0, (r - (Rc - 7)) / 5));
+      const wBlend = Math.min(1, Math.max(0, (r - (Rc - 4)) / 3.5));
       const ww = wBlend * wBlend * (3 - 2 * wBlend);
       for (let a = 0; a < NA; a++) {
         const th = (a / NA) * Math.PI * 2;
@@ -1118,7 +1306,7 @@ diffuseColor.rgb *= stripes * turf;`)
         sdA.set([prj.s, prj.d], k * 2);
         fwA[k] = 0;
         sandA[k] = 0;
-        roughA[k] = surf === 'rough' ? (T.roughDepth(x, z) === 'deep' ? 0.85 : 0.45) : surf === 'oob' ? 1 : 0;
+        roughA[k] = surf === 'rough' ? (0.45 + 0.4 * T.roughGrade(x, z)) : surf === 'oob' ? 1 : 0;
         const pt = T.pointAt(Math.max(0, Math.min(T.length, prj.s)));
         dirA.set([pt.dx, pt.dz], k * 2);
         k++;
@@ -1159,10 +1347,21 @@ diffuseColor.rgb *= stripes * turf;`)
         .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvGreen = aGreen;');
       sh.fragmentShader = sh.fragmentShader
         .replace('#include <common>', '#include <common>\nuniform vec2 uStripe;\nvarying float vGreen;')
-        .replace('diffuseColor.rgb *= stripes * turf;', `diffuseColor.rgb *= mix(stripes * turf, 0.94 + 0.12 * detail, vGreen);
-float st = step(0.5, fract(dot(vWPos.xz, uStripe) / 3.0));
-float cr = step(0.5, fract(dot(vWPos.xz, vec2(-uStripe.y, uStripe.x)) / 3.0));
-diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
+        .replace('diffuseColor.rgb *= stripes * turf;', `// close up, the putting turf's own grain: short dense blades (photographed), fading out with distance
+float tpl = dot(texture2D(uTurfP, vWPos.xz / 0.55).rgb * 0.6 + texture2D(uTurfP, vWPos.xz / 2.1 + 0.5).rgb * 0.4, vec3(0.299, 0.587, 0.114));
+float near = 1.0 - smoothstep(0.015, 0.06, length(fwidth(vWPos.xz)));
+float grain = mix(1.0, clamp(tpl / 0.36, 0.6, 1.4), 0.85 * near);
+diffuseColor.rgb *= mix(stripes * turf, (0.94 + 0.12 * detail) * grain, vGreen);
+// mowing passes across the line of play: alternate passes lay the grass opposite ways, so each pass
+// reads light looking with its lay and dark against it (and turns over as you walk round); soft edges
+float sa = dot(vWPos.xz, uStripe) / 3.0, sb = dot(vWPos.xz, vec2(-uStripe.y, uStripe.x)) / 3.0;
+float ea = fwidth(sa) + 0.04, eb = fwidth(sb) + 0.04;
+float pa = smoothstep(0.5 - ea, 0.5 + ea, abs(fract(sa) - 0.5) * 2.0) * 2.0 - 1.0;
+float pb = smoothstep(0.5 - eb, 0.5 + eb, abs(fract(sb) - 0.5) * 2.0) * 2.0 - 1.0;
+vec2 lk = normalize(vWPos.xz - cameraPosition.xz + 1e-4);
+float withA = dot(lk, vec2(-uStripe.y, uStripe.x)), withB = dot(lk, uStripe);
+float fadeS = 1.0 - smoothstep(0.35, 0.8, max(fwidth(sa), fwidth(sb)));
+diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (0.012 + 0.02 * withB));`);
     };
     mat.customProgramCacheKey = () => 'greenPatch';
     const mesh = new THREE.Mesh(geo, mat);
@@ -1449,6 +1648,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
       const x = pt.x + pt.rx * d, z = pt.z + pt.rz * d;
       if (T.terrain(x, z).surface !== 'rough') continue;
       if (T.greenEdge(x, z) < 3) continue;
+      if (T.bunkers.length && this._sandSd(T, x, z, 1) < 0.7) continue; // the bunker surround is mown: a clean lip
       if (this._mownCarry(x, z)) continue;
       if (this.landmark?.clear?.(x, z)) continue; // the landmark's paving (a street, a plaza)
       if ((this.farLms || []).some((l) => l.occupies?.(x, z))) continue; // a vineyard's rows
@@ -1747,6 +1947,7 @@ diffuseColor.rgb *= 1.0 + vGreen * ((st - 0.5) * 0.09 + (cr - 0.5) * 0.035);`);
   update(t, dt = 1 / 60, camera = null) {
     this.streetLife?.update(dt);
     this.scenery?.update(dt, t, { x: GRASS.uWind.value.x * 8, z: GRASS.uWind.value.y * 8 });
+    this.surf?.update(t);
     // thick rough wherever the ball settles (checked twice a second)
     if (this.ballPos && this.T) {
       this._nearT = (this._nearT || 0) + dt;

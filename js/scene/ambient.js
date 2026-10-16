@@ -5,6 +5,7 @@
 // all birds (wings flap in the vertex shader), a handful of meshes per plane.
 import * as THREE from 'three';
 import { audio } from '../audio/audio.js';
+import { painted } from './pbr.js';
 
 const BIRDS_PER_FLOCK = 11;
 const FLOCKS = 3;
@@ -63,7 +64,7 @@ function navLightTexture() {
 
 function makePlane(tex) {
   const g = new THREE.Group();
-  const body = new THREE.MeshStandardMaterial({ color: 0xe9ecf0, roughness: 0.45, metalness: 0.3 });
+  const body = painted(0xe9ecf0, { roughness: 0.45, metalness: 0.3 }); // painted aluminium
   const fus = new THREE.Mesh(new THREE.CapsuleGeometry(1.9, 30, 4, 10).rotateX(Math.PI / 2), body);
   const wing = new THREE.Mesh(new THREE.BoxGeometry(34, 0.5, 5.5), body);
   wing.position.set(0, -0.6, 1);

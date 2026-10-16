@@ -10,7 +10,8 @@ export default {
   place: "Rolling Hills Golf Club · Godfrey, Illinois",
   theme: 'parkland',
   dem: true,
-  sky: { night: 'milkyway' }, // a dark site's night (js/scene/sky.js)
+  buildings: 'midwest', // the real houses round the course (OSM footprints, js/course/buildings.js)
+  sky: { day: 'prairie', night: 'milkyway' }, // a dark site's night (js/scene/sky.js)
   origin: [38.95036, -90.21312],
   blurb: "Godfrey's par-71 Rolling Hills on one-metre USGS LiDAR: every green, tee and swale at its surveyed height, with the real outlines of the greens, fairways, bunkers and ponds.",
   // the Mississippi above the Melvin Price dam (hydro-flattened at 126.7–127.5 m in the LiDAR)

@@ -12,7 +12,7 @@
 // Far landmarks are modelled in map axes (+x east, +z south).
 import * as THREE from 'three';
 import { mat, lit, box, cyl, sphere, seeded, canvasTex, facadeMaterial, boulderGeometry, landmarkWater } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { Batch, bx, place } from './riverfront.js';
 import { model } from '../../scene/models.js';
 
@@ -28,7 +28,7 @@ function latticeMaterial(repeat = [6, 12]) {
     g.lineWidth = 5;
     g.beginPath(); g.moveTo(0, 0); g.lineTo(w, h); g.moveTo(w, 0); g.lineTo(0, h); g.stroke();
   }, repeat);
-  const m = new THREE.MeshStandardMaterial({ color: BROWN, alphaMap: tex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.8, metalness: 0.2, emissive: 0xffa53a, emissiveIntensity: 0 });
+  const m = painted(BROWN, { alphaMap: tex, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 0.8, metalness: 0.2, emissive: 0xffa53a, emissiveIntensity: 0 });
   tex.colorSpace = THREE.NoColorSpace;
   m.userData.night = 0.9;
   return m;

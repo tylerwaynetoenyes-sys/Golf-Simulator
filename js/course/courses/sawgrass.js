@@ -10,6 +10,9 @@ export default {
   place: "THE PLAYERS Stadium Course · Ponte Vedra Beach, Florida",
   theme: 'parkland',
   dem: true,
+  bulkheads: true, // railroad ties where the water meets the greens (js/course/bulkhead.js)
+  buildings: 'florida', // the real houses round the course (OSM footprints, js/course/buildings.js)
+  sky: { day: 'subtropical' }, // js/scene/sky.js
   origin: [30.20173, -81.39585],
   blurb: "The back nine of Pete Dye's Stadium Course, home of THE PLAYERS Championship, as mapped on OpenStreetMap: water on 11 of 18 holes and the island green at the 17th.",
   credit: 'Holes © OpenStreetMap contributors (ODbL); scorecard via OpenGolfAPI (ODbL); elevation: AWS Terrain Tiles; ground colour: EOxCloudless https://cloudless.eox.at by EOX IT Services GmbH (Contains modified Copernicus Sentinel data 2024), CC BY-NC-SA 4.0',

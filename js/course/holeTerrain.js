@@ -460,16 +460,30 @@ export class HoleTerrain {
     const keepGreen = smooth(this.greenR + 0.2, this.greenR + 2.2, gd);
     // (LiDAR already holds the real bunker floors and faces)
     if (!this.lidar) for (const b of this.bunkers) {
-      const q = this._ellipse(b, x, z);
-      if (q >= 1.7) continue;
-      // the face toward the green stands up: a molded lip of turf, the floor
-      // dished smoothly under it; the far side runs out low and flat
+      if (b.poly) {
+        const bb = b.poly.box;
+        if (x < bb.minx - 2.8 || x > bb.maxx + 2.8 || z < bb.minz - 2.8 || z > bb.maxz + 2.8) continue;
+      } else if (this._ellipse(b, x, z) >= 2.6) continue;
+      // the face toward the green stands up: a rounded lip of turf at the edge, the sand face
+      // falling from it to a flat floor; the far side runs out low and flat
       const gx = this.green.x - b.x, gz = this.green.z - b.z, gl = Math.hypot(gx, gz) || 1;
       const ox = x - b.x, oz = z - b.z, ol = Math.hypot(ox, oz) || 1;
       const face = Math.max(0, (ox * gx + oz * gz) / (ol * gl));
-      const lip = (0.18 + 0.42 * face) * smooth(1.7, 1.08, q) * smooth(0.86, 1.08, q);
-      const bowl = -(0.55 + 0.3 * face) * smooth(1.08, 0.1, q) ** 0.8;
-      h += (bowl + lip) * keepGreen;
+      const L = 0.1 + 0.42 * face, D = 0.5 + 0.32 * face;
+      const R = b.poly ? b.poly.R : Math.min(b.rx, b.rz);
+      const wf = Math.min(1.5, R * 0.45);
+      // distance to the sand's edge (negative in the sand): the lip follows the outline as a band
+      // of one width, with no horns at its corners
+      const prof = (px, pz) => {
+        const sd = b.poly ? b.poly.sd(px, pz) : (Math.sqrt(this._ellipse(b, px, pz)) - 1) * Math.min(b.rx, b.rz);
+        if (sd > 2.2) return 0;
+        return sd < 0 ? L - (L + D) * smooth(0, wf, -sd) : L * (1 - smooth(0, 2.0, sd));
+      };
+      // averaged over a 0.6 m neighbourhood: where a bunker narrows, its faces meet in a rounded
+      // floor rather than a crease down the middle
+      const e = 0.6;
+      const dh = (prof(x, z) * 2 + prof(x + e, z) + prof(x - e, z) + prof(x, z + e) + prof(x, z - e)) / 6;
+      h += dh * keepGreen;
     }
     return h;
   }
@@ -553,6 +567,24 @@ export class HoleTerrain {
    * Rough depth at (x, z): 'first' (the first cut, a few metres off the
    * fairway or green) or 'deep'. Only meaningful where the surface is rough.
    */
+  /**
+   * How far into the rough, 0 (the first cut) to 1 (deep), as a smooth grade across 3.5-7.5 m
+   * from the fairway or green: drawn turf only (play still uses roughDepth's two cuts).
+   */
+  roughGrade(x, z) {
+    let d;
+    if (this.fairwayPolys.length) {
+      d = Infinity;
+      for (const f of this.fairwayPolys) d = Math.min(d, f.sd(x, z));
+    } else {
+      const pr = this.project(x, z);
+      const edge = this.fwHalf > 0 && pr.s > this.fwStart && pr.s < this.length ? this.fairwayHalf(pr.s) : 0;
+      d = edge > 0 ? Math.abs(pr.d) - edge : Infinity;
+    }
+    d = Math.min(d, Math.hypot(x - this.green.x, z - this.green.z) - this.greenR);
+    return smooth(3.5, 7.5, d);
+  }
+
   roughDepth(x, z) {
     const pr = this.project(x, z);
     const ad = Math.abs(pr.d);

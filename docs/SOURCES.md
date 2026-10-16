@@ -336,6 +336,10 @@ From Poly Haven (CC0), photographed for 3D environments:
   (`sky_prairie_4k.jpg`)
 - Mediterranean day: "Pizzo Pernice (Pure Sky)" by Andreas Mischok and
   Jarod Guest (`sky_mediterranean_4k.jpg`)
+- coastal day (Pebble Beach): "Aristea Wreck (Pure Sky)" by Greg Zaal and
+  Jarod Guest (`sky_coastal_4k.jpg`)
+- subtropical day (TPC Sawgrass): "Sunflowers (Pure Sky)" by Jarod Guest and
+  Sergej Majboroda (`sky_subtropical_4k.jpg`)
 
 ## Built surfaces
 
@@ -476,3 +480,19 @@ the game; surfaces are Poly Haven CC0 (`brown_leather`, `rough_linen`,
 `brown_mud_dry`, `thatch_roof_angled`, `bark_brown_02`, `granite_wall`).
 No feather headdresses, war paint or weapons: those are later, Plains-derived
 stereotypes, not Cahokia.
+
+## Surveyed buildings (Pebble Beach, TPC Sawgrass, Rolling Hills)
+
+`tools/fetch-building-shapes.py` measures every OpenStreetMap footprint round
+these courses from the USGS 3DEP aerial LiDAR (public domain), read from the
+public `usgs-lidar-public` Entwine bucket: CA_FEMA_Z4_B1_2018 (Pebble Beach),
+FL_Peninsular_FDEM_StJohns_2018 (TPC Sawgrass), IL_10CoNRCS_3_D23 (Rolling
+Hills). Ground, eave and ridge heights and a 0.75 m roof height map per
+building go into `assets/courses/<id>/buildings.json`. Roof colours are
+sampled from USGS The National Map imagery (NAIP, public domain).
+
+## Bunker sand
+
+`assets/textures/pbr/sand_01_*` — "Sand 01" from Poly Haven (CC0): colour,
+normal and roughness, laid on the bunkers with rake furrows drawn over it.
+

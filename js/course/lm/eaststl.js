@@ -12,7 +12,7 @@
 // Far landmarks are modelled in map axes (+x east, +z south).
 import * as THREE from 'three';
 import { lit, box, seeded, canvasTex, facadeMaterial, FT, landmarkWater } from './kit.js';
-import { pbr } from '../../scene/pbr.js';
+import { pbr, painted } from '../../scene/pbr.js';
 import { place, bx, cy, rod, span, Batch, tow } from './riverfront.js';
 import { courthouse } from './gatewayarch.js';
 import { crowdAt } from '../../scene/crowd.js';
@@ -262,7 +262,7 @@ function eads() {
   g.rotation.y = 0.05;
   // a MetroLink Red Line train crossing on the lower deck: two cars, white with the red band
   const train = new THREE.Group();
-  const body = new THREE.MeshStandardMaterial({ color: 0xeeeeea, roughness: 0.45, metalness: 0.2 }), red = new THREE.MeshStandardMaterial({ color: 0xb8202a, roughness: 0.5 });
+  const body = painted(0xeeeeea, { roughness: 0.45, metalness: 0.2 }), red = painted(0xb8202a, { roughness: 0.5 });
   const win = lit(0x2a3036, 0xffe9c0, { night: 1, roughness: 0.15 });
   for (let k = 0; k < 2; k++) {
     const car = new THREE.Group();
@@ -385,7 +385,7 @@ function eslife() {
       const wl = T.seaLevel != null ? (T.seaLevel - holder.position.y) / holder.scale.y : -1e9;
       const rnd = seeded(1861 + (T.hole?.n || 0));
       const spots = [];
-      const bronze = new THREE.MeshStandardMaterial({ color: 0x6b4a26, metalness: 0.7, roughness: 0.45 });
+      const bronze = painted(0x6b4a26, { metalness: 0.7, roughness: 0.45 });
       const stone = pbr('granite_wall', { scale: 1.2, tint: 0xb8b0a4 });
 
       // the heritage plaque beside the tee
@@ -417,8 +417,8 @@ function eslife() {
       }
       // fishermen along the riverbank, rods out over the water
       if (wl > -1e8) {
-        const rodM = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.5 }), line = new THREE.LineBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.5 });
-        const bucket = new THREE.MeshStandardMaterial({ color: 0xd8d0b0, roughness: 0.6 });
+        const rodM = painted(0x2a2a2a, { roughness: 0.5 }), line = new THREE.LineBasicMaterial({ color: 0xdddddd, transparent: true, opacity: 0.5 });
+        const bucket = painted(0xd8d0b0, { roughness: 0.6 });
         let n = 0;
         for (let k = 0; k < 400 && n < 12; k++) {
           const [x, z] = atHole(rnd() * T.length, (rnd() - 0.5) * 900);
