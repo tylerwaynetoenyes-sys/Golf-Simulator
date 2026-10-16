@@ -15,7 +15,7 @@ Government work); credit given anyway: "Elevation: U.S. Geological Survey,
 | Course | Files | Projects |
 |---|---|---|
 | Rolling Hills (Godfrey, IL) | `assets/courses/rollinghills/dem.*` (1 m over 1.8 km), `far.*` (32 m over 16 km) | Playing area: tile `x74y432` of **IL_10CountyNRCS_D23** (published April 2026). Surround: the same project, then IL_SouthCentral_2021_D21, IL_19County_D24, MO_WestCentral_2018_D19 and others, with Terrarium tiles only where no LiDAR covers. Each file's JSON lists the tiles used. |
-| Whistling Straits, the Straits Course (Haven, WI) | `assets/courses/whistlingstraits/dem.*` (2 m over 3.8 km), `far.*` (32 m over 16 km) | Playing area: tiles `x43y486` and `x44y486` of **WI_Oshkosh_3Rivers_2018_D19** (the WI_Oshkosh_3Rivers_B2_2018 flight), every bit of land; Terrarium tiles only over open Lake Michigan 600 m+ offshore. Surround: the same project, WI_2County_B23 and WI_ManitowocCo_2015. The lake is hydro-flattened at 177.0 m in the LiDAR; its bed was sloped in afterwards (0.35 m at the shore, 1 m per 40 m out, to 30 m), so it is drawn as deep water, not real bathymetry. |
+| Whistling Straits, the Straits Course (Haven, WI) | `assets/courses/whistlingstraits/dem.*` (1 m over a 1.3 by 3.9 km rectangle round the holes), `far.*` (32 m over 16 km) | Playing area: **WI_Oshkosh_3Rivers_2018_D19** (the WI_Oshkosh_3Rivers_B2_2018 flight), 99.6% of it; Terrarium tiles for the 0.4% no tile covers. Baked with `--sanity 30`: under the 20 m bluffs the default 15 m check against the coarse Terrarium surface rejected the real beach and put bluff-top heights on it. Surround: the same project, WI_2County_B23 and WI_ManitowocCo_2015. The lake is hydro-flattened at 177.0 m in the LiDAR; its bed was sloped in afterwards (0.35 m at the shore, 1 m per 40 m out, to 30 m), so it is drawn as deep water, not real bathymetry. |
 
 The script ignores any LiDAR sample more than 15 m from the coarse Terrarium
 surface. Tile `x74y431` of IL_10CountyNRCS_D23 has a strip that reads a
@@ -527,7 +527,8 @@ normal and roughness, laid on the bunkers with rake furrows drawn over it.
   and noise, so the trees are its unclassified returns (`--veg 1`) with the
   10 mapped building footprints blanked out: 19,686 trees 4 m and up over the
   land, 53 of them within 40 m of a Straits hole line (round the clubhouse
-  holes, 1, 9, 10 and 18), none along the lake. Footprints © OpenStreetMap contributors;
+  holes, 1, 9, 10 and 18), none along the lake. Checked against the USGS
+  aerial: the tree tops sit on the woods and the hole lines run between them. Footprints © OpenStreetMap contributors;
   roof colours from USGS/NAIP aerial photography (public domain).
 - Look checked against photographs of holes 3, 7, 12, 17 and 18 and the
   clubhouse found through image search (wisconsingolftrips.com,

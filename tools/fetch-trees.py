@@ -76,7 +76,8 @@ D = os.path.join('assets/courses', args.id)
 with open(os.path.join(D, 'dem.json')) as f:
     meta = json.load(f)
 LAT, LON = meta['lat'], meta['lon']
-HALF = meta['size'] / 2
+HALF = max(meta.get('sizeX', meta['size']), meta.get('sizeZ', meta['size'])) / 2  # the tree grid: square over the DEM's longer side
+HX, HZ = meta.get('sizeX', meta['size']) / 2, meta.get('sizeZ', meta['size']) / 2
 M_LAT = math.pi / 180 * R
 M_LON = M_LAT * math.cos(math.radians(LAT))
 
@@ -124,13 +125,13 @@ def download(t):
 
 
 # the bare-earth DEM, bilinear (as js/course/dem.js samples it)
-dem_n, dem_step = meta['n'], meta['step']
-dem = (meta['min'] + np.fromfile(os.path.join(D, 'dem.bin'), dtype='<u2').astype(np.float32) / 100).reshape(dem_n, dem_n)
+dem_nx, dem_nz, dem_step = meta.get('nx', meta['n']), meta.get('nz', meta['n']), meta['step']
+dem = (meta['min'] + np.fromfile(os.path.join(D, 'dem.bin'), dtype='<u2').astype(np.float32) / 100).reshape(dem_nz, dem_nx)
 
 
 def ground(x, z):
-    fi = np.clip((x + HALF) / dem_step, 0, dem_n - 1.001)
-    fj = np.clip((z + HALF) / dem_step, 0, dem_n - 1.001)
+    fi = np.clip((x + HX) / dem_step, 0, dem_nx - 1.001)
+    fj = np.clip((z + HZ) / dem_step, 0, dem_nz - 1.001)
     i, j = fi.astype(np.int64), fj.astype(np.int64)
     u, v = fi - i, fj - j
     return (dem[j, i] * (1 - u) * (1 - v) + dem[j, i + 1] * u * (1 - v)

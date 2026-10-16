@@ -3,7 +3,8 @@
 // OpenStreetMap (real outlines); scorecard: the published Straits card as listed by GolfPass
 // (https://www.golfpass.com/courses/14635-straits-golf-course-at-whistling-straits/scorecard-and-layout;
 // OpenGolfAPI's card for the resort is another course's); elevation from USGS 3DEP LiDAR
-// (WI_Oshkosh_3Rivers_2018_D19, baked at 2 m over 3.8 km by tools/fetch-lidar.py). Points are DEM-frame metres
+// (WI_Oshkosh_3Rivers_2018_D19, baked at 1 m over a 1.3 by 3.9 km rectangle round the holes by
+// tools/fetch-lidar.py --width 1300 --sanity 30). Points are DEM-frame metres
 // (+x east, +z south, origin 43.85013°, -87.73221°).
 // Data © OpenStreetMap contributors (ODbL 1.0), https://www.openstreetmap.org/copyright
 export default {
@@ -228,7 +229,7 @@ export default {
       lm: { type: "none", at: [0, 0] },
     },
     {
-      n: 17, name: "Pinched Nerve", par: 3,
+      n: 17, name: "Pinched Nerve", par: 3, crowds: true,
       note: "Par 3, 249 yards from the black tees. Handicap 8.",
       pts: [[123, -464], [220, -262]],
       fw: 0,
@@ -240,7 +241,7 @@ export default {
       lm: { type: "none", at: [0, 0] },
     },
     {
-      n: 18, name: "Dyeabolical", par: 4,
+      n: 18, name: "Dyeabolical", par: 4, crowds: true,
       note: "Par 4, 520 yards from the black tees. Handicap 2.",
       pts: [[259, -178], [-12, -195], [-160, -96]],
       fw: 33,

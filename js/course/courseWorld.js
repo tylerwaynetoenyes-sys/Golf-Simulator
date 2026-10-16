@@ -558,10 +558,10 @@ export class CourseWorld {
     // made-up stands where a course has them: every tree near the hole at its
     // real spot, height and crown; beyond play the tallest of each clump
     const surveyed = T.F?.d?.trees?.trees || null;
-    const surveyHalf = surveyed ? T.F.d.dem.half - 4 : 0;
+    const surveyX = surveyed ? T.F.d.dem.halfX - 4 : 0, surveyZ = surveyed ? T.F.d.dem.halfZ - 4 : 0;
     const inSurvey = (x, z) => {
       const [X, Z] = T.F.toDem(x, z);
-      return Math.abs(X) < surveyHalf && Math.abs(Z) < surveyHalf;
+      return Math.abs(X) < surveyX && Math.abs(Z) < surveyZ;
     };
     if (surveyed) {
       // one tree per cell stands in for its clump: finer near the hole, coarse
@@ -1263,18 +1263,35 @@ diffuseColor.rgb *= stripes * turf;`)
     if (!list.length) return;
     const pos = [], col = [], uv = [], sdA = [], fwA = [], sandA = [], roughA = [], dirA = [], idx = [], ease = [];
     const c = new THREE.Color(), cc3 = [0, 0, 0];
-    this._underlay = true; // vertex colours are the turf under the sand: the mask paints the sand, per pixel
-    for (const bk of list) {
+    const boxOf = (bk) => {
       let minx, maxx, minz, maxz;
       if (bk.poly) ({ minx, maxx, minz, maxz } = bk.poly.box);
       else { const r = Math.max(bk.rx, bk.rz); minx = bk.x - r; maxx = bk.x + r; minz = bk.z - r; maxz = bk.z + r; }
-      minx -= OUT; maxx += OUT; minz -= OUT; maxz += OUT;
-      const nx = Math.ceil((maxx - minx) / STEP) + 1, nz = Math.ceil((maxz - minz) / STEP) + 1;
+      return { minx: minx - OUT, maxx: maxx + OUT, minz: minz - OUT, maxz: maxz + OUT };
+    };
+    // bunkers in play (along the fairway corridor, round the green) keep the
+    // fine lip; on a hole with whole fields of them (Whistling Straits) the
+    // inserts coarsen just enough to hold to a budget of cells: the ones out
+    // of play first, the ones in play to 0.3 m at most
+    const inPlay = (bk) => { const pr = T.project(bk.x, bk.z); return pr.s > -20 && pr.s < T.length + 40 && Math.abs(pr.d) < Math.max(T.fwHalf, 15) + 25; };
+    const area = (bx) => (bx.maxx - bx.minx) * (bx.maxz - bx.minz);
+    let nearA = 0, farA = 0;
+    for (const bk of list) (inPlay(bk) ? (nearA += area(boxOf(bk))) : (farA += area(boxOf(bk))));
+    const BUDGET = 100000;
+    // in play, the lip never opens past 0.3 m (the coarse ground is 2.2 m)
+    const nearStep = Math.min(0.3, Math.max(STEP, Math.sqrt(nearA / (BUDGET * 0.75))));
+    const nearCells = nearA / (nearStep * nearStep);
+    const farStep = farA ? Math.min(0.6, Math.max(STEP, Math.sqrt(farA / Math.max(35000, BUDGET - nearCells)))) : STEP;
+    this._underlay = true; // vertex colours are the turf under the sand: the mask paints the sand, per pixel
+    for (const bk of list) {
+      const { minx, maxx, minz, maxz } = boxOf(bk);
+      const st = inPlay(bk) ? nearStep : farStep;
+      const nx = Math.ceil((maxx - minx) / st) + 1, nz = Math.ceil((maxz - minz) / st) + 1;
       const base = pos.length / 3;
       const own = new Uint8Array(nx * nz);
       for (let j = 0; j < nz; j++) {
         for (let i = 0; i < nx; i++) {
-          const x = minx + i * STEP, z = minz + j * STEP;
+          const x = minx + i * st, z = minz + j * st;
           const sd = this._bunkerSd(T, bk, x, z, OUT + 1);
           // this bunker's ground only (another bunker's insert has its own)
           own[j * nx + i] = sd < OUT && this._sandSd(T, x, z, OUT + 1) >= sd - 1e-6 ? 1 : 0;
@@ -1347,6 +1364,7 @@ diffuseColor.rgb *= stripes * turf;`)
     let Rc = (T.greenPoly
       ? Math.max(...T.greenPoly.pts.map(([x, z]) => Math.hypot(x - pin.x, z - pin.z)))
       : Math.hypot(pin.x - T.green.x, pin.z - T.green.z) + T.greenR) + 12;
+    const Rg = Rc; // the green's own reach, before its bunkers widen the patch
     // greenside bunkers belong to the patch, whole: reach past every bunker that comes near it
     const reach = (bk) => {
       const pts = bk.poly ? bk.poly.pts : [[bk.x, bk.z]];
@@ -1367,7 +1385,9 @@ diffuseColor.rgb *= stripes * turf;`)
     const radii = [];
     for (let r = CUP.radius; r < Rp; ) {
       radii.push(r);
-      r += Math.min(0.24, Math.max(0.012, r * 0.13));
+      // a patch widened past 45 m by a chain of bunkers (Whistling Straits' fields):
+      // beyond the green's own reach the rings open out to the spokes' spacing
+      r += Rc > 45 && r > Rg ? Math.max(0.24, r * 0.014) : Math.min(0.24, Math.max(0.012, r * 0.13));
     }
     radii.push(Rp);
     const NA = 448; // ~0.3 m between spokes at 40 m: the collar and greenside lips are true curves
@@ -1730,7 +1750,8 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
       this.tuftGeoLo.userData.shared = true;
       this.tuftMat = grassMaterial(0x6a8a3a);
     }
-    const N = Math.round(15000 * (this.treeDensity ?? 1));
+    // a links course's fescue drifts cover the deep rough: fewer tufts under them
+    const N = Math.round(15000 * (this.treeDensity ?? 1) * (T.hole.links ? 0.7 : 1));
     const tint = { western: 0xb3a05a, coastal: 0x8f9a58, harbor: 0xb0a865 }[T.hole.links ? 'harbor' : T.hole.theme];
     if (tint && !this.tuftMats?.[tint]) {
       this.tuftMats ||= {};
@@ -1778,7 +1799,8 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
     }
     const { geo, lo, mat } = this.fescue;
     const b = T.bounds(70);
-    const N = Math.round(14000 * (this.treeDensity ?? 1));
+    // links (Whistling Straits): fescue over whole holes of dunes, so fewer and sooner to the low tufts
+    const N = Math.round(14000 * (this.treeDensity ?? 1) * (T.hole.links ? 0.55 : 1));
     const placed = [];
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), sc = new THREE.Vector3(), p = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
     let n = 0;
@@ -1799,7 +1821,7 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
       placed.push(m4.compose(p.set(x, y - 0.03, z), q, sc.set(spread, h, spread)).clone());
       n++;
     }
-    this._chunked(g, placed, geo, lo, mat, { lodAt: 50, far: FESCUE_FAR });
+    this._chunked(g, placed, geo, lo, mat, { lodAt: T.hole.links ? 28 : 50, far: FESCUE_FAR });
   }
 
   /**
