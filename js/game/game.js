@@ -223,6 +223,7 @@ export class Game {
   refreshEquipment() {
     const st = store.settings, course = this.mode?.id === 'course';
     rebuildClubs({ set: st.clubSet, bag: st.bag, all: !course, ball: course ? st.ball : st.rangeBall });
+    this.world.ball.setModel(currentBall().id);
     this.club = clubById(this.club?.id);
     this.hud.renderClubs(this.club.id);
   }

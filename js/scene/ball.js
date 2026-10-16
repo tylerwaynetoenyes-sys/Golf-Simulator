@@ -6,6 +6,9 @@ import * as THREE from 'three';
 import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import { BALL } from '../core/physics.js';
 import { groundHeight } from './layout.js';
+import { loadEquipment } from './models.js';
+
+const MODEL_R = 0.021335; // the modelled balls are 1.68" across
 
 function dimpleNormalMap() {
   const s = 256;
@@ -130,6 +133,29 @@ export class Ball {
   }
 
   setGround(fn) { this.ground = fn || groundHeight; }
+
+  /**
+   * Show a modelled ball (assets/models/balls/<id>.glb: its dimple layout,
+   * print and finish); the procedural ball stays until it arrives.
+   */
+  setModel(id) {
+    if (!id || id === this.modelId) return;
+    this.modelId = id;
+    loadEquipment(`balls/${id}.glb`).then((scn) => {
+      const src = scn?.getObjectByName('ball');
+      if (!src || this.modelId !== id) return;
+      const mat = src.material.clone();
+      mat.emissive = new THREE.Color(0x2a241c);
+      mat.emissiveIntensity = 0.55 * (1 - (this.day ?? 0));
+      for (const lv of this.mesh.levels) {
+        lv.object.geometry = src.geometry;
+        lv.object.material = mat;
+        lv.object.scale.setScalar(BALL.radius / MODEL_R);
+      }
+      this._mats = [mat];
+      this.model = id;
+    });
+  }
 
   placeOnTee() { this.placeAt(0, 0, 0, true); }
 

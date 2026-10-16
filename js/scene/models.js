@@ -95,3 +95,34 @@ export function model(name) {
 export function modelBox(obj) {
   return new THREE.Box3().setFromObject(obj);
 }
+
+// ── equipment: club heads, shafts and grips, golf balls ──
+// Built in Blender from published dimensions (tools/equipment, tools/blender/
+// equipment.py): one GLB per head (assets/models/clubs/<set>/<club>.glb, with
+// its face centre and shaft axis in the node's extras), one per set's shafts
+// and grip, one per ball. Loaded on demand; callers draw the procedural
+// stand-ins until a file arrives.
+const eqCache = new Map(); // path → THREE.Object3D | null
+const eqPending = new Map();
+
+/** Load an equipment GLB by its path under assets/models; resolves to its scene (or null). */
+export function loadEquipment(path) {
+  if (eqCache.has(path)) return Promise.resolve(eqCache.get(path));
+  if (eqPending.has(path)) return eqPending.get(path);
+  if (typeof window === 'undefined') return Promise.resolve(null);
+  const url = new URL(`../../assets/models/${path}`, import.meta.url).href;
+  const p = gltfLoader().loadAsync(url).then((g) => {
+    g.scene.traverse((o) => {
+      if (!o.isMesh) return;
+      o.castShadow = true;
+      o.receiveShadow = true;
+    });
+    eqCache.set(path, g.scene);
+    return g.scene;
+  }).catch((e) => { console.warn(`equipment ${path} unavailable`, e); eqCache.set(path, null); return null; });
+  eqPending.set(path, p);
+  return p;
+}
+
+/** A loaded equipment scene (shared, not cloned), or undefined while it loads / null if missing. */
+export function equipment(path) { return eqCache.get(path); }
