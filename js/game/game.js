@@ -30,7 +30,8 @@ import {
 
 const RPM = (2 * Math.PI) / 60;
 const CAMERA_STYLES = ['cinematic', 'follow', 'tee'];
-const RANGE_SETUP = { origin: { x: 0, y: 0.1, z: 0 }, heading: 0, teed: true, putting: false, lie: 'tee', toPin: null };
+// teed, the origin is 4 cm above the ground, as on a course tee (ball.placeAt and the callouts take it back off)
+const RANGE_SETUP = { origin: { x: 0, y: 0.04, z: 0 }, heading: 0, teed: true, putting: false, lie: 'tee', toPin: null };
 
 // Power rises to 100% in 0.95 s, then creeps into an over-swing (max 110%).
 const swingPower = (t) => (t < 0.95 ? t / 0.95 : Math.min(1.1, 1 + (t - 0.95) * 0.35));
@@ -474,6 +475,7 @@ export class Game {
     this._syncTeeButton?.();
     w.ball.teeHeight = teed ? TEE_HEIGHT[kind] ?? 0.008 : 0;
     w.ball.placeAt(s.origin.x, s.origin.y, s.origin.z, teed);
+    this._ballRestY = w.ball.mesh.position.y; // (where the club meets it, even while a range ball is still rolling in)
     const x = s.origin.x, z = s.origin.z;
     const lie = s.teed ? (course ? 'tee' : 'fairway') : s.lie || 'fairway';
     w.ballBed.set({
@@ -529,7 +531,7 @@ export class Game {
     const w = this.world;
     const show = this.showMode();
     if (!s || s.putting || !this.club || show === 'ball') { w.club.hide(); w.golfer.address(w.club, true, w.rig); return; }
-    w.club.setAddress(s.origin, s.heading + this.aimDeg, this.club.id, w.groundFn(s.origin.x, s.origin.z));
+    w.club.setAddress(s.origin, s.heading + this.aimDeg, this.club.id, w.groundFn(s.origin.x, s.origin.z), this._ballRestY);
     w.golfer.address(w.club, show !== 'golfer', w.rig);
     w.club.hideAtAddress = show !== 'golfer';
     w.club._pose();

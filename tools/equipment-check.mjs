@@ -6,8 +6,9 @@
 //
 // For each club it checks that the model (not the procedural stand-in) is in
 // hand, that at address the face centre sits square behind the ball on the
-// ground, and that the swing (replayed from address) brings the face centre back to the ball on the
-// impact frame. For each ball, that its model replaced the procedural one.
+// ground, and that the swing (replayed from address) brings the face centre
+// back to the ball on the impact frame, rising to the ball's centre when it is
+// teed up. For each ball, that its model replaced the procedural one.
 // Any console error fails the run.
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -63,7 +64,8 @@ const CHECK_SET = (set) => `(async () => {
     for (let i = 0; i < 600 && !hit; i++) window.__advance(1 / 240, 1 / 240);
     if (hit) { c.root.updateMatrixWorld(true); imp = at(); }
     c.phase = 'address'; c.theta = 0; c._pose();
-    out.push({ id, ax: +(a.x - ballL.x).toFixed(4), az: +(a.z - ballL.z).toFixed(4), sole: +sole.toFixed(4),
+    const teed = ballL.y > 0.021335 + 0.002;
+    out.push({ id, teed, iy: imp && teed ? +(imp.y - ballL.y).toFixed(4) : null, ax: +(a.x - ballL.x).toFixed(4), az: +(a.z - ballL.z).toFixed(4), sole: +sole.toFixed(4),
       ix: imp ? +(imp.x - ballL.x).toFixed(4) : null, iz: imp ? +(imp.z - ballL.z).toFixed(4) : null, loft: head.userData.loft, lie: head.userData.lie });
   }
   return out;
@@ -117,9 +119,11 @@ try {
     const rows = await ev(CHECK_SET(s));
     for (const r of rows) {
       const bad = r.error || Math.abs(r.ax) > 0.006 || Math.abs(r.az - R) > 0.006 || Math.abs(r.sole) > 0.004
-        || r.ix == null || Math.hypot(r.ix, r.iz - R) > 0.02;
+        || r.ix == null || Math.hypot(r.ix, r.iz - R) > 0.02
+        // teed up, the swing rises to meet the ball's centre with the face's
+        || (r.teed && Math.abs(r.iy) > 0.006);
       if (bad) failed++;
-      console.log(`${bad ? 'FAIL' : 'ok  '} ${s.padEnd(10)} ${r.id.padEnd(5)} ${r.error || `loft ${r.loft}° lie ${r.lie}°  address x ${(r.ax * 1000).toFixed(1)} z ${(r.az * 1000).toFixed(1)} sole ${(r.sole * 1000).toFixed(1)} mm  ${r.ix == null ? 'no impact' : `impact x ${(r.ix * 1000).toFixed(1)} z ${(r.iz * 1000).toFixed(1)} mm`}`}`);
+      console.log(`${bad ? 'FAIL' : 'ok  '} ${s.padEnd(10)} ${r.id.padEnd(5)} ${r.error || `loft ${r.loft}° lie ${r.lie}°  address x ${(r.ax * 1000).toFixed(1)} z ${(r.az * 1000).toFixed(1)} sole ${(r.sole * 1000).toFixed(1)} mm  ${r.ix == null ? 'no impact' : `impact x ${(r.ix * 1000).toFixed(1)} z ${(r.iz * 1000).toFixed(1)}${r.teed ? ` y ${(r.iy * 1000).toFixed(1)} (teed)` : ''} mm`}`}`);
     }
   }
   for (const b of await ev(CHECK_BALLS)) {

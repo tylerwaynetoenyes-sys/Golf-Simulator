@@ -182,8 +182,12 @@ export class Club {
     this.shape = null;
   }
 
-  /** Build the club for `clubId` and stand it behind the ball at (origin), aimed along headingDeg. */
-  setAddress(origin, headingDeg, clubId, groundY = origin.y) {
+  /**
+   * Build the club for `clubId` and stand it behind the ball at (origin), aimed along headingDeg.
+   * ballY: the ball's centre (world y), above the ground when it is teed up.
+   */
+  setAddress(origin, headingDeg, clubId, groundY = origin.y, ballY = null) {
+    this._ballH = ballY == null ? BALL.radius : ballY - groundY;
     if (clubId !== this.id) this._build(clubId);
     this.root.position.set(origin.x, groundY, origin.z);
     this.root.rotation.y = (-headingDeg * Math.PI) / 180;
@@ -251,6 +255,7 @@ export class Club {
       const ax = new THREE.Vector3().fromArray(ud.axis);
       const O = new THREE.Vector3(-fc.x, 0, BALL.radius + 0.003 - fc.z);
       head.position.copy(O);
+      this._fcY = fc.y;
       club.add(head);
       // the shaft follows the head's own axis (its lie), soled flat
       dir.copy(ax);
@@ -300,6 +305,7 @@ export class Club {
     if (!head) {
       // the procedural stand-in while the model loads
       head = headMesh(spec, this.mats, set);
+      this._fcY = 0.02;
       // orient the head: toe out (+X), face to the target (-Z), hosel at the shaft
       head.position.copy(hosel);
       club.add(head);
@@ -421,6 +427,9 @@ export class Club {
     // slide the arc so the head meets the ball at the impact angle, not at the low point
     const head = new THREE.Vector3().sub(P).applyAxisAngle(this._axis, -imp).add(P);
     this.plane.position.set(-head.x, -head.y, -head.z).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+    // a teed ball: the club soles behind it at address, then the arc rises to meet it at the face centre
+    const ballH = this._ballH ?? BALL.radius;
+    if (ballH > BALL.radius + 0.002) this.plane.position.y += Math.max(0, ballH - (this._fcY ?? 0.02)) * w;
     this.plane.rotation.y = yaw;
     // twist the club about its shaft, keeping the hosel where it is
     const q = new THREE.Quaternion().setFromAxisAngle(this._shaftDir, twist);
