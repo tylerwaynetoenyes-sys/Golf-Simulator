@@ -28,11 +28,11 @@ const TOILET = { at: [154, -49], face: [146, -44] };
 function leafTexture(seed) {
   const c = document.createElement('canvas'); c.width = c.height = 256;
   const g = c.getContext('2d'), rnd = seeded(seed);
-  const greens = ['#2e461c', '#3a5622', '#46652a', '#527433', '#5f823a', '#3f5a28', '#6b8c43', '#355020'];
-  for (let i = 0; i < 420; i++) {
+  const greens = ['#4f6e2a', '#5f8432', '#6f973a', '#7ea545', '#8cb14e', '#5a7a30', '#9bbd5a', '#486426', '#3c5622'];
+  for (let i = 0; i < 900; i++) {
     const r = Math.hypot(rnd() - 0.5, rnd() - 0.5);
     const x = 128 + (rnd() - 0.5) * 220 * (0.4 + r), y = 128 + (rnd() - 0.5) * 220 * (0.4 + r);
-    const L = 7 + rnd() * 9, W = L * (0.5 + rnd() * 0.25), a = rnd() * 6.28, heart = rnd() < 0.35;
+    const L = 4.5 + rnd() * 6, W = L * (0.5 + rnd() * 0.25), a = rnd() * 6.28, heart = rnd() < 0.35;
     g.save(); g.translate(x, y); g.rotate(a);
     g.fillStyle = greens[Math.floor(rnd() * greens.length)];
     g.beginPath();
@@ -96,7 +96,7 @@ function clubhouse() {
         const p = geo.attributes.position;
         for (let i = 0; i < p.count; i++) p.setY(i, gy(x + p.getX(i), z + p.getZ(i)) + 0.04);
         geo.computeVertexNormals();
-        const turf = new THREE.Mesh(geo, pbr('grass_ground', { scale: 1.2, tint: 0x5aa83e, offset: -3 }));
+        const turf = new THREE.Mesh(geo, pbr('grass_ground', { scale: 1.2, tint: 0x8fd468, offset: -3, bright: 1.6 }));
         turf.position.set(x, 0, z); turf.receiveShadow = true; local.add(turf);
         const pole = new THREE.MeshStandardMaterial({ color: 0xe8e4d8, roughness: 0.5 }), flag = new THREE.MeshStandardMaterial({ color: 0xd8342c, roughness: 0.7, side: THREE.DoubleSide });
         for (const [dx, dz] of [[-4, 3], [3.5, -4], [5, 4.5]]) {
@@ -207,7 +207,7 @@ function bluff() {
 
       // ── the thicket: a dark core under leaf cards, at the measured height ──
       const cards = cardGeometry(seeded(78), 11);
-      const leafMat = new THREE.MeshStandardMaterial({ map: leafTexture(31), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.82 });
+      const leafMat = new THREE.MeshStandardMaterial({ map: leafTexture(31), alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.78, color: 0xe8f0d8 });
       const th = DATA.thicket;
       const creekDist = (X, Z) => {
         let d = Infinity;
@@ -224,10 +224,13 @@ function bluff() {
         const [x, z] = L(X, Z);
         const sf = T.terrain(x, z).surface;
         if (sf === 'green' || sf === 'fairway' || sf === 'sand' || sf === 'tee' || sf === 'water') continue;
-        const h = Math.min(h0, 2.8) * 0.85;
+        // on the bluff top (within 4 m of the tee's height) the brush stays below a golfer's eye, so
+        // the ravine opens up below the tee as it does in the photographs
+        const lip = T.teeHeight - gy(x, z) < 4 && Math.hypot(x, z) < 40;
+        const h = lip ? Math.min(h0, 0.9) : Math.min(h0, 2.8) * 1.05;
         const w = 1.8 + h * 0.55 + rnd() * 0.9;
         // the creek stays open to the sky between the banks' brush (the photographs show water and stones)
-        if (creekDist(X, Z) < 1.5 + w * 0.5) continue;
+        if (creekDist(X, Z) < 2.6 + w * 0.5) continue;
         q.setFromAxisAngle(up, rnd() * 6.28);
         s.set(w * (0.8 + rnd() * 0.4), h * (0.85 + rnd() * 0.3), w * (0.8 + rnd() * 0.4));
         m4.compose(p.set(x, gy(x, z) - 0.2, z), q, s);
