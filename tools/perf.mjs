@@ -72,7 +72,7 @@ try {
   const row = (h, m) => console.log(`${h.padEnd(15)} ${m.mode.padEnd(9)} ${m.ms.toFixed(1).padStart(5)} ${m.p95.toFixed(1).padStart(5)} ${(m.gpu ?? 0).toFixed(1).padStart(6)} ${String(m.calls).padStart(6)} (${String(m.callsMax).padStart(3)})  ${(m.tris / 1e6).toFixed(2).padStart(5)}M (${(m.trisMax / 1e6).toFixed(2)}M)  ${m.near}/${m.far}`);
   for (const h of holes) {
     const [c, n] = h.split(':');
-    await send('Page.navigate', { url: `${base}/?play=${c}&hole=${n || 1}&day` });
+    await send('Page.navigate', { url: `${base}/?play=${c}&hole=${n || 1}&day${process.env.QS || ''}` }); // QS: extra query (e.g. &ao=0)
     let ok = false;
     for (let i = 0; i < 160 && !ok; i++) { await sleep(500); ok = await ev(`!!(window.__game?.world?.sceneMode === 'course' && window.__game.world.course?.treeList)`); }
     if (!ok) { console.log(`${h.padEnd(15)} did not load`); continue; }

@@ -122,6 +122,11 @@ void main() {
  * The returned material keeps the old `uniforms` (uTime, uDay, uCloud) so the
  * environment can drive it like the river.
  */
+/** The scene reflection shared by every water material (js/scene/waterReflect.js fills it on High quality). */
+export const REFLECT = {
+  uReflTex: { value: null }, uReflMatrix: { value: new THREE.Matrix4() }, uReflLevel: { value: -1e6 }, uReflOn: { value: 0 },
+};
+
 export function createWaterMaterial({ y = 0, tint = 0x1c2a2c, flow = 0.3, clarity = 0 } = {}) {
   const mat = new THREE.MeshStandardMaterial({
     color: new THREE.Color(tint).multiplyScalar(0.95), roughness: 0.035, metalness: 0, envMapIntensity: 1.1,
@@ -130,6 +135,7 @@ export function createWaterMaterial({ y = 0, tint = 0x1c2a2c, flow = 0.3, clarit
   const uni = {
     uTime: { value: 0 }, uDay: { value: 1 }, uCloud: { value: 0.2 }, uFlow: { value: flow },
     uClarity: { value: clarity }, uDeep: { value: new THREE.Color(tint) },
+    ...REFLECT,
   };
   mat.uniforms = uni;
   mat.onBeforeCompile = (sh) => {
@@ -141,6 +147,7 @@ export function createWaterMaterial({ y = 0, tint = 0x1c2a2c, flow = 0.3, clarit
       .replace('#include <common>', `#include <common>
 varying vec3 vWWPos;
 uniform float uTime; uniform float uFlow; uniform float uClarity; uniform float uCloud; uniform vec3 uDeep;
+uniform sampler2D uReflTex; uniform mat4 uReflMatrix; uniform float uReflLevel; uniform float uReflOn;
 float wh(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float wn(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
   return mix(mix(wh(i), wh(i + vec2(1, 0)), u.x), mix(wh(i + vec2(0, 1)), wh(i + vec2(1, 1)), u.x), u.y); }
@@ -175,10 +182,17 @@ vec2 wslope(vec2 p, float t, float fade) {
         float fr = 0.02 + 0.98 * pow(1.0 - cosV, 5.0);
         float a = uClarity > 0.0 ? mix(1.0 - uClarity, 1.0, clamp(fr * 1.6, 0.0, 1.0)) : 1.0;
         diffuseColor.a = a;
+        // the scene in the water (trees, flags, buildings), wobbled by the ripples, strongest at a low angle
+        if (uReflOn > 0.5 && abs(vWWPos.y - uReflLevel) < 0.3) {
+          vec4 pc = uReflMatrix * vec4(vWWPos, 1.0);
+          vec2 ruv = pc.xy / pc.w + normal.xy * 0.05;
+          vec3 refl = texture2D(uReflTex, clamp(ruv, vec2(0.001), vec2(0.999))).rgb;
+          outgoingLight = mix(outgoingLight, refl * 0.82, clamp(fr * 0.75 + 0.06, 0.0, 0.72));
+        }
       }
       #include <opaque_fragment>`);
   };
-  mat.customProgramCacheKey = () => 'fairwayWater2';
+  mat.customProgramCacheKey = () => 'fairwayWater3';
   waterMaterials.add(mat);
   return mat;
 }

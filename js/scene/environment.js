@@ -344,7 +344,7 @@ export class Environment {
       fog.density = THREE.MathUtils.lerp(NIGHT.fogDensity * (1 + c * 0.4), DAY.fogDensity * (1 + c * 1.2), d) * (w.fogScale ?? 1);
     }
     const r = w.r;
-    r.renderer.toneMappingExposure = THREE.MathUtils.lerp(NIGHT.exposure, DAY.exposure, d);
+    r.renderer.toneMappingExposure = THREE.MathUtils.lerp(NIGHT.exposure, DAY.exposure, d) * (r.toneGain ?? 1);
     r.bloom.strength = THREE.MathUtils.lerp(NIGHT.bloom, DAY.bloom, d);
     r.bloom.threshold = THREE.MathUtils.lerp(NIGHT.bloomThreshold, DAY.bloomThreshold, d);
     if (r.grade) r.grade.uniforms.uNight.value = 1 - d;

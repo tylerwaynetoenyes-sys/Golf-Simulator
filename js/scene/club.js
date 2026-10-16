@@ -431,6 +431,9 @@ export class Club {
   _backTheta(p) { return -THREE.MathUtils.degToRad(255) * Math.min(1.1, p); }
 
   _pose() {
+    // straight down the line the clubhead sits right in front of the ball: with no golfer, the club stays out
+    // of the address view (as GSPro and E6 frame it) and comes in as the swing starts
+    this.pivot.visible = !(this.hideAtAddress && this.phase === 'address');
     this.pivot.quaternion.setFromAxisAngle(this._axis, -this.theta);
   }
 

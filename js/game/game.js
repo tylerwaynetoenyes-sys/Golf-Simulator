@@ -531,6 +531,8 @@ export class Game {
     if (!s || s.putting || !this.club || show === 'ball') { w.club.hide(); w.golfer.address(w.club, true, w.rig); return; }
     w.club.setAddress(s.origin, s.heading + this.aimDeg, this.club.id, w.groundFn(s.origin.x, s.origin.z));
     w.golfer.address(w.club, show !== 'golfer', w.rig);
+    w.club.hideAtAddress = show !== 'golfer';
+    w.club._pose();
     if (this.state === 'ready') w.rig.setAim(this.aimDeg); // (re-frame for the golfer)
   }
 

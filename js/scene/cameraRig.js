@@ -87,29 +87,20 @@ export class CameraRig {
       else this.desiredLook.set(o.x + fx * 20, o.y, o.z + fz * 20);
       return;
     }
-    // a little behind and to the side of the ball (off the clubhead, which sits behind it), low enough to
-    // see it on its tee or in its lie, and pitched so the ball sits in the lower third: clear of the
-    // prompts below it, the hole opening up above
-    // with the golfer standing to it, from further back on a longer lens (the broadcast "down the line" view):
-    // him on the left, the ball clear in front of the clubface, the hole opening up beyond
+    // straight down the target line from behind the ball, as GSPro, TrackMan and E6 frame it: the ball dead
+    // centre, low in the frame, the horizon in the upper third and the hole straight ahead.
+    // With a golfer standing to it, further back on a longer lens (him on the left, the line unchanged).
     const g = this.withGolfer;
-    const back = g ? 6.2 : 2.5, side = g ? 1.05 : 0.62, up = g ? 1.55 : 1.3;
-    this.addressFov = g ? 30 : 44;
-    const rx = -fz, rz = fx; // to the right of the line
-    const x = o.x - fx * back + rx * side, z = o.z - fz * back + rz * side;
-    const cy = Math.max(o.y + up, this.ground(x, z) + 0.9);
+    const back = g ? 5.8 : 3.3, up = g ? 1.6 : 1.35;
+    this.addressFov = g ? 32 : 44;
+    const x = o.x - fx * back, z = o.z - fz * back;
+    const cy = Math.max(o.y + up, this.ground(x, z) + 1.0);
     this.desiredPos.set(x, cy, z);
-    const dist = Math.hypot(o.x - x, o.z - z);
-    const below = Math.atan2(cy - o.y, dist);                         // the ball's angle below level
+    const below = Math.atan2(cy - o.y, back);                          // the ball's angle below level
     const half = THREE.MathUtils.degToRad((this.addressFov || 44) / 2);
-    const pitch = below - Math.atan(0.42 * Math.tan(half));            // ball 0.42 of the half-frame below centre
-    // turn halfway between the ball and the line ahead: the ball just left of centre, the hole opening up right
+    const pitch = below - Math.atan(0.56 * Math.tan(half));            // ball well below centre, clear of the prompts
     const L = 60;
-    const ya = Math.atan2(o.x - x, o.z - z), yb = Math.atan2(o.x + fx * L - x, o.z + fz * L - z);
-    let dy = yb - ya; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-    const yaw = ya + dy * 0.55;
-    const lx = x + Math.sin(yaw) * L, lz = z + Math.cos(yaw) * L;
-    this.desiredLook.set(lx, cy - Math.tan(pitch) * L, lz);
+    this.desiredLook.set(o.x + fx * L, cy - Math.tan(pitch) * (back + L), o.z + fz * L);
   }
 
   toAddress(immediate = false) {

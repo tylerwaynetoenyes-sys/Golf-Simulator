@@ -60,7 +60,7 @@ export class BallBed {
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           // sub-pixel blades only alias: they settle into the turf with distance (mown turf by ~1.5 m, rough further)
           vec3 wpos = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
-          transformed.y *= smoothstep(uFade.y, uFade.x, distance(cameraPosition, wpos));
+          transformed *= smoothstep(uFade.y, uFade.x, distance(cameraPosition, wpos)); // gone entirely, not left as specks
           // the tips stir in the breeze, each blade on its own beat
           vec3 ip = vec3(instanceMatrix[3][0], 0.0, instanceMatrix[3][2]);
           float k = position.y * position.y;
@@ -150,6 +150,7 @@ export class BallBed {
     im.receiveShadow = false;
     im.castShadow = false;
     im.frustumCulled = false;
+    im.userData.noAO = true; // (the AO's own depth pass would draw them full size, ignoring the fade: specks)
     this.blades = im;
     this.group.add(im);
   }

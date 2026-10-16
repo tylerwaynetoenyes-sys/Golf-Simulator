@@ -18,6 +18,7 @@ import { PlayerMarkers } from './markers.js';
 import { Divots } from './divots.js';
 import { BallBed } from './ballBed.js';
 import { Golfer } from './golfer.js';
+import { WaterReflections } from './waterReflect.js';
 import { Environment } from './environment.js';
 import { Ambient } from './ambient.js';
 import { Rain } from './rain.js';
@@ -52,6 +53,7 @@ export class World {
     this.divots = new Divots(scene);
     this.ballBed = new BallBed(scene);
     this.golfer = new Golfer(scene);
+    this.reflections = new WaterReflections();
     this.ambient = new Ambient(scene);
     this.rain = new Rain(scene);
     this.ambient.setCenter(0, -160);
@@ -247,6 +249,15 @@ export class World {
     this.ambient.update(dt, t);
     this.rain.update(dt, this.camera, this.env.wind(0, { gust: false }), this.env.day);
     updateInstanceCulling(this.camera); // crowds, cars and boats: only the ones in view
-    if (render) this.r.render();
+    if (render) {
+      // the scene in the water (High quality), drawn just before the frame that shows it
+      const r = this.r;
+      this.reflections.enabled = !!r.quality.reflections;
+      if (this.reflections.enabled) {
+        if (this._reflSize !== `${r._w}x${r._h}x${r._pr}`) { this._reflSize = `${r._w}x${r._h}x${r._pr}`; this.reflections.setSize(r._w * r._pr, r._h * r._pr); }
+        this.reflections.update(r.renderer, this.scene, this.camera, dt);
+      } else this.reflections.update(r.renderer, this.scene, this.camera, dt);
+      r.render();
+    }
   }
 }

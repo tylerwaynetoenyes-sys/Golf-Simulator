@@ -16,10 +16,29 @@ function load() {
 const TABLET = typeof navigator !== 'undefined' && (/iPad|Android(?!.*Mobile)/.test(navigator.userAgent)
   || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
 
+/**
+ * Medium on lighter machines (High's ambient occlusion, reflections and full 2x resolution are for a strong
+ * GPU or the TV): tablets; under 8 GB of memory (Chrome reports it); a base Apple M1/M2/M3 or integrated
+ * Intel/AMD graphics (read from WebGL); and, where the browser hides the GPU (Safari), 8 cores or fewer.
+ */
+function defaultQuality() {
+  if (TABLET) return 'medium';
+  try {
+    if (typeof navigator !== 'undefined' && navigator.deviceMemory && navigator.deviceMemory < 8) return 'medium';
+    const gl = document.createElement('canvas').getContext('webgl');
+    const ext = gl && gl.getExtension('WEBGL_debug_renderer_info');
+    const gpu = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : '';
+    gl?.getExtension('WEBGL_lose_context')?.loseContext();
+    if (/Apple M[1-3](?! (Pro|Max|Ultra))\b/.test(gpu) || /Intel|Radeon(?!.*(RX|Pro W))/i.test(gpu)) return 'medium';
+    if ((!gpu || /Apple GPU/.test(gpu)) && (navigator.hardwareConcurrency || 8) <= 8) return 'medium';
+  } catch { /* can't tell: High */ }
+  return 'high';
+}
+
 const DEFAULT_SETTINGS = {
   units: 'imperial',
   camera: 'cinematic', // cinematic | follow | tee
-  quality: TABLET ? 'medium' : 'high', // high | medium | low
+  quality: 'high', // high | medium | low (until the player picks one, set from the machine: defaultQuality)
   volume: 0.8,
   ambience: 0.6,
   ghostTracers: true,
@@ -53,6 +72,8 @@ class Store {
   constructor() {
     const saved = load() || {};
     this.settings = { ...DEFAULT_SETTINGS, ...(saved.settings || {}) };
+    // every setting is saved, defaults included, so a saved quality isn't a choice unless it was picked
+    if (!this.settings.qualityChosen) this.settings.quality = defaultQuality();
     this.bests = saved.bests || {};
     this.lifetime = saved.lifetime || { shots: 0, sessions: 0 };
     this.history = saved.history || []; // last sessions summaries
@@ -71,6 +92,7 @@ class Store {
 
   setSetting(k, v) {
     this.settings[k] = v;
+    if (k === 'quality') this.settings.qualityChosen = true;
     this.save();
   }
 
