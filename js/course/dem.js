@@ -61,30 +61,32 @@ export function gridFrom(meta, buf) {
   const q = new Uint16Array(buf);
   const h = new Float32Array(q.length);
   for (let i = 0; i < q.length; i++) h[i] = meta.min + q[i] / 100;
-  const { n, step, size } = meta;
-  const half = size / 2;
+  // square (n, size) or, for a long narrow course, a centred rectangle (nx by nz, sizeX by sizeZ)
+  const { step } = meta;
+  const nx = meta.nx ?? meta.n, nz = meta.nz ?? meta.n;
+  const halfX = (meta.sizeX ?? meta.size) / 2, halfZ = (meta.sizeZ ?? meta.size) / 2;
   /** Bilinear height (m above sea level) at DEM-frame metres; clamps at the edge. */
   const at = (x, z) => {
-    const fi = Math.min(n - 1.001, Math.max(0, (x + half) / step));
-    const fj = Math.min(n - 1.001, Math.max(0, (z + half) / step));
+    const fi = Math.min(nx - 1.001, Math.max(0, (x + halfX) / step));
+    const fj = Math.min(nz - 1.001, Math.max(0, (z + halfZ) / step));
     const i = Math.floor(fi), j = Math.floor(fj);
     const u = fi - i, v = fj - j;
-    const k = j * n + i;
-    return h[k] * (1 - u) * (1 - v) + h[k + 1] * u * (1 - v) + h[k + n] * (1 - u) * v + h[k + n + 1] * u * v;
+    const k = j * nx + i;
+    return h[k] * (1 - u) * (1 - v) + h[k + 1] * u * (1 - v) + h[k + nx] * (1 - u) * v + h[k + nx + 1] * u * v;
   };
   // Catmull-Rom bicubic: continuous slope across cells, so fairways roll
   // instead of creasing every `step` metres (what the ball and mesh play on).
   const cr = (p0, p1, p2, p3, t) => p1 + 0.5 * t * (p2 - p0 + t * (2 * p0 - 5 * p1 + 4 * p2 - p3 + t * (3 * (p1 - p2) + p3 - p0)));
-  const H = (i, j) => h[Math.min(n - 1, Math.max(0, j)) * n + Math.min(n - 1, Math.max(0, i))];
+  const H = (i, j) => h[Math.min(nz - 1, Math.max(0, j)) * nx + Math.min(nx - 1, Math.max(0, i))];
   const smooth = (x, z) => {
-    const fi = Math.min(n - 1.001, Math.max(0, (x + half) / step));
-    const fj = Math.min(n - 1.001, Math.max(0, (z + half) / step));
+    const fi = Math.min(nx - 1.001, Math.max(0, (x + halfX) / step));
+    const fj = Math.min(nz - 1.001, Math.max(0, (z + halfZ) / step));
     const i = Math.floor(fi), j = Math.floor(fj);
     const u = fi - i, v = fj - j;
     const row = (jj) => cr(H(i - 1, jj), H(i, jj), H(i + 1, jj), H(i + 2, jj), u);
     return cr(row(j - 1), row(j), row(j + 1), row(j + 2), v);
   };
-  return { meta, h, at, smooth, half };
+  return { meta, h, at, smooth, half: Math.min(halfX, halfZ), halfX, halfZ, nx, nz };
 }
 
 /** Load (once) the elevation for a course; resolves to {dem, far}. */
@@ -109,12 +111,12 @@ export const demFor = (id) => ready.get(id) || null;
  * Returns metres above sea level at DEM-frame metres (x east, z south).
  */
 export function demHeight(d, x, z) {
-  const m = d.dem.half - 160;
+  const mx = d.dem.halfX - 160, mz = d.dem.halfZ - 160;
   const ax = Math.abs(x), az = Math.abs(z);
-  if (ax < m && az < m) return d.dem.smooth(x, z);
+  if (ax < mx && az < mz) return d.dem.smooth(x, z);
   const far = d.far.smooth(x, z);
-  if (ax > d.dem.half - 8 || az > d.dem.half - 8) return far;
-  let k = Math.min(1, Math.max((ax - m) / 152, (az - m) / 152));
+  if (ax > d.dem.halfX - 8 || az > d.dem.halfZ - 8) return far;
+  let k = Math.min(1, Math.max((ax - mx) / 152, (az - mz) / 152));
   k = k * k * (3 - 2 * k);
   return d.dem.smooth(x, z) * (1 - k) + far * k;
 }
@@ -166,9 +168,9 @@ function carveRiverbed(d, polys, level, depth = 1.5) {
     return c;
   };
   for (const g of [d.dem, d.far]) {
-    const { n, step } = g.meta;
-    for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
-      const x = -g.half + i * step, z = -g.half + j * step, k = j * n + i;
+    const { step } = g.meta;
+    for (let j = 0; j < g.nz; j++) for (let i = 0; i < g.nx; i++) {
+      const x = -g.halfX + i * step, z = -g.halfZ + j * step, k = j * g.nx + i;
       if (g.h[k] > level - depth && polys.some((p) => inPoly(x, z, p))) g.h[k] = level - depth;
     }
   }
@@ -187,7 +189,7 @@ export function prepareDemHoles(course, d) {
     const loc = (p) => p.map(([X, Z]) => f.toLocal(X, Z));
     const withPoly = (o) => (o.poly ? { ...o, poly: loc(o.poly) } : o);
     return {
-      ...h, line, demFrame: f, course: course.id, theme: course.theme, far, buildings: course.buildings ?? null, cityPull: course.cityPull ?? null, enrich: !!course.enrich, quays: !!course.quays, noShore: !!course.noShore, bulkheads: !!course.bulkheads, life: course.life || 'club', sky: course.sky || null,
+      ...h, line, demFrame: f, course: course.id, theme: course.theme, far, buildings: course.buildings ?? null, cityPull: course.cityPull ?? null, enrich: !!course.enrich, quays: !!course.quays, noShore: !!course.noShore, bulkheads: !!course.bulkheads, links: !!course.links, life: course.life || 'club', sky: course.sky || null,
       green: withPoly(h.green),
       bunkers: (h.bunkers || []).map(withPoly),
       ...(h.fairways ? { fairways: h.fairways.map(loc) } : {}),

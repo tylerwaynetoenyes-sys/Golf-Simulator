@@ -381,6 +381,8 @@ export const THEME_TREES = {
   sawgrass: { broad: [0, 12, 12, 1], conifer: [8], density: 0.75, scatter: 0.6 },
   // Augusta National: tall loblolly pines (the pine model) over oaks and magnolias
   augusta: { broad: [0, 1, 2], conifer: [8], density: 0.9, conifersFirst: true, scatter: 0.4 },
+  // Whistling Straits: open dunes; the few trees (surveyed) are oaks, maples and spruce windbreaks inland
+  whistlingstraits: { broad: [0, 2, 3], conifer: [4, 5], density: 0.12, scatter: 0.08 },
 };
 
 /** The tree set for a hole: its course's own, else its theme's. */

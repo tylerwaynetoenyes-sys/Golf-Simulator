@@ -38,6 +38,7 @@ export const COURSE_MODELS = {
   centralpark: ['peopleLo'],
   eaststl: ['lowrider', 'wreck', 'people', 'peopleLo', 'rubble'],
   sawgrass: ['people', 'peopleLo'],
+  whistlingstraits: ['people', 'peopleLo'], // the galleries at the 17th and 18th
   // the scanned crowds at the riverfront and in the parks (instanced, js/scene/crowd.js)
   confluence: ['peopleLo', 'zooAnimals', 'zooRocks', 'cahokiaPeople'], // the zoo hole's animals and boulders; the Monks Mound hole's villagers
   alton: ['peopleLo'],

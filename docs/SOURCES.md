@@ -15,6 +15,7 @@ Government work); credit given anyway: "Elevation: U.S. Geological Survey,
 | Course | Files | Projects |
 |---|---|---|
 | Rolling Hills (Godfrey, IL) | `assets/courses/rollinghills/dem.*` (1 m over 1.8 km), `far.*` (32 m over 16 km) | Playing area: tile `x74y432` of **IL_10CountyNRCS_D23** (published April 2026). Surround: the same project, then IL_SouthCentral_2021_D21, IL_19County_D24, MO_WestCentral_2018_D19 and others, with Terrarium tiles only where no LiDAR covers. Each file's JSON lists the tiles used. |
+| Whistling Straits, the Straits Course (Haven, WI) | `assets/courses/whistlingstraits/dem.*` (1 m over a 1.3 by 3.9 km rectangle round the holes), `far.*` (32 m over 16 km) | Playing area: **WI_Oshkosh_3Rivers_2018_D19** (the WI_Oshkosh_3Rivers_B2_2018 flight), 99.6% of it; Terrarium tiles for the 0.4% no tile covers. Baked with `--sanity 30`: under the 20 m bluffs the default 15 m check against the coarse Terrarium surface rejected the real beach and put bluff-top heights on it. Surround: the same project, WI_2County_B23 and WI_ManitowocCo_2015. The lake is hydro-flattened at 177.0 m in the LiDAR; its bed was sloped in afterwards (0.35 m at the shore, 1 m per 40 m out, to 30 m), so it is drawn as deep water, not real bathymetry. |
 
 The script ignores any LiDAR sample more than 15 m from the coarse Terrarium
 surface. Tile `x74y431` of IL_10CountyNRCS_D23 has a strip that reads a
@@ -54,6 +55,9 @@ Required credit:
   imported with `tools/import-course.mjs` through the Overpass API); all
   18 holes of Rolling Hills Golf Course, Godfrey, with the real outlines of
   its greens, fairways, bunkers and ponds (`--outlines`), and
+  all 18 holes of the Straits Course at Whistling Straits, inside the OSM
+  boundary "Whistling Straits", with the real outlines of its greens,
+  fairways (multipolygons), bunkers and water,
   the positions of landmarks on the East St. Louis, Paris and Cassis courses
   (Eads Bridge, grain elevators, Gateway Arch, harbour and château).
 - **OpenGolfAPI** (https://opengolfapi.org, ODbL 1.0; course data
@@ -67,6 +71,13 @@ Required credit:
   retrieved 14 October 2026, in `assets/courses/rollinghills/scorecard.json`.
   OpenGolfAPI has no card for this course. These are facts from the card,
   used to set par and yardage, with credit to the club.
+- **The Straits Course scorecard** (pars, handicaps, six tee sets, ratings):
+  the published card as listed by GolfPass,
+  https://www.golfpass.com/courses/14635-straits-golf-course-at-whistling-straits/scorecard-and-layout,
+  retrieved 16 October 2026, in `assets/courses/whistlingstraits/scorecard.json`.
+  OpenGolfAPI's entry for Whistling Straits carries another course's card, so
+  it is not used. Hole names from the course's own naming (as listed on
+  Wikipedia, https://en.wikipedia.org/wiki/Whistling_Straits).
 
 Data under the ODbL can be used and adapted, including commercially, as long
 as it is credited and any adapted *database* shared under the same licence.
@@ -547,3 +558,22 @@ lines inside the same boundary share the numbers 1-9).
 The club guards its name, marks and imagery closely. Fairway shows the
 course as "Augusta National" from public map and survey data only: no club
 logo, trademark, tournament name or photograph of the course ships with it.
+
+## Whistling Straits
+
+- Trees (`assets/courses/whistlingstraits/trees.json`) and building heights,
+  roof shapes and colours (`buildings.json`): the **USGS 3DEP point cloud of
+  WI_Oshkosh_3Rivers_B2_2018**, public domain, read from the public Entwine
+  copy (`s3://usgs-lidar-public`) by `tools/fetch-trees.py --ept` and
+  `tools/fetch-building-shapes.py` (rockyweb.usgs.gov, where the LAZ tiles
+  are staged, was not answering). This flight classifies only ground, water
+  and noise, so the trees are its unclassified returns (`--veg 1`) with the
+  10 mapped building footprints blanked out: 19,686 trees 4 m and up over the
+  land, 53 of them within 40 m of a Straits hole line (round the clubhouse
+  holes, 1, 9, 10 and 18), none along the lake. Checked against the USGS
+  aerial: the tree tops sit on the woods and the hole lines run between them. Footprints © OpenStreetMap contributors;
+  roof colours from USGS/NAIP aerial photography (public domain).
+- Look checked against photographs of holes 3, 7, 12, 17 and 18 and the
+  clubhouse found through image search (wisconsingolftrips.com,
+  kohlerwisconsin.com, golf.com and others); nothing from them is copied
+  into the game.

@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Bake a course DEM from USGS 3DEP 1-metre LiDAR (bare earth, public domain).
 
-    python tools/fetch-lidar.py <courseId> <lat> <lon> [--size 1800] [--step 1]
+    python tools/fetch-lidar.py <courseId> <lat> <lon> [--size 1800] [--width 1800] [--step 1]
+                                [--sanity 15]
                                 [--far 16000] [--far-step 32]
                                 [--prefer IL_10CountyNRCS_D23,IL_SouthCentral_2021_D21]
 
@@ -16,7 +17,8 @@ tools/fetch-dem.mjs uses.
 Writes the same two grids as tools/fetch-dem.mjs, in the same frame
 (centred on lat/lon, +x east, +z south, metres; js/course/dem.js reads them):
 
-  assets/courses/<id>/dem.bin/.json   the playing area, --size m at --step m
+  assets/courses/<id>/dem.bin/.json   the playing area, --size m (north-south) by --width m
+                                      (east-west, default --size) at --step m
   assets/courses/<id>/far.bin/.json   the surround, --far m at --far-step m
 
 Heights are Uint16 centimetres above the grid minimum (NAVD88 metres).
@@ -51,6 +53,8 @@ ap.add_argument('lat', type=float)
 ap.add_argument('lon', type=float)
 ap.add_argument('--size', type=float, default=1800)
 ap.add_argument('--step', type=float, default=1)
+ap.add_argument('--width', type=float, default=None, help='east-west extent of the playing grid (default --size): a long, narrow course gets a rectangle')
+ap.add_argument('--sanity', type=float, default=15.0, help='largest LiDAR-vs-Terrarium difference kept (m); raise it under bluffs, where the coarse tiles smear the bluff top over the beach')
 ap.add_argument('--far', type=float, default=16000)
 ap.add_argument('--far-step', type=float, default=32)
 ap.add_argument('--prefer', default=PREFER, help='comma-separated 3DEP project names, best first')
@@ -100,20 +104,20 @@ def tiles_over(bounds_ll):
     return sorted(out, key=rank)
 
 
-def lidar_grid(size, step, ref):
+def lidar_grid(size, width, step, ref):
     """Sample the LiDAR mosaic on the course grid; NaN where no tile has data.
 
-    A tile's sample is used only within SANITY metres of `ref` (the coarse
+    A tile's sample is used only within --sanity metres of `ref` (the coarse
     Terrarium heights): a few published tiles carry constant-value strips
     along their edges (x74y431 of IL_10CountyNRCS_D23 reads 92.3 m on a
     170 m hillside), and those fall through to the next-ranked tile.
     """
-    n = int(round(size / step)) + 1
-    half = size / 2
+    nz, nx = ref.shape
+    half, hx = size / 2, width / 2
     # sample k sits at -half + k*step: pixel centres, north row first
-    dst_t = from_origin(-half - step / 2, half + step / 2, step, step)
-    dst = np.full((n, n), np.nan, dtype=np.float32)
-    ll = transform_bounds(LOCAL, 'EPSG:4326', -half - step, -half - step, half + step, half + step, densify_pts=21)
+    dst_t = from_origin(-hx - step / 2, half + step / 2, step, step)
+    dst = np.full((nz, nx), np.nan, dtype=np.float32)
+    ll = transform_bounds(LOCAL, 'EPSG:4326', -hx - step, -half - step, hx + step, half + step, densify_pts=21)
     tiles = tiles_over(ll)
     print(f'  {len(tiles)} LiDAR tiles: ' + ', '.join(sorted({t["project"] for t in tiles})))
     used = []
@@ -127,7 +131,7 @@ def lidar_grid(size, step, ref):
             continue
         with src:
             pad = 4 * step
-            b = transform_bounds(LOCAL, src.crs, -half - pad, -half - pad, half + pad, half + pad, densify_pts=21)
+            b = transform_bounds(LOCAL, src.crs, -hx - pad, -half - pad, hx + pad, half + pad, densify_pts=21)
             sb = src.bounds
             b = (max(b[0], sb.left), max(b[1], sb.bottom), min(b[2], sb.right), min(b[3], sb.top))
             if b[0] >= b[2] or b[1] >= b[3]:
@@ -148,10 +152,10 @@ def lidar_grid(size, step, ref):
             if np.isnan(arr).all():
                 continue
             wt = src.window_transform(win) * rasterio.Affine.scale(win.width / shape[1], win.height / shape[0])
-            tmp = np.full((n, n), np.nan, dtype=np.float32)
+            tmp = np.full((nz, nx), np.nan, dtype=np.float32)
             reproject(arr, tmp, src_transform=wt, src_crs=src.crs, src_nodata=np.nan,
                       dst_transform=dst_t, dst_crs=LOCAL, dst_nodata=np.nan, resampling=Resampling.bilinear)
-            fill = np.isnan(dst) & ~np.isnan(tmp) & (np.abs(tmp - ref) < SANITY)
+            fill = np.isnan(dst) & ~np.isnan(tmp) & (np.abs(tmp - ref) < args.sanity)
             if fill.any():
                 dst[fill] = tmp[fill]
                 used.append({'tile': t['title'], 'project': t['project'], 'published': t['date'], 'samples': int(fill.sum())})
@@ -162,18 +166,14 @@ def lidar_grid(size, step, ref):
 _tcache = {}
 
 
-SANITY = 15.0
-
-
-def terrarium_fill(dst, size, step):
+def terrarium_fill(dst, size, step, width=None):
     """Fill NaN samples from the Terrarium tiles (the same source as fetch-dem.mjs)."""
     miss = np.isnan(dst)
     if not miss.any():
         return 0
-    n = dst.shape[0]
-    half = size / 2
+    half, hx = size / 2, (width or size) / 2
     j, i = np.nonzero(miss)
-    x = -half + i * step
+    x = -hx + i * step
     z = -half + j * step
     lat = LAT - z / ((math.pi / 180) * R)
     lon = LON + x / ((math.pi / 180) * R * math.cos(math.radians(LAT)))
@@ -209,12 +209,13 @@ def terrarium_fill(dst, size, step):
     return int(miss.sum())
 
 
-def bake(name, size, step):
-    print(f'{name}: {size:g} m at {step:g} m')
-    n = int(round(size / step)) + 1
-    ref = np.full((n, n), np.nan, dtype=np.float32)
-    terrarium_fill(ref, size, step)
-    h, used = lidar_grid(size, step, ref)
+def bake(name, size, step, width=None):
+    width = width or size
+    print(f'{name}: {size:g} m' + (f' by {width:g} m' if width != size else '') + f' at {step:g} m')
+    nz, nx = int(round(size / step)) + 1, int(round(width / step)) + 1
+    ref = np.full((nz, nx), np.nan, dtype=np.float32)
+    terrarium_fill(ref, size, step, width)
+    h, used = lidar_grid(size, width, step, ref)
     miss = np.isnan(h)
     h[miss] = ref[miss]
     filled = int(miss.sum())
@@ -229,10 +230,12 @@ def bake(name, size, step):
     d = os.path.join('assets/courses', args.id)
     os.makedirs(d, exist_ok=True)
     q.tofile(os.path.join(d, f'{name}.bin'))
-    n = h.shape[0]
+    nz, nx = h.shape
     projects = sorted({u['project'] for u in used})
+    # a square grid is {size, n}; a rectangle adds sizeX/sizeZ and nx/nz (js/course/dem.js)
+    shape = {'n': nz} if nx == nz else {'n': nz, 'sizeX': width, 'sizeZ': size, 'nx': nx, 'nz': nz}
     meta = {
-        'lat': LAT, 'lon': LON, 'size': size, 'step': step, 'n': n,
+        'lat': LAT, 'lon': LON, 'size': size, 'step': step, **shape,
         'min': round(lo, 2), 'max': round(hi, 2),
         'lidar': bool(used) and filled == 0,
         'source': f'USGS 3DEP 1 m bare-earth DEM ({", ".join(projects)}), public domain'
@@ -241,8 +244,8 @@ def bake(name, size, step):
     }
     with open(os.path.join(d, f'{name}.json'), 'w') as f:
         f.write(json.dumps(meta, indent=2) + '\n')
-    print(f'  {n}×{n}, {lo:.2f}–{hi:.2f} m → {d}/{name}.bin')
+    print(f'  {nx}×{nz}, {lo:.2f}–{hi:.2f} m → {d}/{name}.bin')
 
 
-bake('dem', args.size, args.step)
+bake('dem', args.size, args.step, args.width)
 bake('far', args.far, args.far_step)

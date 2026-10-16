@@ -40,6 +40,7 @@ const STYLE = {
   carmel: { roof: 'hip', house: true, lamp: '#ffd7a0' },
   florida: { roof: 'hip', house: true, lamp: '#ffe0b0' },
   midwest: { roof: 'hip', house: true, lamp: '#ffd090' },
+  straits: { roof: 'hip', house: true, lamp: '#ffd090' },
   paris: {
     bay: 3.4, floor: 3.25, roof: 'mansard',
     facade: (g, w, h) => {
@@ -132,6 +133,18 @@ const REAL = {
     glass: null,
     roof: ['roof_slates_02', { scale: 1.4, tint: 0x6a5a4c }],
     cap: ['roof_slates_02', { scale: 1.4, tint: 0x6a5a4c }],
+  },
+  // Whistling Straits: the clubhouse and the cottages round it are built as an Irish farmstead,
+  // grey-brown fieldstone under dark slate, with deep-set white-framed windows
+  straits: {
+    walls: [
+      ['granite_wall', { scale: 2.4, tint: 0xd2c6b4 }, { bay: 4.4, floor: 3.2, win: [0.32, 0.68, 0.28, 0.78], frame: 0xf2efe8, lit: 0.35 }],
+      ['sandstone_blocks_08', { scale: 2.4, tint: 0xc4b8a6 }, { bay: 4.4, floor: 3.2, win: [0.32, 0.68, 0.28, 0.78], frame: 0xf2efe8, lit: 0.35 }],
+    ],
+    roofs: [['roof_slates_02', { scale: 1.4, tint: 0x5a5c60 }], ['roof_slates_02', { scale: 1.4, tint: 0x4a4c50 }]],
+    glass: null,
+    roof: ['roof_slates_02', { scale: 1.4, tint: 0x55575c }],
+    cap: ['roof_slates_02', { scale: 1.4, tint: 0x55575c }],
   },
   paris: {
     walls: [
