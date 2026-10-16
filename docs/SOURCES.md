@@ -414,6 +414,32 @@ mesh with its coat texture, Draco-compressed (`assets/models/animals/`):
 - "Brown Cow 3d model" by rt699448 (sketchfab.com/rt699448), drawn as the
   wagon trains' oxen
 
+## Wildlife
+
+`assets/models/wildlife/`: real animals for every course (`js/course/wildlife.js`,
+`js/scene/fauna.js`), from Sketchfab under CC BY 4.0, reduced in Blender
+(`tools/blender/wildlife.py`) to one 2.5–7k-triangle mesh with its coat as a
+512–1024 px WebP texture, Draco-compressed. They move in the vertex shader
+(walking, grazing, wingbeats), not with the authors' rigs.
+
+| File | Model | Author | Notes |
+|---|---|---|---|
+| gator.glb | [Mississippi Alligator (Animated, downloadable)](https://sketchfab.com/3d-models/f0cc55fd5e4448e6bbd2ee65b2f1ea66) | andrey. | basking pose, the diorama removed |
+| deer_buck.glb, deer_doe.glb | [Realistic Whitetailed deer / free commercial use](https://sketchfab.com/3d-models/d8192bb6909042a0b8ba08774358a8f1) | free-3d-animal-character-model | the doe is the buck with its antlers cut away; tinted greyer for black-tailed and mule deer |
+| goose.glb | [Canada Goose](https://sketchfab.com/3d-models/d32e8f0c49a04dccbfdeb3593649197d) | OSU.Multimedia | |
+| goose_fly.glb | [Canada Goose - in Flight](https://sketchfab.com/3d-models/25fbbb9e607a4bccb05ae05c08fd0039) | OSU.Multimedia | wings-out frame of its flap; also, recoloured, the herons' and egrets' flight |
+| heron.glb, egret.glb | [Great blue heron](https://sketchfab.com/3d-models/52cffc22bf2441468739ac3ba6d599aa) | faerbogdan99 | the egret is the heron whitened, with black legs (great egret) |
+| eagle.glb | [Bald Eagle Flying Bird Model](https://sketchfab.com/3d-models/30434fd1272f464a8540750a78a5087f) | s8819296 | soaring; tinted for the red-tailed hawk |
+| gull.glb | [Seagull](https://sketchfab.com/3d-models/dc42ffc81c86480e9e7f7752fa134174) | Dayvable | glide frame; scaled and tinted grey-brown for the brown pelican lines (no pelican under an open licence) |
+| squirrel.glb | [Realistic_squirrel_3d_model](https://sketchfab.com/3d-models/b492079385ff407ab68aa7f72c88f828) | mgddeldeen9020 | fox squirrel as is; greyed for the eastern grey squirrel |
+| sheep.glb | [Realistic Woolly Sheep - Game Ready Asset](https://sketchfab.com/3d-models/11d84b8881dd4e5fae326ace6b1515ef) | Hdjusj | face and legs darkened (vertex colour) for Scottish Blackface |
+| mallard.glb | [Realistic Mallard Duck - Game Ready Asset](https://sketchfab.com/3d-models/dd33cd2e30944a4aae2de1a06a828f4f) | Hdjusj | |
+| sealion.glb, harborseal.glb | the zoo's sea lion and harbor seal (credited above) | zhaoqinzzq, c4rn4g3 | re-exported on their own, head toward -Z |
+
+The paragliders and hang gliders over Torrey Pines are built in code.
+Birdsong, gull calls, goose honks and the sea lions' barks are synthesised
+(Web Audio) in `js/course/wildlife.js`.
+
 ## Confluence Point
 
 `assets/courses/confluencepoint/`: `dem.*`/`far.*` (Terrarium, USGS 3DEP) and

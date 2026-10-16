@@ -86,7 +86,9 @@ export function preloadCourseModels(courseId) {
   if (typeof window === 'undefined') return Promise.resolve();
   // every course gets the shared course life (js/course/courseLife.js): people and carts
   const list = new Set([...(COURSE_MODELS[courseId] || []), 'peopleLo', 'golfCart']);
-  return Promise.all([...list].map(load));
+  // [wildlife] the course's animals (js/course/wildlife.js), fetched alongside
+  const fauna = import('../course/wildlife.js').then((m) => m.preloadWildlife(courseId)).catch(() => null);
+  return Promise.all([...[...list].map(load), fauna]);
 }
 
 /** A clone of a loaded model, or null if it isn't loaded. Materials are shared. */

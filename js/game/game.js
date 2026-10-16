@@ -964,11 +964,15 @@ export class Game {
     this.state = 'rest';
     const r = s.result;
     this.world.rig.ballAtRest(new THREE.Vector3(r.rest.x, r.rest.y, r.rest.z));
+    // [wildlife] a ball at rest beside an alligator: now and then a short look at it (js/ui/moments.js)
+    const beast = this.world.sceneMode === 'course' && !r.holed ? this.world.course.wildlife?.ballRest(r.rest) : null;
+    if (beast && moments.wildlife(this, beast)) s.extraRest = 2.4;
     this.world.tracer.finish(store.settings.ghostTracers && !this.mode.course);
     this.hud.setSkip(false);
     this._reveal();
     const o = s.outcome;
     s.restTimer = r.holed && (!s.tapping || s.ring) ? 3.0 : o.summary ? 2.6 : o.holeComplete ? 2.2 : r.putt ? 1.5 : 3.2 + (this.hud.commentEl.classList.contains('show') ? 0.8 : 0);
+    s.restTimer += s.extraRest || 0; // [wildlife]
     // finished inside a putting ring: roll it in
     if (o.finish && !o.finish.holedPutt && !o.finish.skipped && !s.tapped) s.tapDelay = 0.9;
     // in the water: the player chooses drop, re-hit or mulligan

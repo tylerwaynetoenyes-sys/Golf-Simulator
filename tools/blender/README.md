@@ -87,3 +87,13 @@ blender -b --factory-startup --python tools/blender/cup.py -- assets/models/cup.
 blender -b --factory-startup --python tools/blender/green_details.py -- . [pin] [marker] [marks]
 blender -b --factory-startup --python tools/blender/divots.py -- . [chunks] [scars]
 ```
+
+## Wildlife (Sketchfab, CC BY)
+
+`wildlife.py` turns a Sketchfab animal into a game mesh for `js/scene/fauna.js`:
+posed at a chosen frame, joined, base colour only, head to -Z, feet on the
+ground, real length, decimated to 2.5–7 k triangles, Draco and WebP, in
+`assets/models/wildlife/`. The per-animal settings and the egret, doe and
+Blackface variants are listed at the top of the script; credits in
+`docs/SOURCES.md`. `tools/wildlife-preview.html` shows them all with their
+animation (`?kind=deer_doe&gait=1`).
