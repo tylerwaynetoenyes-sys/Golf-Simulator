@@ -11,6 +11,7 @@ import { store } from './data/store.js';
 import { audio } from './audio/audio.js';
 import { $ } from './ui/dom.js';
 import { launchIn } from './ui/motion.js';
+import { mountLogo, dropIn, roll, logos } from './ui/logo.js';
 
 // ?maxdt=0.25 lets slow (software-rendered) test runs keep real-time playback.
 const PARAMS = new URLSearchParams(location.search);
@@ -34,6 +35,13 @@ async function boot() {
     fail('This browser or device does not support WebGL 2. Try a current Chrome, Edge, Safari or Firefox with hardware acceleration on.');
     return;
   }
+
+  // the wordmark: rolling ball while the world builds, the HUD corner, the launch screen
+  logos.loading = await mountLogo($('#loadingLogo'), 'full');
+  const stopRoll = roll(logos.loading);
+  mountLogo($('#brandLogo'), 'word', 'Fairway').then((h) => { logos.hud = h; });
+  const launchLogo = mountLogo($('#launchLogo'), 'full', 'Fairway Golf Sim').then((h) => (logos.launch = h));
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); // let the loader paint first
 
   let world;
   try {
@@ -84,7 +92,11 @@ async function boot() {
       firstFrame = false;
       setTimeout(() => {
         $('#loading').classList.add('done');
-        if ($('#launch').dataset.visible === 'true') launchIn($('#launch'));
+        stopRoll();
+        if ($('#launch').dataset.visible === 'true') {
+          launchIn($('#launch'));
+          launchLogo.then((h) => dropIn(h, 0.55));
+        }
       }, 250);
     }
     requestAnimationFrame(frame);

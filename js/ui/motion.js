@@ -62,7 +62,7 @@ export function wipeIn(el) {
 export function launchIn(root) {
   if (!on() || !root) return;
   G.timeline({ defaults: { ease: 'expo.out' } })
-    .from(root.querySelector('.launch-title img'), { opacity: 0, y: 14, scale: 0.985, filter: 'blur(6px)', duration: 1.4, clearProps: 'filter' }, 0.1)
+    .from(root.querySelector('.launch-title'), { opacity: 0, y: 14, scale: 0.985, filter: 'blur(6px)', duration: 1.4, clearProps: 'filter' }, 0.1)
     .from(root.querySelector('.rule'), { scaleX: 0, duration: 1, ease: 'power3.inOut' }, 0.5)
     .from(root.querySelector('.launch-tag'), { opacity: 0, letterSpacing: '0.4em', duration: 1.1 }, 0.6)
     .from(root.querySelectorAll('.launch-actions > *, .launch-inner > .link-btn, .launch-foot'), { opacity: 0, y: 10, duration: 0.7, stagger: 0.07, ease: 'power3.out', clearProps: 'transform,opacity' }, 0.8);

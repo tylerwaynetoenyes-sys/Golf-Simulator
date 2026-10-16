@@ -10,6 +10,7 @@ import { CLUBS, clubById, demoLaunch, rebuildClubs, currentBall } from '../data/
 import { partyCalls, partyRule } from './party.js';
 import { store } from '../data/store.js';
 import * as moments from '../ui/moments.js';
+import { logos, gold as logoGold } from '../ui/logo.js';
 import { audio } from '../audio/audio.js';
 import { radio, STATIONS } from '../audio/radio.js';
 import { createModes } from './modes.js';
@@ -922,6 +923,8 @@ export class Game {
     this.hud.holeOut({ kicker, title, sub, big });
     moments.holeOut(this, { level, ace: !!o.ace, eagle: cat === 'eagle' || cat === 'albatross', cup: Number.isFinite(hx) ? { x: hx, y: cy, z: hz } : null, holeName: this.mode.course ? `Hole ${this.mode.hole.n} · ${this.mode.hole.name}` : '' });
     this.piasa?.react(big ? 'big' : 'cheer');
+    // birdie or better: the ball in the corner wordmark drops in and turns achievement gold
+    if (o.ace || cat === 'birdie' || cat === 'eagle' || cat === 'albatross') logoGold(logos.hud, { big: !!o.ace || cat !== 'birdie' });
   }
 
   _reveal() {

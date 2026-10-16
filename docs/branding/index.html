@@ -1,0 +1,1006 @@
+<meta charset="utf-8">
+<title>Fairway Branding Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Anton&family=Archivo:wght@400;500;600&family=Archivo+Narrow:wght@500;600&family=Big+Shoulders+Display:wght@800;900&family=Jost:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Montserrat:wght@800;900&family=Oswald:wght@500;600&display=swap">
+<style>
+/* Layout: one neutral board. Five equal columns (the styles) against rows (the uses), then a motion lab. The page itself carries no brand colour, so no style is favoured by the frame around it. */
+:root {
+  --bg: #ecebe8; --surface: #f7f6f3; --sunk: #e2e1dd; --ink: #1b1c1e; --muted: #66676b; --line: #d3d1cc;
+  --gold: #b8922f;
+  --f-ui: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-label: "Archivo Narrow", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+  --col: minmax(250px, 1fr);
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #131416; --surface: #1b1c1f; --sunk: #0f1012; --ink: #ebeae6; --muted: #9c9ca0; --line: #2d2e32; --gold: #e9c97a; color-scheme: dark } }
+:root[data-theme="dark"] { --bg: #131416; --surface: #1b1c1f; --sunk: #0f1012; --ink: #ebeae6; --muted: #9c9ca0; --line: #2d2e32; --gold: #e9c97a; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--ink); font: 15px/1.55 var(--f-ui); margin: 0 }
+.wrap { max-width: 1680px; margin: 0 auto; padding-inline: clamp(16px, 3vw, 40px); padding-block: 36px 80px }
+h1, h2, h3 { font-family: var(--f-label); font-weight: 600; text-wrap: balance; margin: 0 }
+h1 { font-size: clamp(28px, 4vw, 44px); letter-spacing: -0.01em; line-height: 1.05 }
+h2 { font-size: 24px; margin-bottom: 6px }
+h3 { font-size: 15px; letter-spacing: .04em; text-transform: uppercase }
+p { margin: 0; max-width: 68ch }
+.lede { color: var(--muted); margin-top: 10px }
+.label { font: 600 11px/1.2 var(--f-label); letter-spacing: .12em; text-transform: uppercase; color: var(--muted) }
+.mono { font-family: var(--f-mono); font-size: 12px }
+header.top { display: grid; gap: 14px; padding-bottom: 26px; border-bottom: 1px solid var(--line) }
+header.top .meta { display: flex; flex-wrap: wrap; gap: 8px 22px; color: var(--muted); font-size: 13px }
+section { padding-top: 44px; display: grid; gap: 18px }
+.sec-head { display: grid; gap: 6px }
+
+/* ── the comparison matrix ── */
+.matrix-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface) }
+.matrix { display: grid; grid-template-columns: 150px repeat(5, var(--col)); min-width: 1420px }
+.matrix > div { padding: 14px; border-bottom: 1px solid var(--line); border-left: 1px solid var(--line); min-width: 0 }
+.matrix .rowh { position: sticky; left: 0; z-index: 2; background: var(--surface); border-left: 0; display: grid; align-content: start; gap: 6px }
+.matrix .rowh small { color: var(--muted); font-size: 12px; line-height: 1.4 }
+.matrix .colh { display: grid; gap: 4px; position: sticky; top: 0 }
+.colh .swatches { display: flex; gap: 4px; margin-top: 4px }
+.colh .swatches i { width: 14px; height: 14px; border-radius: 3px; border: 1px solid var(--line) }
+.colh b { font: 600 17px/1.2 var(--f-label) }
+.matrix img, .matrix .shot { display: block; width: 100%; border-radius: 6px }
+.matrix .logo-img { aspect-ratio: 16/10; object-fit: cover; background: var(--sunk) }
+.matrix .tall { aspect-ratio: auto }
+.sizes { display: grid; gap: 10px }
+.sizes .row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap }
+.sizes .chip { display: grid; place-items: center; border-radius: 6px; padding: 6px }
+.sizes figcaption { font: 11px var(--f-mono); color: var(--muted) }
+.notes { display: grid; gap: 10px; font-size: 13.5px; line-height: 1.5 }
+.notes dt { font: 600 11px/1.2 var(--f-label); letter-spacing: .1em; text-transform: uppercase; color: var(--muted) }
+.notes dd { margin: 2px 0 0 }
+.notes dl { margin: 0; display: grid; gap: 10px }
+
+/* the in-game mockups: real game frames with the brand laid over them */
+.shot { position: relative; aspect-ratio: 16/10; overflow: hidden; background: #222 center/cover no-repeat; container-type: inline-size }
+.shot.title::before { content: ""; position: absolute; inset: 0; background: inherit; filter: blur(6px) brightness(.55) saturate(.9); transform: scale(1.06) }
+.shot .badge { position: absolute; left: 50%; top: 46%; width: 62%; transform: translate(-50%, -50%); border-radius: 4cqw; box-shadow: 0 2cqw 6cqw rgba(0,0,0,.45); overflow: hidden }
+.shot .badge img { border-radius: 0 }
+.shot .play { position: absolute; left: 50%; bottom: 9%; transform: translateX(-50%); font: 600 3.4cqw/1 var(--f-label); letter-spacing: .14em; text-transform: uppercase; padding: 2.4cqw 5cqw; border-radius: 1.4cqw; white-space: nowrap }
+.shot .cover { position: absolute; left: .6%; top: 2%; width: 8.4%; height: 5.4%; background: rgba(36,38,40,.9); border-radius: .8cqw }
+.shot .hudmark { position: absolute; left: 1%; top: 1.6%; width: 13%; padding: .6cqw .9cqw; border-radius: .9cqw; background: rgba(20,21,23,.72) }
+.shot .moment { position: absolute; left: 50%; top: 40%; transform: translate(-50%, -50%); text-align: center; display: grid; justify-items: center; gap: .6cqw; padding: 3cqw 8cqw; background: radial-gradient(closest-side, rgba(0,0,0,.55), rgba(0,0,0,0)) }
+.shot .moment .k { font: 600 1.9cqw/1 var(--f-label); letter-spacing: .3em; text-transform: uppercase; color: #efe8d8 }
+.shot .moment .t { font-size: 8.5cqw; line-height: .95; letter-spacing: .02em }
+.shot .moment .r { width: 18cqw; height: .35cqw; background: #e9c97a }
+.shot .moment .dv { position: absolute; width: 17cqw; right: -6cqw; bottom: -1cqw }
+
+/* ── motion lab ── */
+.lab { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start }
+@media (max-width: 980px) { .lab { grid-template-columns: 1fr } }
+.stage { position: relative; aspect-ratio: 16/10; border-radius: 10px; overflow: hidden; background: #f2e6c8 center/cover no-repeat; border: 1px solid var(--line); container-type: inline-size }
+.stage.ingame::before { content: ""; position: absolute; inset: 0; background: inherit; }
+.stage .puppet-holder { position: absolute; left: 8%; bottom: 4%; width: 52% }
+.stage.ingame .puppet-holder { left: 4%; width: 40%; bottom: 2% }
+.stage svg.puppet { width: 100%; height: auto; display: block; overflow: visible }
+.stage .bn { position: absolute; right: 5%; top: 18%; width: 46%; display: grid; justify-items: center; gap: 1.1cqw; text-align: center; pointer-events: none; opacity: 0 }
+.stage .bn .k { font: 600 1.5cqw/1 var(--f-label); letter-spacing: .32em; text-transform: uppercase }
+.stage .bn .t { font-size: 8cqw; line-height: .92; white-space: nowrap; overflow: hidden }
+.stage .bn .t span { display: inline-block }
+.stage .bn .r { width: 60%; height: .32cqw; background: #e9c97a; transform-origin: 50% 50% }
+.stage .bn .s { font: 500 1.6cqw/1.2 var(--f-mono); letter-spacing: .05em }
+.stage .stamp { position: absolute; left: 3%; top: 4%; width: 22% }
+.controls { display: grid; gap: 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px }
+.controls .grp { display: grid; gap: 8px }
+.seg { display: flex; flex-wrap: wrap; gap: 6px }
+button { font: 500 13px/1 var(--f-ui); color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 7px; padding: 9px 12px; cursor: pointer }
+button[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink) }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px }
+.stylechip { display: inline-flex; align-items: center; gap: 7px }
+.stylechip i { width: 12px; height: 12px; border-radius: 3px; border: 1px solid rgba(127,127,127,.4) }
+.readout { font: 12px/1.5 var(--f-mono); color: var(--muted); min-height: 3em }
+
+.briefs { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px }
+.brief { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: grid; gap: 10px; align-content: start }
+.brief dl { margin: 0; display: grid; grid-template-columns: 82px 1fr; gap: 7px 12px; font-size: 13px; line-height: 1.45 }
+.brief dt { font: 600 10.5px/1.6 var(--f-mono); letter-spacing: .06em; color: var(--muted) }
+.brief dd { margin: 0; min-width: 0 }
+
+.three-wrap { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px; align-items: start }
+@media (max-width: 980px) { .three-wrap { grid-template-columns: 1fr } }
+#three { width: 100%; aspect-ratio: 16/10; border-radius: 10px; border: 1px solid var(--line); background: #f2e6c8; display: block }
+
+.tbl-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface) }
+table { border-collapse: collapse; width: 100%; min-width: 900px; font-size: 13.5px }
+th, td { text-align: left; vertical-align: top; padding: 11px 14px; border-bottom: 1px solid var(--line) }
+th { font: 600 11px/1.3 var(--f-label); letter-spacing: .1em; text-transform: uppercase; color: var(--muted) }
+td:first-child { font-weight: 600; white-space: nowrap }
+ul.files { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 13.5px }
+code { font-family: var(--f-mono); font-size: 12px; background: var(--sunk); padding: 1px 5px; border-radius: 4px }
+
+/* ── follow-up section ── */
+.r2-block { display: grid; gap: 14px; padding-top: 10px }
+.r2-block h3 { font-size: 16px }
+.cw-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px }
+.cw { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px; display: grid; gap: 10px; align-content: start }
+.cw img { display: block; width: 100%; border-radius: 6px }
+.cw .row2 { display: grid; grid-template-columns: 64px 1fr; gap: 10px; align-items: center }
+.cw .shot { border-radius: 6px }
+.cw b { font: 600 15px/1.2 var(--f-label) }
+.cw .tag { font: 500 11px/1.3 var(--f-mono); color: var(--muted) }
+.verdict { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: grid; gap: 10px }
+.verdict p { font-size: 14.5px }
+.ht-stage { background: #111316; display: grid; place-items: center }
+.ht-stage #htHolder { width: 82% }
+.ht-stage svg { width: 100%; height: auto; display: block; overflow: visible }
+.ht-caption { position: absolute; left: 0; right: 0; bottom: 6%; text-align: center; font: 500 1.6cqw/1 "Jost", var(--f-ui); letter-spacing: .3em; text-transform: uppercase; color: #f2efe8; opacity: 0 }
+.bird-stage { background: #222 url(game/pebble-tee.jpg) center/cover no-repeat }
+.bird-stage svg { position: absolute; inset: 0; width: 100%; height: 100% }
+.bird-bn { right: auto; left: 50%; top: 14%; transform: translateX(-50%); width: 60%; background: radial-gradient(closest-side, rgba(0,0,0,.45), rgba(0,0,0,0)); padding: 2cqw 0 }
+.bird-bn .k { color: #efe8d8 } .bird-bn .t { font-family: "Jost", var(--f-ui); font-weight: 500; color: #f4efe4; letter-spacing: .01em } .bird-bn .s { color: rgba(239,232,216,.8) }
+img.trio { width: 100%; max-width: 980px; border-radius: 10px; display: block }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto } }
+</style>
+
+<div class="wrap">
+<header class="top">
+  <span class="label">Fairway · brand exploration</span>
+  <h1>Fairway branding board</h1>
+  <p class="lede">Five logo directions and the devil character, each shown the same way: the logo, the logo with the character, the character alone, two real game frames, small sizes, and 3D. Below that is a motion lab with idle, swing and hole-out tests. This board makes no recommendation. Every style gets the same treatment so you can compare them.</p>
+  <div class="meta"><span>Vectors: outlined SVG paths, no fonts needed</span><span>Character: traced from your reference, colours unchanged</span><span>3D: Blender extrusions and a generated character mesh</span><span>Motion: GSAP</span></div>
+</header>
+
+<section id="r8">
+  <div class="sec-head"><span class="label">Your new reference · same font, game colours</span><h2>The flagstick I, made to read as an I</h2><p class="lede">The letters are your reference's own outlines, traced, with only the colour changed. R, W, A and Y move 16 px right to make room. The thin flagstick is the whole I in the reference, so at small sizes it drops out and leaves "FA RWAY". The fix is a full-weight I, as thick as the other letters, with a slim pole rising from it to carry the pennant and the ball. The ball sits on top where the dot would be. It's orange like your ball in play, and turns gold on a hole-out.</p></div>
+  <img src="renders/r8-pole.jpg" alt="The pole sitting on top of the I, set into a channel through the I, and inlaid with no gap, at full size and at 30 px HUD size" style="width:100%;border-radius:10px;display:block">
+  <details><summary class="label" style="cursor:pointer">Earlier comparison: your reference and the first full-I versions</summary><img src="renders/r8-compare.jpg" alt="Your reference, the reference I in game colours, and the full-weight I with an ivory or orange flag" style="width:100%;border-radius:10px;display:block;margin-top:10px"></details>
+  <div class="lab">
+    <div class="stage ht-stage" id="r8Stage"><div id="r8Holder" style="width:78%"></div><div class="ht-caption" id="r8Caption"></div></div>
+    <div class="controls">
+      <div class="grp"><span class="label">Test</span><div class="seg" id="r8Tests">
+        <button id="r8-intro" data-t="intro" aria-pressed="true">Intro: ball drops on</button>
+        <button id="r8-hole" data-t="hole">Hole-out: turns gold</button>
+        <button id="r8-load" data-t="load">Loading: ball spins</button>
+      </div></div>
+      <div class="grp"><span class="label">Version</span><div class="seg" id="r8Var">
+        <button id="r8v-inlay" data-v="inlay-orange" aria-pressed="true">Pole through the I (channel)</button>
+        <button id="r8v-stripe" data-v="stripe-orange">Pole inlaid, no gap</button>
+        <button id="r8v-orange" data-v="full-orangeflag">Pole on top</button>
+        <button id="r8v-thin" data-v="thin-ivory">Reference I</button>
+      </div></div>
+      <p class="readout" id="r8Readout"></p>
+    </div>
+  </div>
+  <div class="verdict"><span class="label">In the game · channel version</span><p>This is the version now in the game: the HUD corner, the launch drop-in, the rolling loader, the gold hole-out and the waving flag. The flagstick I is the app icon. <code>tools/brand/build-wordmark.py</code> rebuilds every asset.</p></div>
+  <div class="verdict"><span class="label">The pole through the I</span>
+    <p><strong>Set into a channel (recommended).</strong> The orange pole runs the full height: out of the top to the ball, down through the middle of the I, and it stops flush with the I's foot. A thin dark gap either side makes it read as a pin set into the letter rather than paint on it. The ivory either side keeps the I as heavy as the other letters, so it still reads as FAIRWAY. At HUD size the I takes on a slight orange tint but keeps its full width.</p>
+    <p><strong>Inlaid with no gap.</strong> It's simpler, but the orange and ivory meet edge to edge, which reads more like a stripe painted on the letter.</p>
+    <p>Everything animates as planned: the pennant unfurls and waves, the ball drops onto the top of the pole, and on a hole-out the ball turns gold.</p>
+  </div>
+</section>
+
+<section id="readability">
+  <div class="sec-head"><span class="label">Readability fix · for review</span><h2>FAIRWAY, not FARWAY</h2><p class="lede">In the traced wordmark the I is a thin flagpole whose flag flows into the R, so the I, flag and R read as one shape. Small, it reads as "FARWAY". In the redraw the I is a full-weight stem, the same as the F. The flag flies above the cap line on a pole planted in the I, clear of the R, which gets its own top back. The ball still sits in the flag, and the drop-in, roll and gold animations work the same way.</p></div>
+  <div class="cw-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
+    <div class="cw"><b>Current (in the game now)</b><span class="tag">Traced from the reference</span><img src="svg/hightone-ivory-orange.svg" alt="Current wordmark"></div>
+    <div class="cw"><b>Redrawn</b><span class="tag">Full-weight I, flag above the cap line</span><img src="svg/v2/fairway-hightone.svg" alt="Redrawn wordmark" style="background:#111316;padding:4%"></div>
+  </div>
+  <img src="renders/readability-compare.jpg" alt="Current and redrawn wordmarks side by side at launch size, HUD size and as app icons" style="width:100%;max-width:1300px;border-radius:10px;display:block">
+  <div class="verdict"><span class="label">Trade-offs</span>
+    <p>The redraw is taller, because the flag sits above the letters, so the HUD corner needs about 34 px of height instead of 26 to keep the same letter size. The I and R are now plain letters, so the logo is less of a single fused shape. That loses some originality but gains a word anyone reads at a glance. The new app icon is a flag on the top of the I. It's simpler than the current one and holds up at favicon size.</p>
+  </div>
+</section>
+
+<section id="round2">
+  <div class="sec-head"><span class="label">Follow-up · the alternatives</span><h2>The wordmark alone, the animated ball, and the scoring birds</h2><p class="lede">These follow your question about what would suit the game better than the cartoon devil. They use the game's own interface colours: graphite #111316, ivory text #f2efe8, signal orange #ff7a2f, and achievement gold #e9c97a.</p></div>
+
+  <div class="r2-block">
+    <h3>1 · High Tone, wordmark only, in five colourways</h3>
+    <div class="cw-grid" id="cwGrid"></div>
+    <div class="verdict">
+      <span class="label">Verdict on the wordmark</span>
+      <p><strong>Keep it.</strong> The High Tone wordmark is the strongest thing on this board. It needs no mascot: the flag cut into the I and the ball in its counter already carry the golf story. It also gives you a ready-made app icon (the flag-I on its own, shown under each colourway).</p>
+      <p><strong>Change the colour to ivory with an orange ball.</strong> Ivory is exactly the game's text colour, so the logo sits in the interface as if it belongs there. The orange ball is the same orange as your ball, tracer and tee markers in play, so the logo's ball <em>is</em> the player's ball. When you hole out, it turns achievement gold (see the hole-out test below). The reference red collides with the penalty red. An all-orange wordmark spends the accent on decoration when it should mark the one thing to act on. Graphite on ivory is the version for light backgrounds: print, merch and the App Store.</p>
+      <p><strong>Two things to settle before shipping.</strong> First, below about 120 px wide, use the flag-I icon instead of the full wordmark. Second, the traced letters came from your reference image. If that image was made with the commercial High Tone typeface, license it for logo use.</p>
+    </div>
+  </div>
+
+  <div class="r2-block">
+    <h3>2 · The animated High Tone ball</h3>
+    <div class="lab">
+      <div class="stage ht-stage" id="htStage"><div id="htHolder"></div><div class="ht-caption" id="htCaption"></div></div>
+      <div class="controls">
+        <div class="grp"><span class="label">Test</span><div class="seg" id="htTests">
+          <button id="ht-intro" data-t="intro" aria-pressed="true">Intro: ball drops in</button>
+          <button id="ht-hole" data-t="hole">Hole-out: turns gold</button>
+          <button id="ht-load" data-t="load">Loading: ball rolls</button>
+        </div></div>
+        <div class="grp"><span class="label">Colourway</span><div class="seg" id="htCw"></div></div>
+        <div class="grp"><span class="label">Playback</span><div class="seg" id="htSpeeds">
+          <button id="hs-1" data-s="1" aria-pressed="true">1×</button><button id="hs-.25" data-s=".25">0.25×</button>
+        </div></div>
+        <p class="readout" id="htReadout"></p>
+      </div>
+    </div>
+  </div>
+
+  <div class="r2-block">
+    <h3>3 · The scoring birds: birdie, eagle, albatross</h3>
+    <img class="trio" src="svg/birds-trio.svg" alt="A swallow for birdie, a bald eagle for eagle and an albatross for albatross, drawn in gold and ivory from below">
+    <p class="lede">A swallow, a bald eagle and an albatross, each drawn from below in flight and recognisable by wing shape alone. The span grows with the score: 180, 236 and 300 units. Bodies are ivory and wings are achievement gold, so a bird always means you earned something. Each one flies in its own way: the swallow darts with fast beats, the eagle takes a few heavy strokes and then soars, and the albatross barely moves its wings and banks.</p>
+    <div class="lab">
+      <div class="stage bird-stage" id="birdStage">
+        <svg id="birdSky" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-label="Bird flight test"></svg>
+        <div class="bn bird-bn" id="birdBanner"><div class="k" id="bbK">Hole 7 · Par 3</div><div class="t" id="bbT">Birdie</div><div class="r"></div><div class="s" id="bbS">2 strokes</div></div>
+      </div>
+      <div class="controls">
+        <div class="grp"><span class="label">Score</span><div class="seg" id="birdTests">
+          <button id="b-birdie" data-b="birdie" aria-pressed="true">Birdie (−1)</button>
+          <button id="b-eagle" data-b="eagle">Eagle (−2)</button>
+          <button id="b-albatross" data-b="albatross">Albatross (−3)</button>
+        </div></div>
+        <div class="grp"><span class="label">Playback</span><div class="seg" id="bSpeeds">
+          <button id="bs-1" data-s="1" aria-pressed="true">1×</button><button id="bs-.25" data-s=".25">0.25×</button>
+        </div></div>
+        <p class="readout" id="birdReadout"></p>
+      </div>
+    </div>
+    <div class="verdict">
+      <span class="label">Decision · birds parked</span>
+      <p>The birds are on hold. They only go into the game as real, rigged, animated 3D bird assets that match the course realism, flying over the green on a birdie, eagle or albatross. These vector drafts stay here as a record of the idea. The game now uses the flagstick wordmark (an orange pole set through the I) in the HUD corner and on the launch and loading screens; it turns gold on a birdie or better, and the flagstick I is the app icon.</p>
+    </div>
+  </div>
+  <div class="briefs" id="briefs2"></div>
+</section>
+
+
+<section id="compare">
+  <div class="sec-head"><span class="label">Side by side</span><h2>The five styles</h2><p class="lede">On narrow screens the table scrolls sideways and the row labels stay pinned. Every image here is a file in <code>docs/branding/</code>.</p></div>
+  <div class="matrix-scroll"><div class="matrix" id="matrix"></div></div>
+</section>
+
+<section id="lab">
+  <div class="sec-head"><span class="label">Motion lab</span><h2>Animation tests</h2><p class="lede">This is a cut-out puppet made from the vector trace: tail, legs, torso, head, club, fists and eyelids, each on its own pivot. The art is the same paths as the logo version, so the character looks identical at rest. Choose a style for the ground and banner type, or put it over a real game frame.</p></div>
+  <div class="lab">
+    <div class="stage" id="stage">
+      <img class="stamp" id="stamp" alt="">
+      <div class="puppet-holder" id="puppetHolder" aria-label="Animated devil character"></div>
+      <div class="bn" id="banner"><div class="k" id="bnK">Hole 7 · Par 3</div><div class="t" id="bnT">Birdie</div><div class="r"></div><div class="s" id="bnS">2 strokes · 111 yd</div></div>
+    </div>
+    <div class="controls">
+      <div class="grp"><span class="label">Test</span><div class="seg" id="tests">
+        <button id="t-idle" data-t="idle" aria-pressed="true">Idle</button>
+        <button id="t-swing" data-t="swing">Swing</button>
+        <button id="t-hole" data-t="hole">Hole-out</button>
+        <button id="t-ace" data-t="ace">Hole in one</button>
+      </div></div>
+      <div class="grp"><span class="label">Style</span><div class="seg" id="styleChips"></div></div>
+      <div class="grp"><span class="label">Ground</span><div class="seg" id="grounds">
+        <button id="g-style" data-g="style" aria-pressed="true">Style colour</button>
+        <button id="g-game" data-g="game">Pebble Beach, hole 7</button>
+      </div></div>
+      <div class="grp"><span class="label">Playback</span><div class="seg" id="speeds">
+        <button id="s-1" data-s="1" aria-pressed="true">1×</button>
+        <button id="s-.5" data-s=".5">0.5×</button>
+        <button id="s-.2" data-s=".2">0.2× (inspect)</button>
+      </div></div>
+      <p class="readout" id="readout">Idle loop: breathing, a head bob, a tail sway, a club waggle and blinks every few seconds.</p>
+    </div>
+  </div>
+  <div class="briefs" id="briefs"></div>
+</section>
+
+<section id="three-sec">
+  <div class="sec-head"><span class="label">3D character</span><h2>The devil as a 3D model</h2><p class="lede">The mesh was generated in Blender from the trace and has 23k faces. It ships as an 864 KB GLB, or 844 KB with Draco. It's one rigid piece with no skeleton, so these tests move the whole body: a breathing idle, a celebration hop, and a turntable that shows the side and back. A real 3D swing would need a rig.</p></div>
+  <div class="three-wrap">
+    <canvas id="three" aria-label="3D devil model"></canvas>
+    <div class="controls">
+      <div class="grp"><span class="label">Test</span><div class="seg" id="tests3">
+        <button id="t3-idle" data-t="idle" aria-pressed="true">Idle</button>
+        <button id="t3-hop" data-t="hop">Hole-out hop</button>
+        <button id="t3-turn" data-t="turn">Turntable</button>
+      </div></div>
+      <div class="grp"><span class="label">Ground</span><div class="seg" id="styleChips3"></div></div>
+      <p class="readout" id="readout3">Loading the model…</p>
+    </div>
+  </div>
+</section>
+
+<section id="practical">
+  <div class="sec-head"><span class="label">Practical issues</span><h2>Using these in the game</h2><p class="lede">These are observations, not a ranking. Each row is one concern, with each style's answer next to it.</p></div>
+  <div class="tbl-scroll"><table id="practicalTbl"></table></div>
+  <div class="notes" style="max-width:90ch">
+    <dl>
+      <div><dt>Typefaces</dt><dd>Airone, Therilo, Brison, Los Amigos and High Tone are commercial typefaces. The lettering here is outlined from open-licence stand-ins: Anton, Montserrat Black, Alfa Slab One, Big Shoulders Display and Oswald. Style 3 is the exception: it is traced directly from your reference image, so those letterforms are exactly yours. To switch to the named fonts you would need a licence covering logo use, and I would swap the outlines; the layouts would stay the same.</dd></div>
+      <div><dt>The character</dt><dd>The 2D trace matches the reference stroke for stroke. In the original the feet are hidden behind the letters, so the standalone version cuts them flat and stands on a contact shadow. Rubber-hose devil mascots are common in sports teams and food brands, so a trademark search is worth doing before release.</dd></div>
+      <div><dt>Tone</dt><dd>The game's direction is realistic and premium, and the character is a 1930s cartoon. Nothing on the course would change. The character would only appear in menus, loading screens and moments. Whether that contrast reads as personality or as a clash is the main question this board leaves open.</dd></div>
+      <div><dt>Motion references</dt><dd>Timing follows the motion tokens already in <code>docs/RESEARCH_UPGRADES.md</code>, which came from the earlier design-repo research. That means fast-in, soft-out entrances (expo.out); a 0.06 s word stagger on banners, matching <code>js/ui/moments.js</code>; transform and opacity only; gold reserved for achievements; and a reduced-motion fallback that shows the end pose without movement.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<section id="files">
+  <div class="sec-head"><span class="label">Files</span><h2>What was made</h2></div>
+  <ul class="files">
+    <li><code>svg/&lt;style&gt;-logo.svg</code>: the logo on its ground (1600 × 1000)</li>
+    <li><code>svg/&lt;style&gt;-mark.svg</code>: the same logo on a transparent ground, for overlays</li>
+    <li><code>svg/&lt;style&gt;-logo-character.svg</code>: the logo with the devil standing on the wordmark</li>
+    <li><code>svg/&lt;style&gt;-character.svg</code>: the devil alone on the style's ground</li>
+    <li><code>svg/devil.svg</code>: the transparent character master; <code>svg/devil-puppet.svg</code>: the layered puppet used in the lab</li>
+    <li><code>3d/&lt;style&gt;-logo.glb</code>: the extruded logos (Draco); <code>3d/devil.glb</code> (Draco), <code>3d/devil-web.glb</code>, and <code>3d/devil-web.glb.js</code> (the same model as base64, for the web page)</li>
+    <li><code>renders/</code>: Blender renders of every 3D logo, with and without the character</li>
+  </ul>
+</section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+const STYLES = [
+  { key: 'airone', name: 'Airone-style', blurb: 'Off-white condensed on dark blue, fine stripes', ground: '#13223b', ink: '#efe8d8', second: '#7fae6a', font: '"Anton", Impact, sans-serif', upper: true, play: ['#efe8d8', '#13223b'] },
+  { key: 'therilo', name: 'Therilo-style', blurb: 'Red geometric FA monogram on black', ground: '#0b0b0b', ink: '#e0262b', second: '#f2efe8', font: '"Montserrat", "Arial Black", sans-serif', weight: 900, track: '.08em', upper: true, play: ['#e0262b', '#ffffff'] },
+  { key: 'hightone', name: 'High Tone / condensed', blurb: 'Tall red condensed, flag cut into the I', ground: '#000000', ink: '#c8101a', second: '#c8101a', font: '"Anton", Impact, sans-serif', upper: true, play: ['#c8101a', '#ffffff'] },
+  { key: 'brison', name: 'Brison-style', blurb: 'Red slab serif on yellow', ground: '#f4c12b', ink: '#c41e26', second: '#2f6b3a', font: '"Alfa Slab One", Rockwell, serif', upper: true, play: ['#c41e26', '#fff6dc'] },
+  { key: 'losamigos', name: 'Los Amigos / signage', blurb: 'Red condensed on cream, sign-painter frame', ground: '#f2e6c8', ink: '#b8231b', second: '#3d6b35', font: '"Big Shoulders Display", "Arial Narrow", sans-serif', weight: 900, upper: true, play: ['#b8231b', '#f2e6c8'] },
+];
+
+const NOTES = {
+  airone: {
+    look: 'The calmest of the five. Off-white condensed on blue-black sits closest to the game\'s current graphite interface, so it would fit the menus with the fewest changes. The stripes only show at large sizes and disappear below about 300 px.',
+    char: 'The black body nearly vanishes against the navy, leaving the yellow outline, the red horns and the face. The character reads as a glowing outline rather than a solid figure. Its vintage cartoon tone also contrasts with this style\'s clean, sporty one.',
+  },
+  therilo: {
+    look: 'The FA monogram gives the only real compact mark: it still reads at 24 to 32 px, which suits an app icon, the HUD corner or a ball stamp. The red monogram over a white, wide FAIRWAY reads as modern sportswear.',
+    char: 'The red of the monogram matches the devil\'s horns, ears and tail, so the two belong together. On black the body loses its silhouette, as with Airone. Beside the monogram the devil fills the space the monogram leaves open.',
+  },
+  hightone: {
+    look: 'This is your reference, traced exactly, with the dimples added to the ball. It has the most impact of the five, and the flag cut into the I is its most ownable detail. At 64 px wide it still reads, but the gap between the flag pole and the R is down to about 1 px, so the flag-I starts to merge with its neighbours.',
+    char: 'The devil stands on the wordmark as in the original poster. On pure black only the outline carries the figure. The red is close to the game\'s penalty red and to the signal-orange accent, so a red logo in the HUD would sit near two colours that already have jobs.',
+  },
+  brison: {
+    look: 'The loudest and most retro: it reads as a ballpark or arcade sign. The slab letters are wide, so this needs the most horizontal room. Full-screen yellow is heavy next to the graphite interface, but it works as a badge or card.',
+    char: 'This ground gives the character its strongest silhouette: the black body and yellow outline are fully readable against the yellow. The devil\'s own yellow outline blends into the ground, which flattens the edge slightly.',
+  },
+  losamigos: {
+    look: 'Tall red condensed on cream with a painted-sign frame. It holds up well at small sizes because the letters stay open. The frame only makes sense on a title card, so overlays use the frameless mark.',
+    char: 'Cream is the paper the original art was drawn on, so the devil looks most like its source here. Black on cream gives a full silhouette with the yellow keyline intact.',
+  },
+};
+
+const PRACTICAL = [
+  ['Smallest clean size (checked at 220, 120 and 64 px)', ['Wordmark holds at 64 px; "golf sim" unreadable below ~120 px', 'FA holds far below 64 px; FAIRWAY line below ~120 px', 'Holds at 64 px, but the gap beside the flag-I is about 1 px there', 'Holds at 64 px; the slab letters thicken but stay open', 'Holds at 64 px; the most open of the five']],
+  ['HUD corner (dark interface)', ['Native fit: off-white on dark', 'Monogram alone works', 'Red on dark works; near penalty red', 'Needs its yellow badge', 'Red on dark works; frame dropped']],
+  ['Character silhouette on its ground', ['Body lost, outline carries', 'Body lost, outline carries', 'Body lost, outline carries', 'Full silhouette', 'Full silhouette']],
+  ['Animation potential', ['Letters can slide in by stripe', 'Monogram can build from its bars', 'Flag can wave; ball can drop into the I', 'Slab letters stamp in', 'Sign can light up letter by letter']],
+  ['Colour conflicts in game', ['None with current tokens', 'Red near penalty red', 'Red near penalty red and the orange accent', 'Yellow near achievement gold', 'Red near penalty red']],
+  ['Asset weight', ['Logo SVG 20 KB; devil adds 78 KB', 'Logo SVG 14 KB', 'Logo SVG 28 KB (traced)', 'Logo SVG 15 KB', 'Logo SVG 15 KB']],
+];
+
+const BRIEFS = [
+  { name: 'Idle', rows: {
+    BRAND: 'Fairway\'s devil: mischievous, never frantic. The idle should feel alive between shots without pulling the eye from the HUD.',
+    OBJECTS: 'Torso, head, tail, club, eyelids and speed lines. The legs are pinned to the ground so the feet never slide.',
+    PALETTE: 'Only the source colours: ink black, yellow outline, devil red. No added glow.',
+    PHYSICS: 'Breathing at about 0.6 Hz (scale 1.2% from the hips); the head lags the breath by 0.2 s; the tail sways ±6° on its own period (1.9 s against 1.6 s) so the loop never syncs up; blinks every 2.5–4.5 s, closing in 70 ms and opening in 100 ms.',
+    LOOK: 'sine.inOut on every loop; no overshoot. The speed lines dim to 25% because nothing is moving fast.',
+    CAMERA: 'Locked. The character sits in the lower-left third, leaving the right for the banner.',
+    CHECKS: 'Feet fixed ✓ · no two loops share a period ✓ · reduced motion holds the rest pose ✓',
+  } },
+  { name: 'Swing', rows: {
+    BRAND: 'One readable swing: setup, backswing, a fast hit, a held finish. It should feel cheeky, not technical.',
+    OBJECTS: 'The club, turning about the grip inside fixed fists, torso coil (pivot at the hips), a ball on a tee, and a gold smear arc on the downswing.',
+    PALETTE: 'The smear uses the art\'s yellow fading out. The ball is off-white with an ink rim, matching the outline weight.',
+    PHYSICS: 'Setup 0.6 s, waggle, backswing 0.75 s (power2.inOut), downswing 0.17 s (power3.in, about 4× the backswing speed, as in a real tempo), 50 ms of hit-stop on contact, ball out at about 35°, follow-through 0.45 s (power2.out) into the drawn finish.',
+    LOOK: 'The torso coils −5° and unwinds to +4°, so the hips lead the club. The smear draws with the club head and fades in 0.3 s.',
+    CAMERA: 'Locked. In game this would hand off to the shot camera at contact.',
+    CHECKS: 'Ends exactly on the drawn pose ✓ · the club passes through the ball position at contact ✓ · limit: the arms are one drawing, so the club turns inside fixed fists. A production swing needs 6–8 redrawn key poses.',
+  } },
+  { name: 'Hole-out', rows: {
+    BRAND: 'The payoff, scaled to the score: a birdie gets one hop, an ace gets the full celebration. It uses the game\'s existing moment language: kicker, word-by-word title, gold rule, sub-line.',
+    OBJECTS: 'The whole body (squash and stretch from the feet), the club raised and pumped, a tail flick, gold sparks from the head, and the banner in the style\'s own display face.',
+    PALETTE: 'Gold (#e9c97a) only for the sparks and the rule, the same achievement colour the game uses. The banner title uses the style\'s ink.',
+    PHYSICS: '140 ms anticipation squash (0.94 / 1.04), takeoff 0.32 s (power3.out) up to 15% of body height, 0.1 s hang, fall 0.26 s (power2.in), a 0.93 landing squash recovering on elastic.out(1, 0.45). Volume is roughly kept: scaleX × scaleY stays about 1.',
+    LOOK: 'Title words rise from a mask with a 0.06 s stagger (expo.out), and the rule draws from the centre. The ace version adds a second hop and twice the sparks.',
+    CAMERA: 'Locked. In game the cup push-in from moments.js runs underneath, and the character appears as an overlay.',
+    CHECKS: 'Never blocks play: about 2.2 s and click-through ✓ · feet return to the same baseline ✓ · reduced motion shows the final pose and the banner without movement ✓',
+  } },
+];
+
+const $ = (s, r = document) => r.querySelector(s);
+const el = (t, cls, html) => { const e = document.createElement(t); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+
+/* ── build the matrix ── */
+(function buildMatrix() {
+  const m = $('#matrix');
+  const cell = (node) => { const d = el('div'); d.append(node); m.append(d); return d; };
+  const rowHead = (title, sub) => { const d = el('div', 'rowh', `<h3>${title}</h3>${sub ? `<small>${sub}</small>` : ''}`); m.append(d); };
+  const img = (src, alt, cls = 'logo-img') => { const i = el('img', cls); i.src = src; i.alt = alt; i.loading = 'lazy'; return i; };
+  m.append(el('div', 'rowh', '<span class="label">Style</span>'));
+  for (const s of STYLES) cell(el('div', 'colh', `<b>${s.name}</b><span style="color:var(--muted);font-size:12.5px">${s.blurb}</span><span class="swatches"><i style="background:${s.ground}"></i><i style="background:${s.ink}"></i><i style="background:${s.second}"></i></span>`));
+  rowHead('Logo', 'Accurate vector, outlined paths');
+  for (const s of STYLES) cell(img(`svg/${s.key}-logo.svg`, `${s.name} logo`));
+  rowHead('Logo + character', 'The devil standing on the wordmark, as in the poster');
+  for (const s of STYLES) cell(img(`svg/${s.key}-logo-character.svg`, `${s.name} logo with the devil`, 'logo-img tall'));
+  rowHead('Character alone', 'On the style\'s ground');
+  for (const s of STYLES) cell(img(`svg/${s.key}-character.svg`, `Devil on ${s.name} ground`));
+  rowHead('Title screen', 'Over a blurred Pebble Beach frame');
+  for (const s of STYLES) {
+    const d = el('div', 'shot title'); d.style.backgroundImage = 'url(game/pebble-tee.jpg)';
+    const b = el('div', 'badge'); b.append(img(`svg/${s.key}-logo-character.svg`, '', 'tall')); d.append(b);
+    const p = el('div', 'play', 'Tee off'); p.style.background = s.play[0]; p.style.color = s.play[1]; d.append(p);
+    cell(d);
+  }
+  rowHead('In play', 'Corner mark in the HUD, and a birdie moment (Paris, hole 3)');
+  for (const s of STYLES) {
+    const d = el('div', 'shot'); d.style.backgroundImage = 'url(game/paris-tee.jpg)';
+    d.append(el('div', 'cover'));
+    const hm = el('div', 'hudmark'); hm.append(img(`svg/${s.key}-mark.svg`, '', '')); d.append(hm);
+    const mo = el('div', 'moment', `<span class="k">Hole 3 · Par 5</span><span class="t" style="font-family:${s.font};font-weight:${s.weight || 400};color:${s.key === 'airone' ? s.ink : '#f4efe4'}">BIRDIE</span><span class="r"></span>`);
+    const dv = img('svg/devil.svg', '', 'dv'); mo.append(dv); d.append(mo);
+    cell(d);
+  }
+  rowHead('Small sizes', 'At 220, 120 and 64 px wide, as drawn');
+  for (const s of STYLES) {
+    const f = el('div', 'sizes');
+    for (const w of [220, 120, 64]) {
+      const r = el('figure', 'row'); r.style.margin = 0;
+      const c = el('div', 'chip'); c.style.background = s.key === 'airone' || s.key === 'therilo' || s.key === 'hightone' ? '#141517' : s.ground;
+      const i = img(`svg/${s.key}-mark.svg`, '', ''); i.style.width = w + 'px'; i.style.borderRadius = 0; c.append(i);
+      r.append(c, el('figcaption', '', w + ' px')); f.append(r);
+    }
+    cell(f);
+  }
+  rowHead('3D logo', 'Blender extrusion, EEVEE render');
+  for (const s of STYLES) cell(img(`renders/${s.key}-3d.jpg`, `${s.name} in 3D`));
+  rowHead('3D logo + character', 'The generated devil mesh standing on the 3D logo');
+  for (const s of STYLES) cell(img(`renders/${s.key}-3d-character.jpg`, `${s.name} in 3D with the devil`));
+  rowHead('Notes', 'How it looks in game, and what the character adds');
+  for (const s of STYLES) cell(el('div', 'notes', `<dl><div><dt>In the game</dt><dd>${NOTES[s.key].look}</dd></div><div><dt>The character</dt><dd>${NOTES[s.key].char}</dd></div></dl>`));
+})();
+
+/* practical table */
+(function () {
+  const t = $('#practicalTbl');
+  t.innerHTML = `<thead><tr><th>Concern</th>${STYLES.map((s) => `<th>${s.name}</th>`).join('')}</tr></thead><tbody>${PRACTICAL.map(([k, v]) => `<tr><td>${k}</td>${v.map((x) => `<td>${x}</td>`).join('')}</tr>`).join('')}</tbody>`;
+})();
+
+/* briefs */
+(function () {
+  const b = $('#briefs');
+  for (const br of BRIEFS) b.append(el('article', 'brief', `<h3>${br.name}: motion brief</h3><dl>${Object.entries(br.rows).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`));
+})();
+
+/* ── the puppet ── */
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+let P = null, current = null, active = null, blinkGen = 0, styleKey = 'losamigos', ground = 'style';
+const NS = 'http://www.w3.org/2000/svg';
+
+function applyStage() {
+  const s = STYLES.find((x) => x.key === styleKey);
+  const st = $('#stage');
+  st.classList.toggle('ingame', ground === 'game');
+  st.style.backgroundColor = s.ground;
+  st.style.backgroundImage = ground === 'game' ? 'url(game/pebble-tee.jpg)' : 'none';
+  $('#stamp').src = `svg/${s.key}-mark.svg`;
+  $('#stamp').hidden = ground === 'game';
+  const t = $('#bnT'); t.style.fontFamily = s.font; t.style.fontWeight = s.weight || 400; t.style.letterSpacing = s.track || '.02em';
+  const light = ['airone', 'therilo', 'hightone'].includes(s.key) || ground === 'game';
+  t.style.color = s.key === 'airone' ? s.ink : ground === 'game' ? '#f4efe4' : s.ink;
+  $('#bnK').style.color = light ? '#efe8d8' : '#2a2219';
+  $('#bnS').style.color = light ? 'rgba(239,232,216,.75)' : 'rgba(42,34,25,.75)';
+  $('#banner').style.background = ground === 'game' ? 'radial-gradient(closest-side, rgba(0,0,0,.5), rgba(0,0,0,0))' : 'none';
+  document.querySelectorAll('#styleChips button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.k === styleKey));
+  document.querySelectorAll('#grounds button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.g === ground));
+}
+
+async function loadPuppet() {
+  const txt = await fetch('svg/devil-puppet.svg').then((r) => r.text());
+  $('#puppetHolder').innerHTML = txt;
+  const svg = $('#puppetHolder svg');
+  const q = (c) => svg.querySelector(c);
+  P = { svg, root: q('.pp-root'), body: q('.pp-body'), upper: q('.pp-upper'), head: q('.pp-head'), club: q('.pp-club'), fists: q('.pp-fists'), tail: q('.pp-tail'), lids: svg.querySelectorAll('.pp-lid'), fx: q('.pp-fx'), smear: q('.pp-smear'), ball: q('.pp-ball'), shadow: q('.pp-shadow') };
+  // the club turns about the grip; the fists stay drawn over it
+  // tee and sparks are added here so the source SVG stays a clean asset
+  const tee = document.createElementNS(NS, 'path'); tee.setAttribute('d', 'M533 571 h14 l-4 6 h-6 Z'); tee.setAttribute('fill', '#e9e2cf'); tee.setAttribute('stroke', '#171916'); tee.setAttribute('stroke-width', '2.5'); tee.classList.add('pp-tee');
+  P.root.insertBefore(tee, P.ball); P.tee = tee;
+  P.smear.setAttribute('d', 'M280 50 A290 290 0 1 0 775 255');
+  P.sparks = [];
+  for (let i = 0; i < 16; i++) {
+    const s = document.createElementNS(NS, 'path');
+    s.setAttribute('d', 'M0 -16 L4 -4 L16 0 L4 4 L0 16 L-4 4 L-16 0 L-4 -4 Z'); s.setAttribute('fill', '#e9c97a'); s.setAttribute('opacity', '0');
+    P.root.append(s); P.sparks.push(s);
+  }
+  rest();
+  play('idle');
+}
+
+function rest() {
+  gsap.killTweensOf('*');
+  const all = [P.body, P.upper, P.head, P.club, P.fists, P.tail, P.root];
+  gsap.set(all, { clearProps: 'transform' });
+  gsap.set(P.upper, { svgOrigin: '330 465', rotation: 0, scaleY: 1, y: 0 });
+  gsap.set(P.head, { svgOrigin: '262 302', rotation: 0 });
+  gsap.set(P.club, { svgOrigin: '485 255', rotation: 0 });
+  gsap.set(P.tail, { svgOrigin: '262 505', rotation: 0 });
+  gsap.set(P.body, { svgOrigin: '330 577', scaleX: 1, scaleY: 1, y: 0 });
+  gsap.set(P.lids, { transformOrigin: '50% 0%', scaleY: 0 });
+  gsap.set(P.fx, { opacity: 1 });
+  gsap.set(P.smear, { opacity: 0, strokeDasharray: 1140, strokeDashoffset: 1140 });
+  gsap.set([P.ball, P.tee], { opacity: 0 });
+  gsap.set(P.ball, { x: 540, y: 560, scale: 1, transformOrigin: '50% 50%' });
+  gsap.set(P.sparks, { opacity: 0, x: 262, y: 110, scale: 0, rotation: 0 });
+  gsap.set(P.shadow, { svgOrigin: '330 582', scaleX: 1 });
+  gsap.set('#banner', { opacity: 0 });
+}
+
+function idle() {
+  const tl = gsap.timeline();
+  tl.to(P.fx, { opacity: .25, duration: .6 }, 0)
+    .to(P.upper, { scaleY: 1.012, y: -2, duration: 1.6, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0)
+    .to(P.head, { rotation: 2, duration: 1.6, ease: 'sine.inOut', yoyo: true, repeat: -1 }, .2)
+    .fromTo(P.tail, { rotation: -6 }, { rotation: 6, duration: 1.9, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0)
+    .to(P.club, { rotation: -4, duration: 1.15, ease: 'sine.inOut', yoyo: true, repeat: -1, repeatDelay: .5 }, .4);
+  const gen = ++blinkGen;
+  const blink = () => { if (current !== 'idle' || gen !== blinkGen) return; gsap.timeline({ onComplete: () => gsap.delayedCall(2.5 + Math.random() * 2, blink) })
+      .to(P.lids, { scaleY: 1, duration: .07, ease: 'power2.in' }).to(P.lids, { scaleY: 0, duration: .1, ease: 'power2.out' }); };
+  gsap.delayedCall(1.2, blink);
+  return tl;
+}
+
+function banner(k, t, s) {
+  $('#bnK').textContent = k; $('#bnS').textContent = s;
+  const T = $('#bnT'); T.innerHTML = t.split(' ').map((w) => `<span>${w}</span>`).join(' ');
+  const tl = gsap.timeline({ defaults: { ease: 'expo.out' } });
+  tl.set('#banner', { opacity: 1 })
+    .from('#bnK', { opacity: 0, letterSpacing: '.6em', duration: .7 }, 0)
+    .from(T.children, { yPercent: 110, duration: .7, stagger: .06 }, .06)
+    .fromTo('#banner .r', { scaleX: 0 }, { scaleX: 1, duration: .8, ease: 'power3.inOut' }, .2)
+    .from('#bnS', { opacity: 0, y: 6, duration: .5 }, .45)
+    .to('#banner', { opacity: 0, duration: .5, ease: 'power2.in' }, 2.6);
+  return tl;
+}
+
+function swing() {
+  const tl = gsap.timeline({ onComplete: () => play('idle') });
+  const C = [P.club];
+  tl.to(P.fx, { opacity: 0, duration: .3 }, 0)
+    .to([P.ball, P.tee], { opacity: 1, duration: .3 }, 0)
+    .to(C, { rotation: 135, duration: .6, ease: 'power2.inOut' }, 0)              // set up to the ball
+    .to(C, { rotation: 141, duration: .18, ease: 'sine.inOut', yoyo: true, repeat: 1 }, .7)   // waggle
+    .to(P.upper, { rotation: -5, duration: .75, ease: 'power2.inOut' }, 1.1)      // coil
+    .to(C, { rotation: 270, duration: .75, ease: 'power2.inOut' }, 1.1)           // backswing
+    .set(P.smear, { opacity: .9, strokeDashoffset: 1140 }, 1.9)
+    .to(C, { rotation: 135, duration: .17, ease: 'power3.in' }, 1.9)              // downswing
+    .to(P.upper, { rotation: 4, duration: .17, ease: 'power3.in' }, 1.9)
+    .to(P.smear, { strokeDashoffset: 570, duration: .17, ease: 'power3.in' }, 1.9)
+    .addLabel('impact', 2.07)
+    .to({}, { duration: .05 }, 'impact')                                           // hit-stop
+    .to(P.ball, { x: 1080, y: 150, scale: .45, duration: .6, ease: 'power1.out' }, 'impact+=0.05')
+    .to(P.ball, { opacity: 0, duration: .15 }, 'impact+=0.5')
+    .to(C, { rotation: 0, duration: .45, ease: 'power2.out' }, 'impact+=0.05')    // follow-through to the drawn finish
+    .to(P.smear, { strokeDashoffset: 0, duration: .3, ease: 'power2.out' }, 'impact+=0.05')
+    .to(P.smear, { opacity: 0, duration: .3 }, 'impact+=0.25')
+    .to(P.upper, { rotation: 0, duration: .6, ease: 'power2.out' }, 'impact+=0.1')
+    .to(P.head, { rotation: -3, duration: .2, yoyo: true, repeat: 1 }, 'impact')
+    .to(P.fx, { opacity: 1, duration: .1 }, 'impact+=0.1')
+    .to(P.tee, { opacity: 0, duration: .3 }, 'impact+=0.7')
+    .to({}, { duration: .8 });
+  return tl;
+}
+
+function holeOut(ace) {
+  const tl = gsap.timeline({ onComplete: () => play('idle') });
+  const C = [P.club];
+  const hop = (at, h) => {
+    tl.to(P.body, { scaleY: .94, scaleX: 1.04, duration: .14, ease: 'power2.out' }, at)
+      .to(P.body, { y: -h, scaleY: 1.06, scaleX: .97, duration: .32, ease: 'power3.out' }, at + .14)
+      .to(P.shadow, { scaleX: .7, opacity: .15, duration: .32, ease: 'power3.out' }, at + .14)
+      .to(P.body, { y: 0, scaleY: 1, scaleX: 1, duration: .26, ease: 'power2.in' }, at + .56)
+      .to(P.shadow, { scaleX: 1, opacity: .28, duration: .26, ease: 'power2.in' }, at + .56)
+      .to(P.body, { scaleY: .93, scaleX: 1.05, duration: .08, ease: 'power2.out' }, at + .82)
+      .to(P.body, { scaleY: 1, scaleX: 1, duration: .5, ease: 'elastic.out(1, 0.45)' }, at + .9);
+  };
+  tl.to(P.fx, { opacity: 0, duration: .2 }, 0)
+    .to(C, { rotation: -45, duration: .35, ease: 'back.out(1.6)' }, .1)
+    .to(P.head, { rotation: -6, duration: .3, ease: 'power2.out' }, .14)
+    .to(P.tail, { rotation: 16, duration: .25, ease: 'power2.out' }, .14)
+    .to(P.tail, { rotation: -4, duration: .9, ease: 'elastic.out(1, 0.35)' }, .4);
+  hop(0, 85);
+  if (ace) hop(1.1, 110);
+  tl.to(C, { rotation: -22, duration: .18, ease: 'sine.inOut', yoyo: true, repeat: ace ? 5 : 3 }, .5);
+  const n = ace ? 16 : 8;
+  P.sparks.forEach((s, i) => {
+    if (i >= n) return;
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2, r = 170 + (i % 3) * 40;
+    tl.fromTo(s, { x: 262, y: 110, scale: 0, opacity: 1, rotation: 0 }, { x: 262 + Math.cos(a) * r, y: 110 + Math.sin(a) * r * .8, scale: .6 + (i % 2) * .5, rotation: 90, duration: .8, ease: 'expo.out' }, .4 + (i % 4) * .03)
+      .to(s, { opacity: 0, duration: .4, ease: 'power1.in' }, 1.0 + (i % 4) * .03);
+    if (ace) tl.fromTo(s, { x: 262, y: 110, scale: 0, opacity: 1 }, { x: 262 + Math.cos(a + .2) * r * 1.2, y: 110 + Math.sin(a + .2) * r, scale: .8, duration: .8, ease: 'expo.out' }, 1.5).to(s, { opacity: 0, duration: .4 }, 2.1);
+  });
+  tl.add(ace ? banner('Pebble Beach · hole 7', 'Hole in one', '111 yd · first ace') : banner('Hole 7 · Par 3', 'Birdie', '2 strokes · 111 yd'), .25)
+    .to(C, { rotation: 0, duration: .6, ease: 'power2.inOut' }, ace ? 2.9 : 2.2)
+    .to(P.head, { rotation: 0, duration: .5 }, ace ? 2.9 : 2.2)
+    .to({}, { duration: .3 });
+  return tl;
+}
+
+const READ = {
+  idle: 'Idle loop: breathing, a head bob, a tail sway, a club waggle and blinks every few seconds.',
+  swing: 'Swing: set up, waggle, backswing, a 0.17 s downswing, 50 ms of hit-stop, then the follow-through into the drawn finish. It returns to idle.',
+  hole: 'Birdie: anticipation squash, one hop, club pumps, gold sparks and the banner in this style\'s type. It returns to idle.',
+  ace: 'Hole in one: two hops, twice the sparks and the larger banner.',
+};
+function play(t) {
+  if (!P) return;
+  current = t; blinkGen++;
+  if (active) active.kill();
+  rest();
+  document.querySelectorAll('#tests button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.t === t));
+  $('#readout').textContent = READ[t];
+  if (reduced) {
+    if (t === 'hole' || t === 'ace') { gsap.set(P.club, { rotation: -45 }); gsap.set('#banner', { opacity: 1 }); $('#bnT').textContent = t === 'ace' ? 'Hole in one' : 'Birdie'; }
+    $('#readout').textContent += ' (Reduced motion is on, so this shows the end pose.)';
+    return;
+  }
+  active = t === 'idle' ? idle() : t === 'swing' ? swing() : holeOut(t === 'ace');
+}
+
+/* controls */
+for (const s of STYLES) {
+  const b = el('button', 'stylechip', `<i style="background:${s.ground}"></i>${s.name.split(' ')[0].replace('-style', '')}`);
+  b.id = 'sc-' + s.key; b.dataset.k = s.key; b.addEventListener('click', () => { styleKey = s.key; applyStage(); });
+  $('#styleChips').append(b);
+}
+$('#tests').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) play(b.dataset.t); });
+$('#grounds').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) { ground = b.dataset.g; applyStage(); } });
+$('#speeds').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; gsap.globalTimeline.timeScale(+b.dataset.s); document.querySelectorAll('#speeds button').forEach((x) => x.setAttribute('aria-pressed', x === b)); });
+applyStage();
+loadPuppet().catch((err) => { $('#readout').textContent = 'The puppet file did not load: ' + err.message; });
+</script>
+
+<script>
+(function () {
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const $ = (s, r = document) => r.querySelector(s);
+  const NS = 'http://www.w3.org/2000/svg';
+  const press = (sel, el) => document.querySelectorAll(sel).forEach((b) => b.setAttribute('aria-pressed', b === el));
+
+  /* 1 · colourways */
+  const CW = [
+    { k: 'ivory-orange', name: 'Ivory, orange ball', tag: 'Fits the interface: text ivory, ball = your ball', bg: '#111316', word: '#f2efe8', ball: '#ff7a2f', dim: '#a9461a' },
+    { k: 'ivory', name: 'Ivory', tag: 'Quietest; ball loses its meaning', bg: '#111316', word: '#f2efe8', ball: '#f2efe8', dim: '#a8a49a' },
+    { k: 'orange', name: 'Signal orange', tag: 'Loud; spends the accent on the logo', bg: '#111316', word: '#ff7a2f', ball: '#f2efe8', dim: '#a8a49a' },
+    { k: 'light', name: 'Graphite on ivory', tag: 'For light grounds: print, merch, store', bg: '#f2efe8', word: '#111316', ball: '#ff7a2f', dim: '#a9461a' },
+    { k: 'reference', name: 'Reference red', tag: 'Your original; close to penalty red', bg: '#000000', word: '#c8101a', ball: '#c8101a', dim: '#6e0710' },
+  ];
+  const grid = $('#cwGrid');
+  for (const c of CW) {
+    const d = document.createElement('div'); d.className = 'cw';
+    d.innerHTML = `<b>${c.name}</b><span class="tag">${c.tag}</span><img src="svg/hightone-${c.k}.svg" alt="High Tone wordmark, ${c.name}">
+      <div class="row2"><img src="svg/hightone-icon-${c.k}.svg" alt="App icon, ${c.name}"><div class="shot" style="background-image:url(game/paris-tee.jpg)"><div class="cover"></div><div class="hudmark" style="padding:0;background:none;width:15%"><img src="svg/hightone-${c.k}.svg" alt="" style="border-radius:.6cqw"></div></div></div>`;
+    grid.append(d);
+  }
+
+  /* 2 · the High Tone ball */
+  let H = null, htCw = CW[0], htActive = null;
+  const BX = 1016, BY = 281, BR = 112, STEP = BR * 0.25;
+  function htColour(c) {
+    htCw = c;
+    if (!H) return;
+    H.bg.setAttribute('fill', c.bg); H.word.setAttribute('fill', c.word); H.fill.setAttribute('fill', c.ball); H.dim.setAttribute('fill', c.dim);
+    $('#htStage').style.background = c.bg;
+    $('#htCaption').style.color = c.word;
+    document.querySelectorAll('#htCw button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.k === c.k));
+  }
+  function htRest() {
+    if (htActive) htActive.kill();
+    gsap.killTweensOf([H.ball, H.dim, H.wrap, H.fill, H.ring, '#htCaption']);
+    gsap.set(H.ball, { x: 0, y: 0, scaleX: 1, scaleY: 1, svgOrigin: `${BX} ${BY + BR}` });
+    gsap.set(H.dim, { x: 0 }); gsap.set(H.wrap, { y: 0, opacity: 1 });
+    gsap.set(H.ring, { attr: { r: BR }, opacity: 0 });
+    gsap.set('#htCaption', { opacity: 0 });
+    htColour(htCw);
+  }
+  const READ_HT = {
+    intro: 'Intro: the wordmark rises, then the ball falls behind the flag and lands in its counter, with two decaying bounces and a squash on each contact.',
+    hole: 'Hole-out: the ball drops in and rattles, then turns achievement gold as a gold ring pulses out. After 2.5 s it returns to your colour.',
+    load: 'Loading: the ball rolls in place (the dimples scroll across it) while the course loads. Use it as the loading indicator.',
+  };
+  function htPlay(t) {
+    if (!H) return;
+    htRest();
+    press('#htTests button', $(`#htTests [data-t="${t}"]`));
+    $('#htReadout').textContent = READ_HT[t];
+    if (reduced) { $('#htReadout').textContent += ' (Reduced motion: end state only.)'; if (t === 'hole') { H.fill.setAttribute('fill', '#e9c97a'); H.dim.setAttribute('fill', '#9a7a2c'); } return; }
+    const tl = gsap.timeline(); htActive = tl; if (window.__htScale) tl.timeScale(window.__htScale);
+    const land = (at, k) => tl.to(H.ball, { scaleY: 1 - .14 * k, scaleX: 1 + .1 * k, duration: .06, ease: 'power2.out' }, at).to(H.ball, { scaleY: 1, scaleX: 1, duration: .14, ease: 'power2.out' }, at + .06);
+    if (t === 'intro') {
+      tl.set(H.ball, { y: -900 })
+        .from(H.wrap, { y: 140, opacity: 0, duration: .9, ease: 'expo.out' }, 0)
+        .to('#htCaption', { opacity: .7, duration: .6 }, .3).set('#htCaption', { textContent: 'Pebble Beach · hole 7' }, 0)
+        .to(H.ball, { y: 0, duration: .52, ease: 'power2.in' }, .75)
+        .to(H.dim, { x: STEP * 2, duration: .52, ease: 'power1.in' }, .75);
+      land(1.27, 1);
+      tl.to(H.ball, { y: -105, duration: .25, ease: 'power2.out' }, 1.33).to(H.ball, { y: 0, duration: .25, ease: 'power2.in' }, 1.58);
+      land(1.83, .5);
+      tl.to(H.ball, { y: -26, duration: .12, ease: 'power2.out' }, 1.89).to(H.ball, { y: 0, duration: .12, ease: 'power2.in' }, 2.01)
+        .to('#htCaption', { opacity: 0, duration: .5 }, 3.2);
+    } else if (t === 'hole') {
+      tl.set(H.ball, { y: -620 }).set('#htCaption', { textContent: 'Birdie · hole 7' })
+        .to(H.ball, { y: 0, duration: .46, ease: 'power2.in' }, .1);
+      land(.56, 1);
+      tl.to(H.ball, { keyframes: [{ x: 14 }, { x: -11 }, { x: 7 }, { x: -3 }, { x: 0 }], duration: .42, ease: 'sine.inOut' }, .62)  // the rattle in the cup
+        .to(H.fill, { attr: { fill: '#e9c97a' }, duration: .35, ease: 'power1.out' }, 1.0)
+        .to(H.dim, { attr: { fill: '#9a7a2c' }, duration: .35 }, 1.0)
+        .fromTo(H.ring, { attr: { r: BR, 'stroke-width': 14 }, opacity: 1 }, { attr: { r: BR * 2.4, 'stroke-width': 2 }, opacity: 0, duration: 1.1, ease: 'expo.out' }, 1.0)
+        .fromTo('#htCaption', { opacity: 0, y: 8 }, { opacity: 1, y: 0, color: '#e9c97a', duration: .5, ease: 'expo.out' }, 1.05)
+        .to(H.fill, { attr: { fill: htCw.ball }, duration: .6 }, 3.5).to(H.dim, { attr: { fill: htCw.dim }, duration: .6 }, 3.5)
+        .to('#htCaption', { opacity: 0, duration: .5 }, 3.5).set('#htCaption', { color: htCw.word }, 4.1);
+    } else {
+      tl.set('#htCaption', { textContent: 'Loading Pebble Beach' }).to('#htCaption', { opacity: .7, duration: .4 }, 0)
+        .to(H.dim, { x: STEP, duration: .3, ease: 'none', repeat: -1 }, 0)
+        .to(H.ball, { y: -8, duration: .6, ease: 'sine.inOut', yoyo: true, repeat: -1 }, 0);
+    }
+  }
+  fetch('svg/hightone-anim.svg').then((r) => r.text()).then((txt) => {
+    $('#htHolder').innerHTML = txt;
+    const svg = $('#htHolder svg');
+    H = { svg, bg: svg.querySelector('.ht-bg'), ball: svg.querySelector('.ht-ball'), fill: svg.querySelector('.ht-ball-fill'), dim: svg.querySelector('.ht-dimples'), wrap: svg.querySelector('.ht-wordwrap'), word: svg.querySelector('.ht-word') };
+    const ring = document.createElementNS(NS, 'circle');
+    ring.setAttribute('cx', BX); ring.setAttribute('cy', BY); ring.setAttribute('r', BR); ring.setAttribute('fill', 'none'); ring.setAttribute('stroke', '#e9c97a'); ring.setAttribute('opacity', '0');
+    svg.append(ring); H.ring = ring;
+    // the ball is only ever seen below the flag's top bar, as if dropping into the cup
+    const cp = document.createElementNS(NS, 'clipPath'); cp.id = 'htBallWindow';
+    const cr = document.createElementNS(NS, 'rect'); cr.setAttribute('x', 700); cr.setAttribute('y', 40); cr.setAttribute('width', 800); cr.setAttribute('height', 1600);
+    cp.append(cr); svg.prepend(cp);
+    const win = document.createElementNS(NS, 'g'); win.setAttribute('clip-path', 'url(#htBallWindow)');
+    H.ball.parentNode.insertBefore(win, H.ball); win.append(H.ball);
+    htRest(); $('#htReadout').textContent = READ_HT.intro;
+  }).catch((e) => { $('#htReadout').textContent = 'The wordmark file did not load: ' + e.message; });
+  for (const c of CW) {
+    const b = document.createElement('button'); b.className = 'stylechip'; b.id = 'hc-' + c.k; b.dataset.k = c.k;
+    b.innerHTML = `<i style="background:${c.word};box-shadow:inset 0 0 0 3px ${c.bg}"></i>${c.name}`;
+    b.addEventListener('click', () => { htColour(c); }); $('#htCw').append(b);
+  }
+  $('#htTests').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) htPlay(b.dataset.t); });
+  $('#htSpeeds').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; if (htActive) htActive.timeScale(+b.dataset.s); window.__htScale = +b.dataset.s; press('#htSpeeds button', b); });
+
+  /* 3 · the birds */
+  const sky = $('#birdSky'); let birdTl = null; const birds = {};
+  // each bird starts close to the camera and flies away toward the green, wings level, shrinking with distance
+  const FLIGHT = {
+    birdie: { scale: 1, dur: 2.6, from: [700, 880, 2.2], to: [1010, 400, .16], drift: [[-60, -4], [70, 5], [-30, -3]], title: 'Birdie', sub: '2 strokes · 111 yd',
+      read: 'Birdie: a swallow darts away toward the green in 2.6 s, jinking side to side, with bursts of fast beats (90 ms) between short glides.' },
+    eagle: { scale: 1, dur: 4.2, from: [560, 900, 2.2], to: [1060, 360, .18], drift: [[40, 3], [-30, -2]], title: 'Eagle', sub: '1 stroke · 111 yd',
+      read: 'Eagle: three heavy wingbeats (320 ms each), then a long soar away over the green with the wings held level.' },
+    albatross: { scale: 1, dur: 5.4, from: [320, 860, 1.8], to: [1180, 380, .16], drift: [[0, 8], [0, -8], [0, 5]], title: 'Albatross', sub: '2 on a par 5',
+      read: 'Albatross: one slow beat, then 5 s of soaring. The wings barely move, and the bird banks one way, then the other, as it rides the wind out over the water.' },
+  };
+  function placeBird(k) {
+    sky.innerHTML = '';
+    const outer = document.createElementNS(NS, 'g'); const inner = document.createElementNS(NS, 'g');
+    inner.innerHTML = birds[k]; outer.append(inner); sky.append(outer);
+    return { outer, inner, wl: outer.querySelector('.wing-l'), wr: outer.querySelector('.wing-r') };
+  }
+  function birdBanner(k) {
+    $('#bbT').textContent = FLIGHT[k].title; $('#bbS').textContent = FLIGHT[k].sub;
+    return gsap.timeline({ defaults: { ease: 'expo.out' } })
+      .set('#birdBanner', { opacity: 1 })
+      .from('#bbK', { opacity: 0, letterSpacing: '.6em', duration: .7 }, 0)
+      .from('#bbT', { yPercent: 60, opacity: 0, duration: .7 }, .06)
+      .fromTo('#birdBanner .r', { scaleX: 0 }, { scaleX: 1, duration: .8, ease: 'power3.inOut' }, .2)
+      .from('#bbS', { opacity: 0, y: 6, duration: .5 }, .45);
+  }
+  function fly(k) {
+    if (!birds[k]) return;
+    if (birdTl) birdTl.kill(); gsap.killTweensOf('#birdBanner, #bbK, #bbT, #bbS, #birdBanner .r');
+    press('#birdTests button', $(`#birdTests [data-b="${k}"]`));
+    $('#birdReadout').textContent = FLIGHT[k].read;
+    const B = placeBird(k), F = FLIGHT[k];
+    gsap.set(B.wr, { transformOrigin: '0% 55%' }); gsap.set(B.wl, { transformOrigin: '100% 55%' });
+    const at = (p) => ({ x: F.from[0] + (F.to[0] - F.from[0]) * p, y: F.from[1] + (F.to[1] - F.from[1]) * p, scale: F.from[2] * Math.pow(F.to[2] / F.from[2], p) });
+    gsap.set(B.outer, at(0));
+    if (reduced) {
+      gsap.set(B.outer, at(.45));
+      gsap.set('#birdBanner', { opacity: 1 }); $('#bbT').textContent = F.title; $('#birdReadout').textContent += ' (Reduced motion: still frame.)';
+      return;
+    }
+    const W = [B.wl, B.wr];
+    birdTl = gsap.timeline();
+    // distance shrinks geometrically, so the bird recedes at a believable rate
+    const prog = { p: 0 };
+    birdTl.to(prog, { p: 1, duration: F.dur, ease: 'sine.out', onUpdate: () => gsap.set(B.outer, at(prog.p)) }, 0)
+      .to(B.inner, { keyframes: F.drift.map(([dx, rot]) => ({ x: dx, rotation: rot })), duration: F.dur * .9, ease: 'sine.inOut' }, 0)
+      .add(birdBanner(k), .3);
+    if (k === 'birdie') {
+      const flap = gsap.timeline({ repeat: -1, repeatDelay: .22 }).to(W, { scaleX: .28, scaleY: 1.06, duration: .09, ease: 'sine.inOut', yoyo: true, repeat: 5 });
+      birdTl.add(flap, 0);
+    } else if (k === 'eagle') {
+      birdTl.to(W, { scaleX: .42, duration: .32, ease: 'sine.inOut', yoyo: true, repeat: 5 }, 0)
+        .to(W, { scaleX: .93, duration: .6, ease: 'sine.out' }, 1.95)
+        .to(W, { scaleX: .5, duration: .34, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 3.1);
+    } else {
+      birdTl.to(W, { scaleX: .68, duration: .45, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0)
+        .to(B.wl, { scaleX: .9, duration: 1.4, ease: 'sine.inOut', yoyo: true, repeat: 2 }, .9)
+        .to(B.wr, { scaleX: .97, duration: 1.4, ease: 'sine.inOut', yoyo: true, repeat: 2 }, .9)
+
+    }
+    birdTl.to('#birdBanner', { opacity: 0, duration: .5 }, F.dur + .4);
+    if (window.__bScale) birdTl.timeScale(window.__bScale);
+  }
+  Promise.all(Object.keys(FLIGHT).map((k) => fetch(`svg/bird-${k}.svg`).then((r) => r.text()).then((t) => { birds[k] = new DOMParser().parseFromString(t, 'image/svg+xml').documentElement.innerHTML; })))
+    .then(() => {
+      // at rest: the swallow mid-flight with its banner, so the frame is complete before anything plays
+      const B = placeBird('birdie'), F = FLIGHT.birdie;
+      gsap.set(B.outer, { x: F.from[0] + (F.to[0] - F.from[0]) * .4, y: F.from[1] + (F.to[1] - F.from[1]) * .4, scale: F.from[2] * Math.pow(F.to[2] / F.from[2], .4) });
+      gsap.set('#birdBanner', { opacity: 1 });
+      $('#birdReadout').textContent = FLIGHT.birdie.read;
+    }).catch((e) => { $('#birdReadout').textContent = 'The bird files did not load: ' + e.message; });
+  $('#birdTests').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) fly(b.dataset.b); });
+  $('#bSpeeds').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; window.__bScale = +b.dataset.s; if (birdTl) birdTl.timeScale(+b.dataset.s); press('#bSpeeds button', b); });
+
+  /* motion briefs */
+  const BR2 = [
+    { name: 'High Tone ball', rows: {
+      BRAND: 'The logo does the celebrating, so no mascot is needed. The ball in the flag is the player\'s ball, in the player\'s colour.',
+      OBJECTS: 'The wordmark (a single traced path), the ball behind it showing only through the flag\'s counter, the dimple field clipped to the ball, and a gold ring.',
+      PALETTE: 'Ivory #f2efe8 on graphite #111316, ball #ff7a2f. On a hole-out the ball turns achievement gold #e9c97a, and only then.',
+      PHYSICS: 'The fall uses power2.in, which is gravity-like. Bounce heights decay roughly by the square of a 0.5 restitution: 105, then 26. Squash is 14% at the first contact and 7% at the second, from the ball\'s base. The rattle is a decaying ±14 → ±3. The dimples scroll as the ball falls, so it reads as spinning.',
+      LOOK: 'The wordmark rises 0.9 s on expo.out. The gold ring expands to 2.4× and thins out over 1.1 s. Transform, fill and opacity only.',
+      CAMERA: 'Locked. It works as a splash screen, a loading screen and a hole-out stinger.',
+      CHECKS: 'The ball never draws over the letters ✓ · it ends exactly where the logo has it ✓ · gold only on an achievement ✓ · reduced motion shows the end state ✓',
+    } },
+    { name: 'Scoring birds', rows: {
+      BRAND: 'Golf\'s own vocabulary: the bird is the score. They should feel real and calm, never cute.',
+      OBJECTS: 'Body, left wing and right wing per bird. The wings flap by foreshortening from the shoulder (seen from below, a downstroke shortens the span).',
+      PALETTE: 'Ivory bodies (and the eagle\'s white head and tail), gold wings, deeper gold for the eagle\'s body and the albatross\'s tips and trailing edge.',
+      PHYSICS: 'Wingbeat frequency drops with size, as it does in nature: the swallow beats in about 90 ms, the eagle in 320 ms, the albatross in 450 ms and then soars. Flight time grows too: 2.8, 4.2, then 5.4 s.',
+      LOOK: 'Each bird flies away from the camera toward the green, wings level, shrinking geometrically with distance. Side drift and a few degrees of bank give it life: the swallow jinks, the eagle sways, and the albatross banks ±8° with its wings flexing unevenly.',
+      CAMERA: 'Overlay on the game frame. In the 3D version it would cross above the green behind the cup push-in from moments.js.',
+      CHECKS: 'The bird reads by silhouette at 1× and 0.25× ✓ · the banner uses the game\'s Jost and gold rule ✓ · never blocks play: overlay only ✓',
+    } },
+  ];
+  const b2 = $('#briefs2');
+  for (const br of BR2) { const a = document.createElement('article'); a.className = 'brief'; a.innerHTML = `<h3>${br.name}: motion brief</h3><dl>${Object.entries(br.rows).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>`; b2.append(a); }
+})();
+</script>
+
+<script>
+(function () {
+  const $ = (q) => document.querySelector(q);
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const BX = 1801, BY = 566, BR = 80, STEP = BR * 0.25;
+  let H = null, tl = null, variant = 'inlay-orange', test = 'intro';
+  const READ = {
+    intro: 'Intro: the pennant unfurls, then the ball drops onto the top of the pole and settles with two small bounces.',
+    hole: 'Hole-out: the ball hops, rattles on the pole top, turns gold and sends out a gold ring; the flag snaps in the wind. It returns to orange after 2.6 s.',
+    load: 'Loading: the ball spins on the pole top (the dimples scroll) while the flag ripples.',
+  };
+  async function load(v) {
+    variant = v;
+    const t = await fetch(`svg/r8/${v}.svg`).then((r) => r.text());
+    $('#r8Holder').innerHTML = t;
+    const svg = $('#r8Holder svg'); svg.style.width = '100%'; svg.style.height = 'auto'; svg.style.overflow = 'visible';
+    const bg = svg.querySelector('rect[width="5000"]'); if (bg) bg.remove();
+    H = { ball: svg.querySelector('.fw-ball'), fill: svg.querySelector('.fw-ball-fill'), dim: svg.querySelector('.fw-dimples'), ring: svg.querySelector('.fw-ring'), pen: svg.querySelector('.fw-pennant'), wrap: svg.querySelector('.fw-wordwrap') };
+    document.querySelectorAll('#r8Var button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === v));
+    play(test);
+  }
+  function wave(amp = 1, dur = 0.9) {
+    return gsap.timeline({ repeat: -1, yoyo: true })
+      .to(H.pen, { skewY: 4 * amp, scaleX: 0.96, scaleY: 1.03, duration: dur, ease: 'sine.inOut', transformOrigin: '0% 50%' });
+  }
+  function play(t) {
+    test = t; if (!H) return;
+    if (tl) tl.kill(); gsap.killTweensOf([H.ball, H.dim, H.fill, H.ring, H.pen, H.wrap, '#r8Caption']);
+    gsap.set(H.ball, { x: 0, y: 0, scaleX: 1, scaleY: 1, svgOrigin: `${BX} ${BY + BR}` });
+    gsap.set(H.dim, { x: 0 }); gsap.set(H.ring, { opacity: 0, attr: { r: BR } });
+    gsap.set(H.pen, { skewY: 0, scaleX: 1, scaleY: 1, transformOrigin: '0% 50%' });
+    H.fill.setAttribute('fill', '#ff7a2f'); H.dim.setAttribute('fill', '#a9461a');
+    gsap.set('#r8Caption', { opacity: 0, color: '#f2efe8' });
+    document.querySelectorAll('#r8Tests button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.t === t));
+    $('#r8Readout').textContent = READ[t];
+    if (reduced) { $('#r8Readout').textContent += ' (Reduced motion: end state only.)'; return; }
+    const land = (at, k) => tl.to(H.ball, { scaleY: 1 - .14 * k, scaleX: 1 + .1 * k, duration: .06, ease: 'power2.out' }, at).to(H.ball, { scaleY: 1, scaleX: 1, duration: .14, ease: 'power2.out' }, at + .06);
+    tl = gsap.timeline();
+    if (t === 'intro') {
+      tl.from(H.wrap, { y: 120, opacity: 0, duration: .9, ease: 'expo.out' }, 0)
+        .from(H.pen, { scaleX: 0, duration: .7, ease: 'back.out(1.6)' }, .45)
+        .set(H.ball, { y: -1400 }, 0)
+        .to(H.ball, { y: 0, duration: .55, ease: 'power2.in' }, .8)
+        .to(H.dim, { x: STEP * 2, duration: .55, ease: 'power1.in' }, .8);
+      land(1.35, 1);
+      tl.to(H.ball, { y: -110, duration: .25, ease: 'power2.out' }, 1.41).to(H.ball, { y: 0, duration: .25, ease: 'power2.in' }, 1.66);
+      land(1.91, .5);
+      tl.to(H.ball, { y: -26, duration: .12, ease: 'power2.out' }, 1.97).to(H.ball, { y: 0, duration: .12, ease: 'power2.in' }, 2.09)
+        .add(wave(.6, 1.1), 1.2)
+        .set('#r8Caption', { textContent: 'Pebble Beach · hole 7' }, 0).to('#r8Caption', { opacity: .7, duration: .6 }, .4);
+    } else if (t === 'hole') {
+      tl.to(H.ball, { y: -260, duration: .26, ease: 'power2.out' }, 0).to(H.ball, { y: 0, duration: .26, ease: 'power2.in' }, .26);
+      land(.52, 1);
+      tl.to(H.ball, { keyframes: [{ x: 16 }, { x: -12 }, { x: 7 }, { x: -3 }, { x: 0 }], duration: .42, ease: 'sine.inOut' }, .58)
+        .to(H.fill, { attr: { fill: '#e9c97a' }, duration: .35 }, .95).to(H.dim, { attr: { fill: '#9a7a2c' }, duration: .35 }, .95)
+        .fromTo(H.ring, { opacity: 1, attr: { r: BR, 'stroke-width': 12 } }, { opacity: 0, attr: { r: BR * 2.6, 'stroke-width': 2 }, duration: 1.1, ease: 'expo.out' }, .95)
+        .add(wave(1.6, .22).repeat(7), .9)
+        .set('#r8Caption', { textContent: 'Birdie · hole 7' }, 0).fromTo('#r8Caption', { opacity: 0, y: 8 }, { opacity: 1, y: 0, color: '#e9c97a', duration: .5, ease: 'expo.out' }, 1)
+        .to(H.fill, { attr: { fill: '#ff7a2f' }, duration: .6 }, 3.5).to(H.dim, { attr: { fill: '#a9461a' }, duration: .6 }, 3.5).to('#r8Caption', { opacity: 0, duration: .5 }, 3.5);
+    } else {
+      tl.to(H.dim, { x: STEP, duration: .3, ease: 'none', repeat: -1 }, 0).add(wave(.8, .7), 0)
+        .set('#r8Caption', { textContent: 'Loading Pebble Beach' }, 0).to('#r8Caption', { opacity: .7, duration: .4 }, 0);
+    }
+  }
+  $('#r8Tests').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) play(b.dataset.t); });
+  $('#r8Var').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) load(b.dataset.v); });
+  load(variant).catch((e) => { $('#r8Readout').textContent = 'The logo file did not load: ' + e.message; });
+})();
+</script>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const canvas = document.getElementById('three');
+const out = document.getElementById('readout3');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, devicePixelRatio));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.05;
+renderer.shadowMap.enabled = true;
+const scene = new THREE.Scene();
+const cam = new THREE.PerspectiveCamera(30, 16 / 10, .1, 50);
+cam.position.set(.6, 1.3, 5.2); cam.lookAt(0, .85, 0);
+scene.add(new THREE.HemisphereLight(0xfff4e0, 0x403830, 1.6));
+const key = new THREE.DirectionalLight(0xffffff, 2.4); key.position.set(-2.5, 4, 3); key.castShadow = true; key.shadow.mapSize.set(1024, 1024); scene.add(key);
+const rim = new THREE.DirectionalLight(0xffe2b0, 1.4); rim.position.set(3, 2, -3); scene.add(rim);
+const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.ShadowMaterial({ opacity: .28 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+const rig = new THREE.Group(); scene.add(rig);   // the hop and turn move this
+const body = new THREE.Group(); rig.add(body);   // squash and stretch, from the feet
+const GROUNDS = { airone: '#13223b', therilo: '#0b0b0b', hightone: '#000000', brison: '#f4c12b', losamigos: '#f2e6c8' };
+const setGround = (k) => { const c = new THREE.Color(GROUNDS[k]); scene.background = c; canvas.style.background = GROUNDS[k]; document.querySelectorAll('#styleChips3 button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.k === k)); };
+for (const [k, c] of Object.entries(GROUNDS)) {
+  const b = document.createElement('button'); b.className = 'stylechip'; b.id = 'g3-' + k; b.dataset.k = k;
+  b.innerHTML = `<i style="background:${c}"></i>${{ airone: 'Airone', therilo: 'Therilo', hightone: 'High Tone', brison: 'Brison', losamigos: 'Los Amigos' }[k]}`;
+  b.addEventListener('click', () => setGround(k)); document.getElementById('styleChips3').append(b);
+}
+setGround('losamigos');
+function resize() { const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }
+new ResizeObserver(resize).observe(canvas); resize();
+let tl = null;
+const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const G = window.gsap;
+function test3(t) {
+  document.querySelectorAll('#tests3 button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.t === t));
+  if (tl) tl.kill(); G.killTweensOf([rig.position, rig.rotation, body.scale]);
+  rig.position.set(0, 0, 0); rig.rotation.set(0, 0, 0); body.scale.set(1, 1, 1);
+  if (reduced) { out.textContent = 'Reduced motion is on, so the model stays still.'; return; }
+  if (t === 'idle') {
+    out.textContent = 'Idle: breathing scale from the feet and a slow weight shift. One rigid mesh, so nothing bends.';
+    tl = G.timeline({ repeat: -1 })
+      .to(body.scale, { y: 1.015, x: .995, z: .995, duration: 1.6, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0)
+      .to(rig.rotation, { y: .12, duration: 1.6, ease: 'sine.inOut', yoyo: true, repeat: 1 }, 0);
+  } else if (t === 'hop') {
+    out.textContent = 'Hole-out hop: anticipation squash, a hop with a full turn, and an elastic landing.';
+    tl = G.timeline({ onComplete: () => test3('idle') })
+      .to(body.scale, { y: .92, x: 1.04, z: 1.04, duration: .14, ease: 'power2.out' })
+      .to(body.scale, { y: 1.06, x: .97, z: .97, duration: .3, ease: 'power3.out' })
+      .to(rig.position, { y: .38, duration: .3, ease: 'power3.out' }, '<')
+      .to(rig.rotation, { y: Math.PI * 2, duration: .56, ease: 'power2.inOut' }, '<')
+      .to(rig.position, { y: 0, duration: .26, ease: 'power2.in' })
+      .to(body.scale, { y: .92, x: 1.05, z: 1.05, duration: .08, ease: 'power2.out' })
+      .to(body.scale, { y: 1, x: 1, z: 1, duration: .5, ease: 'elastic.out(1, 0.45)' })
+      .to({}, { duration: .6 });
+    rig.rotation.y = 0;
+  } else {
+    out.textContent = 'Turntable: the side and back are the generator\'s guess at the parts the 2D art never showed.';
+    tl = G.to(rig.rotation, { y: Math.PI * 2, duration: 8, ease: 'none', repeat: -1 });
+  }
+}
+document.getElementById('tests3').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) test3(b.dataset.t); });
+const onModel = (g) => {
+  const m = g.scene;
+  m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  const box = new THREE.Box3().setFromObject(m), size = box.getSize(new THREE.Vector3());
+  const k = 1.7 / size.y; m.scale.setScalar(k);
+  const b2 = new THREE.Box3().setFromObject(m), c = b2.getCenter(new THREE.Vector3());
+  m.position.set(-c.x, -b2.min.y, -c.z);
+  body.add(m);
+  test3('idle');
+};
+const fail = (err) => { out.textContent = 'The model did not load: ' + (err?.message || err); };
+// the GLB ships as base64 inside a script (3d/devil-web.glb.js) so it loads anywhere a script can
+const tag = document.createElement('script'); tag.src = '3d/devil-web.glb.js';
+tag.onload = () => { try { const bin = Uint8Array.from(atob(window.FW_DEVIL_GLB), (c) => c.charCodeAt(0)); new GLTFLoader().parse(bin.buffer, '', onModel, fail); } catch (e) { fail(e); } };
+tag.onerror = () => fail(new Error('3d/devil-web.glb.js was not found'));
+document.head.append(tag);
+renderer.setAnimationLoop(() => renderer.render(scene, cam));
+</script>
