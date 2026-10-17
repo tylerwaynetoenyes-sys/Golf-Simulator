@@ -66,7 +66,7 @@ ${OCC_TEST}`);
 /** Patch every instanced mesh (trees, shrubs, grass) under `root`. */
 export function patchOccluders(root) {
   root.traverse((o) => {
-    if (!o.isInstancedMesh) return;
+    if (!o.isInstancedMesh || o.userData.noOcclude) return; // [wildlife] animals stay solid
     const ms = Array.isArray(o.material) ? o.material : [o.material];
     for (const m of ms) patch(m);
   });

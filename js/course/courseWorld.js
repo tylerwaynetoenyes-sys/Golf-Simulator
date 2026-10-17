@@ -29,6 +29,7 @@ import { dressScenery } from './scenery.js';
 import { buildDecay } from './decay.js';
 import { mergeByMaterial } from '../scene/merge.js';
 import { dressPinFlag, flagpole, fireworks } from './usa.js';
+import { Wildlife } from './wildlife.js'; // [wildlife]
 
 const C = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.SRGBColorSpace);
 const COL = {
@@ -727,6 +728,15 @@ export class CourseWorld {
 
     // ── scenery beyond play: herds and wagons, boats and sea stacks, crowds ──
     this.scenery = dressScenery(T, hole, rand, this.groundAt, buildLandmark);
+    // [wildlife] the course's animals (js/course/wildlife.js): placed by the ground they need, kept out of play
+    this.wildlife = null;
+    if (typeof document !== 'undefined') {
+      let ws = 53 + (hole.n || 1) * 11;
+      const wr = () => ((ws = (ws * 16807) % 2147483647) / 2147483647);
+      this.wildlife = new Wildlife(T, hole, { ground: this.groundAt, trees: this.treeList, rnd: wr, quality: this.r?.quality?.pixelRatio < 1.5 ? 0.7 : 1 });
+      this.wildlife.setDay(this.day);
+      g.add(this.wildlife.group);
+    }
     // surf on a rocky coast: the wash at the rocks and the breakers rolling in
     this.surf = null;
     if (hole.theme === 'coastal' && T.seaLevel != null) {
@@ -2004,6 +2014,7 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
   setDay(d) {
     this.day = d;
     if (!this.hole) return;
+    this.wildlife?.setDay(d); // [wildlife]
     for (const s of this.floods) { s.intensity = 2600 * (1 - d); s.visible = d < 0.6; }
     for (const m of this.mastMeshes || []) m.visible = d < 0.6;
     this.lampMat.color.setRGB(0.5 + 4.5 * (1 - d), 0.48 + 3.6 * (1 - d), 0.42 + 2.6 * (1 - d));
@@ -2095,6 +2106,7 @@ diffuseColor.rgb *= 1.0 + vGreen * fadeS * (pa * (0.03 + 0.045 * withA) + pb * (
     this.streetLife?.update(dt);
     this.scenery?.update(dt, t, { x: GRASS.uWind.value.x * 8, z: GRASS.uWind.value.y * 8 });
     this.surf?.update(t);
+    this.wildlife?.update(dt, t, camera, this.ballPos); // [wildlife]
     // thick rough wherever the ball settles (checked twice a second)
     if (this.ballPos && this.T) {
       this._nearT = (this._nearT || 0) + dt;

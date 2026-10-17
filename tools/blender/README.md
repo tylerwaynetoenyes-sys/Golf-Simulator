@@ -87,3 +87,30 @@ blender -b --factory-startup --python tools/blender/cup.py -- assets/models/cup.
 blender -b --factory-startup --python tools/blender/green_details.py -- . [pin] [marker] [marks]
 blender -b --factory-startup --python tools/blender/divots.py -- . [chunks] [scars]
 ```
+
+## Wildlife (Sketchfab, CC BY)
+
+Two steps, headless on the CPU (take a Chrome/perf slot first; see HANDOFF):
+
+1. `wildlife.py` reduces a Sketchfab import to a static mesh in
+   `assets/models/wildlife/src/` (head to -Z, feet on the ground, real size).
+2. `wildlife_rig/` rigs and animates it and writes the runtime GLB next to it:
+   `deer.py` (WildMesh's doe and its clips; the buck's antlers on its head bone),
+   `gator.py`, `quad.py sheep|squirrel`, `bird.py goose|heron|egret|mallard`,
+   `flyer.py goose_fly|heron_fly|egret_fly|pelican|osprey|eagle|gull` (wing
+   joints found along each wing's leading edge), `seal.py sealion|harborseal`.
+   `rigkit.py` builds armatures, binds with inverse-distance weights over the
+   nearest bones (bone heat fails on these scans) and keys clips in armature
+   space; `ortho.py` renders top and side views on a 10 cm grid to read joints from.
+
+```
+blender -b --factory-startup --python tools/blender/wildlife_rig/bird.py -- tools/blender/wildlife_rig <work dir> goose
+```
+
+The work dir holds the raw downloads the deer, alligator and flyer scripts
+read (`raw/doe_rig.glb`, `raw/gator2.glb`, `raw/crane.glb`, `raw/pelican.glb`,
+`raw/osprey.glb`): each is the Sketchfab model imported through the Blender
+MCP add-on into a scratch scene and exported as GLB with its armature and
+actions (the s8819296 birds decimated to ~12k triangles first).
+`tools/wildlife-preview.html?kind=goose&clip=graze` plays any clip
+(`&t=1.2` holds a frame, `&cam=x,y,z,tx,ty,tz` places the camera).

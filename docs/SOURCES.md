@@ -476,6 +476,37 @@ mesh with its coat texture, Draco-compressed (`assets/models/animals/`):
 - "Brown Cow 3d model" by rt699448 (sketchfab.com/rt699448), drawn as the
   wagon trains' oxen
 
+## Wildlife
+
+`assets/models/wildlife/`: the animals of every course (`js/course/wildlife.js`,
+`js/scene/fauna.js`), skinned and animated, the clips baked into each GLB
+(Draco, WebP). Models from Sketchfab under CC BY 4.0. The deer's animation is
+WildMesh 3D's own; every other rig and clip was built in Blender
+(`tools/blender/wildlife_rig/`). `src/` holds the static, reduced meshes the
+rigs were built on (`tools/blender/wildlife.py`); the game does not load them.
+
+| File | Model | Author | Rig and animation |
+|---|---|---|---|
+| deer_doe.glb | [Realistic Animated Doe 3D Model](https://sketchfab.com/3d-models/b6172618aa304473a4cf7b9246c0a218) | WildMesh_3D | the author's rig and clips (stand, graze, look, walk, trot, run, turns), root motion taken out and kept as ground speeds; tinted greyer for black-tailed and mule deer |
+| deer_buck.glb | the doe, with the antlers of [Realistic Whitetailed deer / free commercial use](https://sketchfab.com/3d-models/d8192bb6909042a0b8ba08774358a8f1) | WildMesh_3D, free-3d-animal-character-model | antlers grafted onto the doe's head bone; plays the doe's clips |
+| gator.glb | [American Alligator](https://sketchfab.com/3d-models/605a2c7ebd1b4cd1b47bac9fbdb4c98a) | sidarthmenon | built here: spine, 7-bone tail, sprawled legs; bask, alert, belly-walk, slide, swim, float |
+| goose_rig.glb | [Canada Goose](https://sketchfab.com/3d-models/d32e8f0c49a04dccbfdeb3593649197d) | OSU.Multimedia | built here: idle, graze (pecking), waddle, alert, hiss, take-off run |
+| goose_fly_rig.glb | [Canada Goose - in Flight](https://sketchfab.com/3d-models/25fbbb9e607a4bccb05ae05c08fd0039) | OSU.Multimedia | built here: wingbeat, glide, take-off |
+| heron_rig.glb, egret_rig.glb | [Great blue heron](https://sketchfab.com/3d-models/52cffc22bf2441468739ac3ba6d599aa) | faerbogdan99 | built here: idle, stalk, strike, alert, crouch; the egret is the heron whitened with black legs |
+| heron_fly.glb, egret_fly.glb | [Whooping Crane – Flying Rigged Bird](https://sketchfab.com/3d-models/c207f839b5ad4f8eb5605c166fe6d790) | s8819296 | recoloured slate blue-grey (great blue heron) and white (great egret), the crane's black neck band lifted; its climbing take-off pose kept; wingbeat, glide, take-off built here |
+| pelican.glb | [Great White Pelican – Flying Rigged Bird](https://sketchfab.com/3d-models/2675d53944cb4a6186873a09416638cb) | s8819296 | recoloured grey-brown for the brown pelican; wingbeat and glide built here |
+| osprey.glb | [Osprey – Flying Raptor Rigged Bird](https://sketchfab.com/3d-models/9e65ce0542a24ea388e81e3e6e9c9054) | s8819296 | wingbeat and glide built here |
+| eagle_rig.glb | [Bald Eagle Flying Bird Model](https://sketchfab.com/3d-models/30434fd1272f464a8540750a78a5087f) | s8819296 | wingbeat and glide built here; tinted for the red-tailed hawk |
+| gull_rig.glb | [Seagull](https://sketchfab.com/3d-models/dc42ffc81c86480e9e7f7752fa134174) | Dayvable | wingbeat and glide built here |
+| squirrel_rig.glb | [Realistic_squirrel_3d_model](https://sketchfab.com/3d-models/b492079385ff407ab68aa7f72c88f828) | mgddeldeen9020 | built here: forage, look, sit up, walk, bound; fox squirrel as is, greyed for the eastern grey |
+| sheep_rig.glb | [Realistic Woolly Sheep - Game Ready Asset](https://sketchfab.com/3d-models/11d84b8881dd4e5fae326ace6b1515ef) | Hdjusj | built here: idle, graze, look, walk; face and legs darkened (vertex colour) for Scottish Blackface |
+| mallard_rig.glb | [Realistic Mallard Duck - Game Ready Asset](https://sketchfab.com/3d-models/dd33cd2e30944a4aae2de1a06a828f4f) | Hdjusj | built here: float, dabble (upending), preen |
+| sealion_rig.glb, harborseal_rig.glb | the zoo's sea lion and harbor seal (credited above) | zhaoqinzzq, c4rn4g3 | built here: idle, look, bark (sea lion), banana pose (harbor seal) |
+
+The paragliders and hang gliders over Torrey Pines are built in code.
+Birdsong, gull calls, goose honks and hisses and the sea lions' barks are
+synthesised (Web Audio) in `js/course/wildlife.js`.
+
 ## Confluence Point
 
 `assets/courses/confluencepoint/`: `dem.*`/`far.*` (Terrarium, USGS 3DEP) and

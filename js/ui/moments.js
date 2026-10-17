@@ -113,6 +113,36 @@ export function notable(game, kind, info = {}) {
 }
 
 /**
+ * [wildlife] The ball has stopped beside an alligator (js/course/wildlife.js,
+ * rare, once a hole at most): the camera drops to a low look along the bank at
+ * the animal and the ball while it lifts its head and slides off, then play
+ * goes on. Returns true when it ran.
+ */
+export function wildlife(game, { kind, at, ball }) {
+  if (!enabled() || kind !== 'gator') return false;
+  const w = game.world;
+  const V = THREE.Vector3;
+  const A = new V(at.x, at.y, at.z), B = new V(ball.x, ball.y, ball.z);
+  const mid = A.clone().lerp(B, 0.4);
+  // across the line from the gator to the ball, on the camera's side, low to the ground
+  const ab = B.clone().sub(A); ab.y = 0;
+  const span = Math.max(4, ab.length());
+  ab.normalize();
+  const side = new V(-ab.z, 0, ab.x);
+  const cam = w.camera.position.clone();
+  if (side.dot(cam.clone().sub(mid)) < 0) side.negate();
+  const end = mid.clone().add(side.multiplyScalar(span + 4.5)).add(ab.clone().multiplyScalar(-1.5));
+  end.y = (w.course.groundAt?.(end.x, end.z) ?? mid.y) + 1.1;
+  const look = mid.clone(); look.y += 0.35;
+  if (animate()) {
+    const from = new V(); w.camera.getWorldDirection(from);
+    w.rig.flyover([{ pos: cam, look: cam.clone().add(from.multiplyScalar(20)) }, { pos: end, look }], 1.6, null, { toAddress: false, fov: 38, easeIn: 0.3, easeOut: 1.0 });
+  }
+  setTimeout(() => banner({ kicker: 'Wildlife', title: 'American alligator', sub: 'Keep your distance', size: 's', ms: 2200 }), animate() ? 900 : 0);
+  return true;
+}
+
+/**
  * The round ends: the camera cranes up and back from the last green over the
  * course, the winner's name and score rise over it with the gold rule, then the
  * summary card opens with its rows staggering in (motion.panelIn).
