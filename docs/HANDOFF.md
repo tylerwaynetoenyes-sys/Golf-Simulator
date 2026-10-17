@@ -222,6 +222,31 @@ add `&manual` to drive frames with `window.__advance(seconds)`.
   `tools/blender/container.py`), UVs in metres, rust heavier at the bottom
   rail.
 
+## Wildlife (October 16)
+
+- `js/course/wildlife.js` (who lives where, behaviour, synthesised calls) and
+  `js/scene/fauna.js` (`Beast`: a skinned animal with an AnimationMixer; clips
+  play in place and move the animal at their authored ground speed). Rosters
+  per course: alligators, egrets and herons, ospreys and eagles at Sawgrass;
+  black-tailed deer, seals and sea lions, pelican lines and gulls at Pebble;
+  Blackface sheep at Whistling; fox squirrels at Pinehurst; whitetails, Canada
+  geese, bald eagles and grey squirrels on the Midwest courses; gliders off
+  Torrey Pines. New course ids fall back by name (`/torrey|pinehurst|.../`) or
+  theme, so the courses still being merged get animals too.
+- Placement: pond banks from the water polygons, the tree line from the
+  hole's tree records, the coast from the sea level; never on greens, tees,
+  bunkers or the fairway's middle, and clear of the tee and the green.
+- Reactions: geese run and lift off, herons crouch and fly to another bank,
+  deer bound away, a basking gator rouses and slides into the water, a
+  floating one sinks, squirrels run up a tree. Rare and switchable with
+  Settings → Effects → Moments: a ball stopping beside a gator cuts to a low
+  shot of it (`moments.wildlife`), and now and then a goose stands its ground.
+- Assets and the Blender pipeline: `docs/SOURCES.md` (Wildlife) and
+  `tools/blender/README.md`. Animation runs within 260 m of the camera; past
+  650 m ground animals are not drawn. iPad budget held on Medium
+  (sawgrass:17, rollinghills:1, pebble:7, whistlingstraits:3: 60 fps,
+  174–247 calls, ≤ 1.44M triangles at address).
+
 ## Next steps
 
 - Long and middle irons land 2–4° flatter than Trackman; closing that needs

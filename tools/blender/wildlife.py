@@ -1,4 +1,4 @@
-"""Wildlife models for js/scene/fauna.js: one game mesh per animal.
+"""Wildlife source meshes (assets/models/wildlife/src/): one static, reduced mesh per animal, rigged afterwards by tools/blender/wildlife_rig/.
 
 Run inside Blender with a Sketchfab import already in the scene (the Blender
 MCP add-on's import_asset, or File > Import > glTF of the downloaded model):
@@ -46,7 +46,7 @@ import sys
 import bpy
 from mathutils import Matrix, Vector
 
-OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(bpy.data.filepath or __file__)))), 'assets', 'models', 'wildlife')
+OUT = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(bpy.data.filepath or __file__)))), 'assets', 'models', 'wildlife', 'src')
 
 
 def wire_base(ob):

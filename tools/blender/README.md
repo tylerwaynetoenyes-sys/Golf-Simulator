@@ -90,10 +90,27 @@ blender -b --factory-startup --python tools/blender/divots.py -- . [chunks] [sca
 
 ## Wildlife (Sketchfab, CC BY)
 
-`wildlife.py` turns a Sketchfab animal into a game mesh for `js/scene/fauna.js`:
-posed at a chosen frame, joined, base colour only, head to -Z, feet on the
-ground, real length, decimated to 2.5–7 k triangles, Draco and WebP, in
-`assets/models/wildlife/`. The per-animal settings and the egret, doe and
-Blackface variants are listed at the top of the script; credits in
-`docs/SOURCES.md`. `tools/wildlife-preview.html` shows them all with their
-animation (`?kind=deer_doe&gait=1`).
+Two steps, headless on the CPU (take a Chrome/perf slot first; see HANDOFF):
+
+1. `wildlife.py` reduces a Sketchfab import to a static mesh in
+   `assets/models/wildlife/src/` (head to -Z, feet on the ground, real size).
+2. `wildlife_rig/` rigs and animates it and writes the runtime GLB next to it:
+   `deer.py` (WildMesh's doe and its clips; the buck's antlers on its head bone),
+   `gator.py`, `quad.py sheep|squirrel`, `bird.py goose|heron|egret|mallard`,
+   `flyer.py goose_fly|heron_fly|egret_fly|pelican|osprey|eagle|gull` (wing
+   joints found along each wing's leading edge), `seal.py sealion|harborseal`.
+   `rigkit.py` builds armatures, binds with inverse-distance weights over the
+   nearest bones (bone heat fails on these scans) and keys clips in armature
+   space; `ortho.py` renders top and side views on a 10 cm grid to read joints from.
+
+```
+blender -b --factory-startup --python tools/blender/wildlife_rig/bird.py -- tools/blender/wildlife_rig <work dir> goose
+```
+
+The work dir holds the raw downloads the deer, alligator and flyer scripts
+read (`raw/doe_rig.glb`, `raw/gator2.glb`, `raw/crane.glb`, `raw/pelican.glb`,
+`raw/osprey.glb`): each is the Sketchfab model imported through the Blender
+MCP add-on into a scratch scene and exported as GLB with its armature and
+actions (the s8819296 birds decimated to ~12k triangles first).
+`tools/wildlife-preview.html?kind=goose&clip=graze` plays any clip
+(`&t=1.2` holds a frame, `&cam=x,y,z,tx,ty,tz` places the camera).
