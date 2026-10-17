@@ -380,6 +380,9 @@ export const THEME_TREES = {
   // Rock Spring Park, on the bluff above the river: white and red oak, sugar maple and hickory over mown
   // parkland, sycamores in the ravines, eastern red cedar and the odd planted spruce (the trees stand where the LiDAR found them)
   rockspring: { broad: [0, 0, 2, 1, 3], conifer: [4, 4, 5], density: 0.9, scatter: 0.5 },
+  // The Woodlands: oak-hickory woods, oak-led (white and younger oak), sycamore along the West Fork, the odd red cedar
+  // (no maple slot: its model is the heaviest, and these woods are full enough to fill the near-model budget)
+  woodlands: { broad: [0, 0, 3, 1], conifer: [4], density: 0.7, scatter: 0.5 },
   // TPC Sawgrass: live oaks, sabal palms and slash pine
   sawgrass: { broad: [0, 12, 12, 1], conifer: [8], density: 0.75, scatter: 0.6 },
   // Augusta National: tall loblolly pines (the pine model) over oaks and magnolias

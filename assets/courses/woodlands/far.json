@@ -1,0 +1,91 @@
+{
+  "lat": 38.934,
+  "lon": -90.133,
+  "size": 16000,
+  "step": 32,
+  "n": 501,
+  "min": 107.04,
+  "max": 202.92,
+  "lidar": false,
+  "source": "USGS 3DEP 1 m bare-earth DEM (IL_10CountyNRCS_D23, IL_19County_D24, IL_SouthCentral_2021_D21, MO_WestCentral_2018_D19), public domain; 0.0% from Terrarium tiles (AWS Open Data)",
+  "tiles": [
+    {
+      "tile": "USGS 1 Meter 15 x74y431 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 27031
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y432 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 93600
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y433 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 5547
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y431 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 29472
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y432 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 63395
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y433 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 4967
+    },
+    {
+      "tile": "USGS 1 Meter 16 x23y431 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 1
+    },
+    {
+      "tile": "USGS 1 Meter 16 x23y433 IL_10CountyNRCS_D23",
+      "project": "IL_10CountyNRCS_D23",
+      "published": "2026-04-04",
+      "samples": 23
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y433 IL_SouthCentral_2021_D21",
+      "project": "IL_SouthCentral_2021_D21",
+      "published": "2022-12-08",
+      "samples": 4826
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y433 IL_19County_D24",
+      "project": "IL_19County_D24",
+      "published": "2026-09-02",
+      "samples": 1562
+    },
+    {
+      "tile": "USGS 1 Meter 15 x75y433 IL_19County_D24",
+      "project": "IL_19County_D24",
+      "published": "2026-09-02",
+      "samples": 4276
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y431 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 16221
+    },
+    {
+      "tile": "USGS 1 Meter 15 x74y432 MO_WestCentral_2018_D19",
+      "project": "MO_WestCentral_2018_D19",
+      "published": "2022-05-20",
+      "samples": 5
+    }
+  ]
+}

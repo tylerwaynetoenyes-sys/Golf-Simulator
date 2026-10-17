@@ -243,6 +243,25 @@ add `&manual` to drive frames with `window.__advance(seconds)`.
   1b6ecdd). At address (Medium): 13 = 226 calls / 1.13M, 11 = 203 / 1.15M,
   16 = 264 / 1.18M, 12 = 288 / 1.06M.
 
+## The Woodlands, Alton (October 16)
+
+- `?play=woodlands`: 18 holes, par 72, 6,423 yd (GolfPass card, matches OpenGolfAPI). OSM maps only
+  three holes, so the greens, fairways, bunkers, tees, paths and creek are measured: NAIP imagery
+  (`USGSNAIPImagery`; `USGSNAIPPlus` was timing out), the 3DEP point cloud's return intensity (turf vs
+  rough; bunker sand reads ~570-850, paths and bright turf above 900) and leaf-off canopy, and the 1 m
+  DEM for tee pads and greens. The club's own course diagram gave only the numbering.
+- The favourite hole is the 2nd: tee on a level pad at 155.4 m on the bluff, the creek 20 m below,
+  green with a bunker front-left, path behind, a portable toilet by the 8th tee, the white house up the
+  7th/3rd. `js/course/lm/woodlands.js` lays the ravine thicket (leaf cards wherever the point cloud has
+  low vegetation), the creek-bed stones and the real path; and the clubhouse grounds for 1, 9, 10 and 18
+  (putting green, umbrella patio, fieldstone wall, WOODLANDS in white stones, cars).
+- Mapped water can say `shore: false` (no cattails): the creek reaches use it, and ponds more than 70 m
+  off a hole's line, which play never sees. A hole can say `cartPath: false` when its landmark draws the
+  real path (`js/course/courseLife.js`).
+- iPad budget (Medium, address): 2 = 172 calls / 1.40M, 15 = 175 / 1.42M, 18 = 241 / 1.25M, all 60 fps.
+  The wooded holes fill the 110 near-model cap, so the tree mix leaves out maple (6,600 triangles, the
+  heaviest model).
+
 ## Next steps
 
 - Long and middle irons land 2–4° flatter than Trackman; closing that needs
