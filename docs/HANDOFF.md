@@ -283,9 +283,12 @@ add `&manual` to drive frames with `window.__advance(seconds)`.
 - Mapped water can say `shore: false` (no cattails): the creek reaches use it, and ponds more than 70 m
   off a hole's line, which play never sees. A hole can say `cartPath: false` when its landmark draws the
   real path (`js/course/courseLife.js`).
-- iPad budget (Medium, address): 2 = 172 calls / 1.40M, 15 = 175 / 1.42M, 18 = 241 / 1.25M, all 60 fps.
-  The wooded holes fill the 110 near-model cap, so the tree mix leaves out maple (6,600 triangles, the
-  heaviest model).
+- iPad budget with the wildlife (Medium, address, measured with no other Chrome running): 2 = 178 calls /
+  1.42M, 15 = 182 / 1.42M, 18 = 240 / 1.25M, Rolling Hills 1 = 173 / 1.16M, all 60 fps. The wooded holes fill
+  the 110 near-model cap, so the tree mix is white oak and sycamore only (maple 6,600 and beech 4,280
+  triangles are heavier). Wildlife: animals past 90 m draw without a shadow, geese, squirrels and mallards
+  past 280 m are not drawn (`js/course/wildlife.js`, `Beast.shadows` in `js/scene/fauna.js`), and the
+  Woodlands roster is a smaller flock (3-6 geese, 1-3 deer).
 
 ## Next steps
 

@@ -36,6 +36,8 @@ import { store } from '../data/store.js';
 
 const MIDWEST = { deer: [2, 5], geese: [5, 10], squirrels: [2, 4], soar: [['eagle', 1, { river: true }], ['hawk', 1]], song: 'cardinal' };
 const ROSTERS = {
+  // The Woodlands (Alton): the Midwest set, a smaller flock on its small ponds and a deer or three at the woods
+  woodlands: { ...MIDWEST, deer: [1, 3], geese: [3, 6] },
   sawgrass: { gators: [2, 4], waders: [2, 4], squirrels: [1, 3], soar: [['osprey', 1], ['eagle', 1]], song: 'cardinal' },
   augusta: { deer: [1, 2], squirrels: [3, 6], soar: [['hawk', 1]], song: 'cardinal' },
   pebble: { deer: [2, 4], blacktail: true, seals: [3, 7], pelicans: true, gulls: [3, 6], song: 'gull' },
@@ -90,6 +92,9 @@ const angDiff = (a, b) => { let d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if
 const approach = (v, to, k) => v + (to - v) * Math.min(1, k);
 const NEAR = 260; // animation runs within this distance of the camera; past FAR an animal is not drawn
 const FAR = 650;
+const SHADOW_NEAR = 90; // past this an animal draws without its shadow (fauna.js Beast.shadows)
+// small ground animals are a few pixels at this range: not drawn past it
+const SMALL = new Set(['goose', 'squirrel', 'mallard']), SMALL_FAR = 280;
 
 /**
  * The wildlife of one hole: build with the hole, update every frame.
@@ -493,9 +498,9 @@ export class Wildlife {
       }
       if (a.type === 'pelican') continue;
       const b = a.b;
-      b.root.visible = !a.hidden && (a.type === 'soar' || a.type === 'flyer' || dc < FAR);
+      b.root.visible = !a.hidden && (a.type === 'soar' || a.type === 'flyer' || dc < (SMALL.has(a.kind) ? SMALL_FAR : FAR));
       b.awake = b.root.visible && (!far || a.type === 'soar');
-      if (b.root.visible) { b.place(a.x, a.y, a.z, a.yaw, a.pitch, a.roll); b.update(dt * (a.rate || 1)); }
+      if (b.root.visible) { b.place(a.x, a.y, a.z, a.yaw, a.pitch, a.roll); b.update(dt * (a.rate || 1)); b.shadows?.(dc < SHADOW_NEAR || a.type === 'soar' || a.type === 'flyer'); }
     }
     if (this.pelicanLine) this._pelicanLine(dt, night, cam);
     this._sounds(dt, cam);

@@ -109,6 +109,9 @@ export class Beast {
     this.want = ['idle', {}];
     this.speeds = {};
     this.awake = true;
+    this.meshes = []; // the body's meshes, for the shadow LOD
+    this.shadow = shadow;
+    this._shadowOn = shadow;
     loadRig(kind).then((m) => {
       if (!m) return;
       const R = RIGS[kind], names = RIGS[R.clipsFrom || kind]?.clips || R.clips;
@@ -117,6 +120,7 @@ export class Beast {
         if (!o.isMesh) return;
         if (tint != null || grey > 0) o.material = tintMaterial(o.material, tint ?? 0xffffff, grey);
         o.castShadow = shadow;
+        this.meshes.push(o);
       });
       const pivot = new THREE.Group();
       pivot.add(body);
@@ -165,6 +169,14 @@ export class Beast {
   place(x, y, z, yaw, pitch = 0, roll = 0) {
     this.root.position.set(x, y, z);
     this.root.rotation.set(pitch, yaw, roll, 'YXZ');
+  }
+
+  /** Shadow LOD: a far animal's shadow is a few pixels, not worth a second skinned draw. */
+  shadows(on) {
+    on = on && this.shadow;
+    if (on === this._shadowOn) return;
+    this._shadowOn = on;
+    for (const m of this.meshes) m.castShadow = on;
   }
 
   update(dt) { if (this.mixer && this.awake) this.mixer.update(dt); }
