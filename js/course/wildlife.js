@@ -191,11 +191,15 @@ export class Wildlife {
   }
 
   /** The sea's edge, where the ground meets the water just above it (rocks and beaches). */
-  _coast(n) {
+  _coast(n, reach = [260]) {
     const T = this.T;
     if (T.seaLevel == null) return [];
-    const b = T.bounds(260), out = [];
-    for (let k = 0; k < 900 && out.length < n * 3; k++) {
+    const out = [];
+    // search wider and wider (Torrey Pines plays along bluffs a hundred metres above the sea)
+    for (const r of reach) {
+      if (out.length) break;
+      const b = T.bounds(r);
+      for (let k = 0; k < 1500 && out.length < n * 3; k++) {
       const x = b.minx + this.rnd() * (b.maxx - b.minx), z = b.minz + this.rnd() * (b.maxz - b.minz);
       const h = this.ground(x, z) - T.seaLevel;
       if (h < 0.15 || h > 2.6) continue;
@@ -208,6 +212,7 @@ export class Wildlife {
       if (!this._clear(x, z, { margin: 30 })) continue;
       const l = Math.hypot(wx, wz) || 1;
       out.push([x, z, wx / l, wz / l]);
+      }
     }
     return out;
   }
@@ -421,7 +426,7 @@ export class Wildlife {
     // brown pelicans: a line of them gliding low past the cliffs, flaps rippling down the line
     const T = this.T;
     if (T.seaLevel == null) return;
-    const coast = this._coast(6);
+    const coast = this._coast(6, [260, 700, 1400]);
     if (!coast.length) return;
     const n = 4 + Math.floor(this.rnd() * 5);
     const [x, z, wx, wz] = coast[0];
@@ -437,14 +442,17 @@ export class Wildlife {
 
   _gliders(n) {
     // the Torrey Pines Gliderport: paragliders and hang gliders on the cliff's lift
-    const coast = this._coast(4);
+    const coast = this._coast(4, [260, 700, 1400]);
     if (!coast.length) return;
     const [x, z, wx, wz] = coast[0];
+    // they ride the lift above the cliff top: the height of the land just inland
+    let top = this.T.seaLevel;
+    for (let r = 20; r <= 160; r += 20) top = Math.max(top, this.ground(x - wx * r, z - wz * r));
     for (let k = 0; k < n; k++) {
       const hang = this.rnd() < 0.35;
       const g = hang ? hangGlider(this.rnd) : paraglider(this.rnd);
       this.group.add(g);
-      this.animals.push({ type: 'glider', obj: g, hang, cx: x + wx * 40, cz: z + wz * 40, ax: -wz, az: wx, wx, wz, span: 220 + this.rnd() * 200, u: this.rnd(), speed: hang ? 11 : 8, alt: (hang ? 70 : 55) + this.rnd() * 50, phase: this.rnd() * TAU, base: this.T.seaLevel, t: 0 });
+      this.animals.push({ type: 'glider', obj: g, hang, cx: x + wx * 40, cz: z + wz * 40, ax: -wz, az: wx, wx, wz, span: 220 + this.rnd() * 200, u: this.rnd(), speed: hang ? 11 : 8, alt: (hang ? 45 : 30) + this.rnd() * 50, phase: this.rnd() * TAU, base: top, t: 0 });
     }
   }
 

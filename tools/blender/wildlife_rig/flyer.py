@@ -133,8 +133,8 @@ def recolor(mode):
         elif mode == 'heron':  # great blue heron: slate blue-grey body, dark flight feathers, pale head
             put(~dark & ~red & ~orange, (0.46, 0.52, 0.60)); put(dark, (0.16, 0.18, 0.22)); put(red, (0.80, 0.80, 0.78)); put(orange, (0.80, 0.62, 0.20), shade=False)
         elif mode == 'brownpelican':  # brown pelican: grey-brown body and wings, dark primaries, pale head, dull bill
-            pale = (lum > 0.5) & ~orange
-            put(pale, (0.45, 0.42, 0.38)); put(orange, (0.45, 0.38, 0.30), shade=False)
+            pale = (lum > 0.22) & (sat < 0.35) & ~orange
+            put(pale, (0.36, 0.33, 0.29)); put(orange, (0.45, 0.38, 0.30), shade=False)
         tex.pixels[:] = out.ravel(); tex.update()
         print('recolor', mode, tex.name)
 if CFG.get('neckband'):
