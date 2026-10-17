@@ -16,10 +16,45 @@ Government work); credit given anyway: "Elevation: U.S. Geological Survey,
 |---|---|---|
 | Rolling Hills (Godfrey, IL) | `assets/courses/rollinghills/dem.*` (1 m over 1.8 km), `far.*` (32 m over 16 km) | Playing area: tile `x74y432` of **IL_10CountyNRCS_D23** (published April 2026). Surround: the same project, then IL_SouthCentral_2021_D21, IL_19County_D24, MO_WestCentral_2018_D19 and others, with Terrarium tiles only where no LiDAR covers. Each file's JSON lists the tiles used. |
 | Whistling Straits, the Straits Course (Haven, WI) | `assets/courses/whistlingstraits/dem.*` (1 m over a 1.3 by 3.9 km rectangle round the holes), `far.*` (32 m over 16 km) | Playing area: **WI_Oshkosh_3Rivers_2018_D19** (the WI_Oshkosh_3Rivers_B2_2018 flight), 99.6% of it; Terrarium tiles for the 0.4% no tile covers. Baked with `--sanity 30`: under the 20 m bluffs the default 15 m check against the coarse Terrarium surface rejected the real beach and put bluff-top heights on it. Surround: the same project, WI_2County_B23 and WI_ManitowocCo_2015. The lake is hydro-flattened at 177.0 m in the LiDAR; its bed was sloped in afterwards (0.35 m at the shore, 1 m per 40 m out, to 30 m), so it is drawn as deep water, not real bathymetry. |
+| Rock Spring (Alton, IL) | `assets/courses/rockspring/dem.*` (1 m over 1.5 km), `far.*` (32 m over 16 km) | Playing area: tiles `x74y432` and `x74y431` of **IL_10CountyNRCS_D23**. Surround: the same project, then MO_WestCentral_2018_D19, IL_MadisonCo_2014, MO_SaintLouis_2017; Terrarium for 88 samples. |
 
 The script ignores any LiDAR sample more than 15 m from the coarse Terrarium
 surface. Tile `x74y431` of IL_10CountyNRCS_D23 has a strip that reads a
 constant 92.3 m along its north edge, on ground near 170 m.
+
+## Pinehurst No. 2 (Pinehurst, NC)
+
+- **Elevation:** the **2024 NC CGIA Lidar DEM: Phase 3, North Carolina
+  Statewide** (NOAA InPort 79627; 3.125 ft / 0.95 m hydro-flattened bare
+  earth from Sanborn's February 2024 leaf-off flight, funded by the North
+  Carolina Center for Geographic Information and Analysis), read as
+  Cloud-Optimized GeoTIFFs from NOAA Digital Coast's public
+  `noaa-nos-coastal-lidar-pds` bucket (`dem/NC_phase3_2024_15636/MooreCoNC/`)
+  by `tools/fetch-lidar.py --noaa`. 16 tiles cover the 2.3 km playing area
+  (`assets/courses/pinehurst2/dem.*`, 1 m); heights converted from US survey
+  feet. The surround (`far.*`) is Terrarium tiles (the NOAA tiles have no
+  overviews). USGS 3DEP has no 1 m DEM here and only a 2001 point cloud;
+  the state's point cloud is behind a login at sdd.nc.gov and was not used.
+  Credit: "NC CGIA / NOAA Office for Coastal Management".
+- **Trees:** the **Meta and World Resources Institute Global Canopy Height
+  Map** (1 m, CC BY 4.0, https://registry.opendata.aws/dataforgood-fb-forests/;
+  Tolan et al. 2024), tile `032003130`, through `tools/fetch-trees.py
+  --chm-raster meta`: 5,336 tree tops with height and crown. Heights come
+  from satellite imagery, a few metres less exact than LiDAR, and the
+  crowns can't separate pine from oak, so the course draws mostly longleaf
+  pine (`THEME_TREES.sandhills`). Credit: "Canopy height © Meta and WRI,
+  CC BY 4.0".
+- **Holes:** OpenStreetMap (ODbL), all 18 holes inside the OSM boundary of
+  "Pinehurst No. 2" (hole refs "1 - #2" … "18 - #2"), with real outlines of
+  greens, fairways (multipolygons), bunkers and the one pond; buildings from
+  OSM footprints (`tools/fetch-buildings.mjs`), the resort clubhouse among
+  them. The 4th and 5th share one mapped fairway, given to both by hand.
+- **Scorecard:** OpenGolfAPI (ODbL), "Pinehurst No. 2": par 72 by hole,
+  stroke indexes, yardages from the longest listed tees (7,551 yd).
+- **Ground colour:** EOxCloudless 2024 (CC BY-NC-SA 4.0), as for the other courses.
+- **Look:** checked against published photographs of the course (USGA,
+  Golf Digest and LINKS coverage of the 2010-11 restoration's sandscapes and
+  the clubhouse); no photographs are copied into the game.
 
 ## Elevation: Terrarium tiles (the other real-terrain courses)
 
@@ -317,6 +352,32 @@ water, by a search over that map. The landmarks (Bethesda Terrace and the
 Angel of the Waters, Bow Bridge, Belvedere Castle, Cleopatra's Needle) are
 modelled in `js/course/lm/centralpark.js` from published descriptions.
 
+## Rock Spring
+
+`assets/courses/rockspring/`: the nine holes of Rock Spring Golf Course in
+Alton's Rock Spring Park (Tom Bendelow, 1912), imported by
+`tools/import-course.mjs --lidar --outlines --course "Rock Spring Golf Course"`:
+hole lines and green outlines from OpenStreetMap (© OpenStreetMap
+contributors, ODbL 1.0). OSM maps no fairways, bunkers or water there: the
+fairways (the mown bands along each hole; hole 1's by hand) and the three
+greenside bunkers (holes 3, 6, 9) are traced from the USGS NAIP aerial
+(`USGSNAIPImagery` ImageServer, about 0.6 m, public domain), checked against
+the 1 m LiDAR hillshade. `dem.*`/`far.*` from USGS 3DEP
+1 m LiDAR (above); `sat.*` (EOxCloudless) as above; `buildings.json` by
+`tools/fetch-buildings.mjs` (OSM footprints) measured by
+`tools/fetch-building-shapes.py` from IL_10CoNRCS_3_D23 (below); the pro
+shop's walls and roof and the greenhouse range's white, translucent and
+rust-red roof runs set from the user's own Apple Maps views (a visual check
+only, not traced or shipped) and NAIP. `trees.json` by `tools/fetch-trees.py
+--ept IL_10CoNRCS_3_D23` (the same 2023 flight read from the public
+usgs-lidar-public Entwine bucket): 9,687 trees, median 16.5 m, tallest 32.6 m.
+The scorecard (par 35; pars, handicaps, blue and red tees) is typed into
+`scorecard.json` from the GolfPass listing,
+https://www.golfpass.com/courses/5007-rock-spring-golf-course/scorecard-and-layout/scorecard-and-layout,
+retrieved 16 October 2026 (the club publishes no card online; OpenGolfAPI has
+none). Its totals, 3,015 and 2,501 yards, match illinoisgolf.com and Rivers
+and Routes.
+
 ## The Seine (Paris)
 
 `assets/landmarks/paris/seine.json`: the Seine's outline, the bridges' OSM
@@ -529,7 +590,7 @@ stereotypes, not Cahokia.
 these courses from the USGS 3DEP aerial LiDAR (public domain), read from the
 public `usgs-lidar-public` Entwine bucket: CA_FEMA_Z4_B1_2018 (Pebble Beach),
 FL_Peninsular_FDEM_StJohns_2018 (TPC Sawgrass), IL_10CoNRCS_3_D23 (Rolling
-Hills). Ground, eave and ridge heights and a 0.75 m roof height map per
+Hills, Rock Spring). Ground, eave and ridge heights and a 0.75 m roof height map per
 building go into `assets/courses/<id>/buildings.json`. Roof colours are
 sampled from USGS The National Map imagery (NAIP, public domain).
 
@@ -608,3 +669,27 @@ logo, trademark, tournament name or photograph of the course ships with it.
   clubhouse found through image search (wisconsingolftrips.com,
   kohlerwisconsin.com, golf.com and others); nothing from them is copied
   into the game.
+## Torrey Pines (South Course)
+
+- Holes, greens, fairways (multipolygon relations), bunkers and the pond at the
+  18th: © OpenStreetMap contributors (ODbL 1.0), inside the OSM boundary
+  "Torrey Pines South Course" (the North Course next door is left out).
+- Scorecard (par, stroke index, black-tee yardages): OpenGolfAPI (ODbL 1.0),
+  course "Torrey Pines South Course", retrieved 2026-10-16.
+- Elevation: USGS 3DEP 1 m bare-earth DEM, CA_SanDiegoCo_D24 with
+  San_Diego_CA_2014_LiDAR (public domain); the sea offshore from the Terrarium
+  tiles (AWS Open Data).
+- Trees: USGS 3DEP point cloud CA_SanDiegoQL2_2014 (public domain), read from the
+  `usgs-lidar-public` Entwine bucket. The flight has no vegetation class, so
+  unclassified returns more than 1.5 m above the ground count as canopy, with
+  OSM building footprints and the cliff faces masked out.
+- Building heights and roofs: the same CA_SanDiegoQL2_2014 flight
+  (tools/fetch-building-shapes.py) over OSM footprints.
+- Ground colour: EOxCloudless 2024 (EOX IT Services GmbH, contains modified
+  Copernicus Sentinel data 2024), CC BY-NC-SA 4.0.
+- The Gliderport (`js/course/lm/torreypines.js`): position from the OSM
+  aerodrome "Torrey Pines Gliderport"; the flight park, windsock and
+  paragliders are modelled, not surveyed.
+- Hole notes: the 2021 U.S. Open hole-by-hole guide (NBC Sports / Golf
+  Channel), PGA.com's spotlight on the 3rd, and Links Magazine on the 12th
+  (the hardest hole of the 2008 U.S. Open, scoring average 4.58).

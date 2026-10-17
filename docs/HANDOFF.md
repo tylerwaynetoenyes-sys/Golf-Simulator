@@ -247,6 +247,27 @@ add `&manual` to drive frames with `window.__advance(seconds)`.
   (sawgrass:17, rollinghills:1, pebble:7, whistlingstraits:3: 60 fps,
   174–247 calls, ≤ 1.44M triangles at address).
 
+## Pinehurst No. 2 (October 16)
+
+- `?play=pinehurst2`: all 18 holes from OSM inside "Pinehurst No. 2" (refs
+  "1 - #2" ... "18 - #2"), par 72 from OpenGolfAPI, on the 2024 NC Phase 3
+  LiDAR DEM (0.95 m) from NOAA Digital Coast. USGS 3DEP has no 1 m DEM there,
+  so `tools/fetch-lidar.py --noaa <dataset>/<county>` reads NOAA's COGs
+  (STAC-indexed, feet converted, tile seams filled). The greens' turtleback
+  fall-off (0.4-0.7 m within 6 m of the edge) is in the survey.
+- Trees come from `tools/fetch-trees.py --chm-raster meta` (the Meta/WRI
+  canopy-height map). NC's point cloud needs a login, so there are no LiDAR
+  buildings: OSM footprints in the 'carolina' style.
+- The 'sandhills' theme (`js/course/courseWorld.js`) draws a band of pale sand
+  with scattered wiregrass along play, then pine straw under the pines. The
+  lie stays 'rough' (no new surface type).
+- `tools/import-course.mjs` now asks Overpass for `out geom`, because
+  `out tags geom` dropped every multipolygon fairway.
+- iPad budget: Pinehurst's 120+ bunkers made 300-770k insert cells per hole,
+  so the Whistling Straits bunker cell budget is in (the same hunks as
+  1b6ecdd). At address (Medium): 13 = 226 calls / 1.13M, 11 = 203 / 1.15M,
+  16 = 264 / 1.18M, 12 = 288 / 1.06M.
+
 ## Next steps
 
 - Long and middle irons land 2–4° flatter than Trackman; closing that needs
