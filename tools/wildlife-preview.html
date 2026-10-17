@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <title>Wildlife preview</title>
   <!-- Every wildlife model with its procedural animation (js/scene/fauna.js):
-       tools/wildlife-preview.html?kind=gator&gait=1&head=-1&flap=1 -->
+       tools/wildlife-preview.html?kind=gator&clip=slide (or &t=1.2 to hold a frame; &cam=x,y,z,tx,ty,tz) -->
   <script type="importmap">
     { "imports": { "three": "../vendor/three/three.module.js", "three/addons/": "../vendor/three/addons/" } }
   </script>
@@ -14,10 +14,10 @@
 <div id="l"></div>
 <script type="module">
 import * as THREE from 'three';
-import { Herd, uFauna, preloadFauna, Beast, RIGS, preloadRigs } from '../js/scene/fauna.js';
+import { Beast, RIGS, preloadRigs } from '../js/scene/fauna.js';
 
 const q = new URLSearchParams(location.search);
-const kinds = (q.get('kind') || 'gator,deer_buck,deer_doe,sheep,squirrel,goose,mallard,heron,egret,sealion,harborseal,goose_fly,eagle,gull').split(',');
+const kinds = (q.get('kind') || 'gator,doe,buck,sheep,squirrel,goose,mallard,heron,egret,sealion,harborseal').split(',');
 const R = new THREE.WebGLRenderer({ antialias: true });
 R.setSize(innerWidth, innerHeight); R.setPixelRatio(devicePixelRatio); R.shadowMap.enabled = true;
 R.outputColorSpace = THREE.SRGBColorSpace;
@@ -32,11 +32,8 @@ sun.shadow.camera.left = sun.shadow.camera.bottom = -12; sun.shadow.camera.right
 scene.add(sun);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x5d7a3a, roughness: 1 }));
 ground.receiveShadow = true; scene.add(ground);
-const tints = { hawk: ['eagle', { tint: 0xc79a72 }], pelican: ['gull', { tint: 0x8a7e6e, grey: 0.6 }], greysquirrel: ['squirrel', { tint: 0xb4aca4, grey: 0.85 }] };
-const head = +(q.get('head') || 0), gait = +(q.get('gait') || 0), flap = +(q.get('flap') || 0);
-await preloadFauna(kinds.map((k) => tints[k]?.[0] || k));
 await preloadRigs(kinds);
-const herds = [], beasts = [];
+const beasts = [];
 const clip = q.get('clip') || 'idle', at = q.get('t');
 let x = -(kinds.length - 1) * 1.6;
 for (const k of kinds) {
@@ -46,22 +43,14 @@ for (const k of kinds) {
     scene.add(b.root); beasts.push(b); b.play(clip, { offset: 0 });
     x += 3.2; continue;
   }
-  const [kind, o] = tints[k] || [k, {}];
-  const h = new Herd(kind, 1, o);
-  const i = h.add();
-  const air = /fly|eagle|gull|hawk|pelican/.test(k);
-  h.set(i, x, air ? 1.5 : 0, 0, +(q.get('yaw') || -Math.PI / 2));
-  h.pose(i, 0, head, gait, flap);
-  scene.add(h.mesh); herds.push(h);
   x += 3.2;
 }
 ctl.target.set(0, 0.5, 0);
 document.getElementById('l').textContent = kinds.join('  ·  ');
-const clock = new THREE.Clock();
+const clock = new THREE.Timer();
 window.__ready = false;
 R.setAnimationLoop(() => {
-  const dt = clock.getDelta();
-  uFauna.uTime.value = clock.elapsedTime;
+  clock.update(); const dt = clock.getDelta();
   for (const b of beasts) { if (at != null) { b.mixer?.setTime(+at); } else b.update(dt); }
   window.__beasts = beasts;
   ctl.update();
